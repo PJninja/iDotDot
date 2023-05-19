@@ -4,110 +4,105 @@
 	<meta charset="UTF-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Document</title>
+	<title>iDotDot</title>
 
-	<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lato&display=swap" rel="stylesheet"> 
 
 	<style>
+
+	html{
+		scroll-behavior: smooth;
+	}
+
 		body {
-			margin: 0;
+			margin: 0px;
 			font-family: 'Lato', sans-serif;
 			color: white;
 			background: #202731;
 			overflow-x: hidden;
 		}
 
+		#menu{
+			height: 100vh;
+			display: flex;
+			align-items: center;
+		}
+
+		#header{
+			font-family: 'Lato', sans-serif;
+			color: #455263;
+			font-size: clamp(1rem, 1vw, 1rem);
+			margin-left: clamp(4rem, 6vw, 8rem);
+			position: absolute
+		}
+		.sub-header{
+			font-size: clamp(1rem, 0.5vw, 0.5rem);
+		}
+
+		#menu-items {
+			margin-left: clamp(4rem, 20vw, 48rem);
+		}
+		#menu-items:hover > .menu-item {
+			opacity: 0.3;
+		}
+		#menu-items:hover > .menu-item:hover {
+			opacity: 1;
+		}
+
+		.menu-item{
+			color: white;
+			font-size: clamp(1rem, 6vw, 6rem);
+			font-family: 'Lato', sans-serif;
+
+			display: block;
+			text-decoration: none;
+			padding: clamp(0.25rem, 0.5vw, 1rem) 0rem;
+		}
+
+		.return{
+			color: gray;
+			font-family: 'Lato', sans-serif;
+			text-decoration: none;
+			padding: 10px 15vw;
+		}
+
+		#menu-items {
+			margin-left: clamp(4rem, 20vw, 48rem);
+			position: relative;
+			z-index: 2;
+		}
+
+		#menu-background-pattern{
+			height: 100%;
+			width: 100%;
+			background-image: url('./polygon-scatter-haikei-large.svg');
+			opacity: 0.5;
+			background-position: 0% 0%;
+			background-size: 240vmin 240vmin;
+			position: absolute;
+			left: 0px;
+			top: 0px;
+			z-index: 1;
+
+			transition: opacity 2000ms,
+				background-size 2000ms;
+		}
+
+		#menu-items:hover ~ #menu-background-pattern{
+			background-size: 150vmin 150vmin;
+			opacity: 0.25;
+		}
+
+		
 		section {
 			position: relative;
 			display: flex;
 			flex-direction: column;
 			align-items: center;
 			min-height: 400px;
-			padding: 100px 20vw;
-		}
-
-		.blue {
-			background: darkblue;
-		}
-
-		.red {
-			background: #57130c;
-			z-index: -3;
-		}
-
-		.green {
-			background: #0c5a14;
-		}
-
-		.dark {
-			background: #0f0f10;
-		}
-
-		.pink {
-			background: palevioletred;
-		}
-
-		.curve {
-			position: absolute;
-			height:  255px;
-			width: 100%;
-			bottom: 0;
-		}
-
-		.curve::before {
-			content: '';
-			display: block;
-			position: absolute;
-			border-radius: 100% 50%;
-			width: 55%;
-			height: 100%;
-			background-color: #57130c;
-			transform: translate(85%, 60%);
-		}
-		.curve::after {
-			content: '';
-			display: block;
-			position: absolute;
-			border-radius: 100% 50%;
-			width: 55%;
-			height: 100%;
-			background-color: darkblue;
-			transform: translate(-4%, 40%);
-			z-index: -1;
-		}
-
-		.bubble::after{
-			content: '';
-			border-top-left-radius: 50% 100%;
-			border-top-right-radius: 50% 100%;
-			position: absolute;
-			bottom: 0;
-			height: 85%;
-			width: 100%;
-			background-color: #0f0f10;
-			z-index: -1;
-		}
-
-		.wave {
-    		position: absolute;
-    		top: 0;
-   			left: 0;
-    		width: 100%;
-    		overflow: hidden;
-    		line-height: 0;
-		}
-
-		.wave svg {
-    		position: relative;
-    		display: block;
-    		width: calc(160% + 1.3px);
-    		height: 178px;
-		}
-
-		.wave .shape-fill {
-    		fill: #202731;
+			padding: 10px 15vw;
 		}
 
 		.spacer {
@@ -119,7 +114,20 @@
 		}
 
 		.layer1{
-			background-image: url('./layer1.svg');
+			background-image: url('./divider1.svg');
+		}
+		.layer2{
+			background-image: url('./divider2.svg')
+		}
+		.layer3{
+			background-image: url('./divider3.svg')
+		}
+
+		.dots{
+			background-image: radial-gradient(
+				rgba(2255, 255, 255, 0.1) 9%,
+				transparent 6%
+			);
 		}
 
 		.logo{
@@ -131,56 +139,61 @@
 			opacity: 1;
 		}
 
+		iframe {
+			outline: none;
+			display: block;
+    		border: 3px outset #2e3948;
+    		width: 100%;
+			height: 90vh;
+		}
+
 	</style>
 </head>
+
+<div id="header">
+	<h1>iDotDot</h1>
+	<h1 class="sub-header">by Anthony Liparulo</h1>
+</div>
+
+<div id="menu">
+	<div id="menu-items">
+		<a href="#post1" class="menu-item">Home</a>
+		<a href="#post1" class="menu-item">First Post</a>
+		<a href="#post2" class="menu-item">Second Post</a>
+		<a href="#post2" class="menu-item">Third Post</a>
+		<a href="#post2" class="menu-item">More...</a>
+	</div>
+	<div id="menu-background-pattern"></div>
+</div>
+
 <body>
-	<section class = "blue">
-		<h1>Nice Curves</h1>
-		<p>
-			Lorem ipsum dolor sit, amet consectetur adipisicing elit. Doloribus quis qui ipsa sint reiciendis vel nemo repellendus quaerat dolorum ratione ut, 
-			eum eveniet explicabo aut dolorem illo quibusdam exercitationem. Accusantium!
-		</p>
-		<div class="curve"></div>
-	</section>
-	<section class = "red">
-		<h1>Nice Curves</h1>
-		<p>Omnis eveniet a inventore expedita assumenda eum cum in ipsa harum corrupti, labore, incidunt sint quasi sunt unde, culpa nostrum nobis delectus. Ex aperiam ipsam eos reprehenderit qui. Aliquam, facere.</p>
-	</section>
-	<section class = "dark">
-		<h1>Nice Curves</h1>
-		<p>Commodi distinctio ipsum, voluptas excepturi similique quisquam debitis veritatis. Sequi vitae dolorum perferendis nisi quia similique asperiores, iusto sed numquam. Perspiciatis laboriosam aut, culpa modi facere fugiat aperiam repellat cumque.</p>
-	</section>
-	<section>
-		<h1>Nice Curves</h1>
-		<p>Delectus doloremque sed vel suscipit qui dolores tenetur nulla maxime fugit cupiditate eaque quasi corrupti reiciendis neque voluptates fugiat excepturi consequuntur animi, maiores omnis distinctio ipsam? Similique praesentium pariatur beatae.</p>
-	</section>
+	<div class = "spacer layer2"></div>
+
+	<div id="post1">
+		<section>
+			<h1> FIRST POST May 19, 2023</h1>
+			<a href="#menu" class="return">Back To Top</a>
+			<iframe id='inlineBlogPost'
+				src='./firstpost.html'>
+				Sorry your browser does not viewing this blog post.
+			</iframe>
+		</section>
+	</div>
 
 	<div class = "spacer layer1"></div>
 
-	<section class = "logo">
-		<h1>Nice Curves</h1>
-		<p>Recusandae nam autem explicabo, tempore officia culpa accusamus deleniti corporis architecto provident nemo eum dolor debitis asperiores molestiae facilis neque ducimus. Eos sed dolorem aliquam, quasi rem id nobis maiores.</p>
-	</section>
-	<section class ="red">
-		<h1>Nice Curves</h1>
-		<p>
-			Tenetur, nemo dolorem. Dolor minus porro voluptate, consectetur fugit mollitia enim aut cupiditate optio. Ex, doloribus perferendis. 
-			Rem quasi deserunt quos ex nobis autem dignissimos libero dicta? Adipisci, doloribus officia.
-		</p>
-		<div class="wave">
-			<svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-				<path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" class="shape-fill"></path>
-			</svg>
-		</div>
-	</section>
-	<section class = "bubble">
-		<h1>Nice Curves</h1>
-		<p>Odit quidem deserunt quasi voluptatibus, nam, laborum animi incidunt veritatis quas quis minus hic laudantium perferendis cum, unde harum quod commodi nostrum? Vero eius porro ipsam aliquam error inventore sint.</p>
-	</section>
-	<section class = "dark">
-		<h1>Nice Curves</h1>
-		<p>Earum id molestiae molestias blanditiis saepe nihil eum ab quia sapiente reiciendis! Numquam nesciunt inventore quam amet, nisi iste omnis tempora esse dolore. Nulla tenetur enim suscipit inventore, debitis explicabo?</p>
-	</section>
-	
+	<div id="post2">
+		<section>
+			<h1> SECOND POST May 19, 2023</h1>
+			<a href="#menu" class="return">Back To Top</a>
+			<iframe id='inlineBlogPost2'
+				src='./firstpost.html'>
+				Sorry your browser does not viewing this blog post.
+			</iframe>
+		</section>
+	</div>
+
+	<div class = "spacer layer3"></div>
+
 </body>
 </html>
