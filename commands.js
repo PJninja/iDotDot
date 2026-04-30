@@ -26,9 +26,9 @@ const COMMANDS = {
   'theme cyan':  () => { setTheme('cyan');  return { flash: `theme: cyan   ${SWATCH}` }; },
   'theme white': () => { setTheme('white'); return { flash: `theme: white  ${SWATCH}` }; },
   'theme red':   () => { setTheme('red');   return { flash: `theme: red    ${SWATCH}` }; },
-  'themes':      () => ({ flash: `themes: ${THEME_NAMES.join(' | ')}` }),
+  'themes':      () => ({ flash: `Use 'theme <color>' to swap: ${THEME_NAMES.join(' | ')}` }),
   'play cube11': () => ({ game: 'cube11' }),
-  'help':        () => ({ flash: 'commands: cd home | cd blog | cd contact | cd projects | themes | play cube11 | clear' }),
+  'help':        () => ({ flash: 'commands: cd home | cd blog | cd contact | cd projects | themes | clear' }),
   'clear':       () => ({ clear: true }),
   'cls':         () => ({ clear: true }),
 };
