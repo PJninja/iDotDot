@@ -17,7 +17,7 @@ export const PROJECTS = [
     title: "UHRB",
     desc: "Unspeakable Horror Race Betting - A web game for betting on races between lovcraftian abominations",
     tags: ["web", "game", "js"],
-    links: { github: "https://github.com/PJninja/UHRB", play: "https://uhrb.netlify.app" },
+    links: { github: "https://github.com/PJninja/UHRB", play: "https://uhrb.idotdot.com/" },
     file: "projects/uhrb-project.html"
   }
 ];
