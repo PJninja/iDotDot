@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>iDotDot — iDotDot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="project.css">
+</head>
+<body class="theme">
+
+  <nav id="nav" class="nav">
+    <a href="../index.html" class="nav-title">
+      iDotDot
+    </a>
+    <ul class="nav-links">
+      <li><a href="../index.html#projects" aria-label="Projects"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="14" height="10"/><rect x="3" y="3" width="10" height="6"/><line x1="8" y1="11" x2="8" y2="13"/><line x1="4" y1="13" x2="12" y2="13"/></svg></a></li>
+      <li><a href="../blog.html" aria-label="Blog"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" shape-rendering="crispEdges" aria-hidden="true"><rect x="2" y="1" width="10" height="14"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="8" x2="10" y2="8"/><line x1="4" y1="11" x2="8" y2="11"/></svg></a></li>
+      <li><a href="../contact.html" aria-label="Contact"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="3" width="14" height="10"/><polyline points="1,3 8,9 15,3"/></svg></a></li>
+    </ul>
+  </nav>
+
+  <div class="project-wrap">
+
+    <a href="../index.html#projects" class="back-link">&lt; back to projects</a>
+
+    <h1>iDotDot</h1>
+
+    <div class="project-meta">
+      <span class="tag">HTML</span>
+      <span class="tag">CSS</span>
+      <span class="tag">JS</span>
+      <span class="tag">Static</span>
+      <span class="meta-date dim">2026</span>
+    </div>
+
+    <div class="project-body">
+
+      <!-- ── SUMMARY ──────────────────────────────────────────── -->
+      <p>A static portfolio and playground site built from scratch with no frameworks and no build step — just HTML, CSS, and vanilla JavaScript with a retro DOS/CRT aesthetic.</p>
+
+
+      <!-- ── BACKGROUND ────────────────────────────────────────── -->
+      <h3>Background</h3>
+      <p>
+        I wanted a portfolia site that was <em>me</em> — not based on a theme, not a template, not a SaaS portfolio builder.
+        I must preface: I do not come from web development, so I used this as a learning experience - and the structure is pretty messy.
+        The DOS terminal aesthetic stems from my system and app-level expertise.
+        Sprinkled around are also little <strong>easter eggs</strong>, a by-product of my game design passion.
+      </p>
+      <p>
+        The constraint of zero dependencies and no build tooling was intentional.
+        Frameworks are fine — I use them plenty elsewhere — but for a personal site I wanted to showcase my capability.
+      </p>
+
+
+      <!-- ── DESIGN ─────────────────────────────────────────────── -->
+      <h3>Design</h3>
+      <p>
+        The visual language is phthalo green on black, monospaced type throughout, and CRT scanlines applied in pure CSS.
+        Every color is a CSS variable on <code>:root</code> so the entire palette can be swapped at runtime — which is exactly what the theme switcher does.
+        The priority was to establish a "tone" and stick with it. Only breaking it for real accessbility purposes.
+        Some functionality exists purely just to force me to learn something new. For example: I never worked with web canvas drawing before.
+        Heading elements run through a glitch pass on an interval, randomly corrupting one to three characters for ~300ms to simulate phosphor decay.
+      </p>
+      <div class="callout">
+        <p>Type <code>theme amber</code>, <code>theme cyan</code>, <code>theme white</code>, or <code>theme red</code> into the terminal footer to switch palettes. The choice persists in <code>localStorage</code> across pages.</p>
+      </div>
+
+
+      <!-- ── TERMINAL FOOTER ─────────────────────────────────────── -->
+      <h3>Terminal Footer</h3>
+      <p>
+        The footer was made for... well, me. I have no rhyme or reason as to why it exists or why it does what it does. But I really like it.
+        It reads like a shell prompt and reacts to everything happening in the page above it.
+        Hovering a link or project card auto-completes a <code>cd</code> command reflecting the navigation target.
+        Selecting text on the page shows a <code>copy "..."</code> preview.
+        Clicking the footer activates keyboard input — type characters, hit <strong>Enter</strong> to run a command, <strong>Escape</strong> to clear.
+      </p>
+      <p>
+        A small <code>commands.js</code> module handles dispatch: built-in commands like <code>cd home</code>, <code>theme 'name'</code>,
+        and a few easter eggs route to navigation, theme changes, flash messages, or dynamically imported game modules.
+        Unknown input flashes an error. The whole system is about 130 lines and zero dependencies.
+      </p>
+
+
+      <!-- ── ARCHITECTURE ────────────────────────────────────────── -->
+      <h3>Architecture</h3>
+      <p>
+        Content lives in <code>data.js</code> — two arrays, <code>PROJECTS</code> and <code>POSTS</code>.
+        Adding a project is two steps: create the HTML file, add one object to the array.
+        <code>main.js</code> renders the project grid and post list from that data at runtime; there is no static generation step.
+      </p>
+      <ul>
+        <li><strong><code>main.js</code></strong> — renders the project grid and post list, runs the typewriter effect</li>
+        <li><strong><code>footer.js</code></strong> — terminal footer interactions and keyboard handling</li>
+        <li><strong><code>commands.js</code></strong> — command dispatch and routing logic</li>
+        <li><strong><code>glitch.js</code></strong> — periodic character corruption on headings</li>
+        <li><strong><code>theme.js</code></strong> — reads/writes <code>localStorage</code>, applies theme class on load</li>
+        <li><strong><code>data.js</code></strong> — the only file you need to touch to add content</li>
+      </ul>
+      <p>
+        Project detail pages each import a shared <code>project-shell.js</code> that re-initializes the footer with the correct prompt path,
+        keeping the terminal context consistent as you navigate between pages. I want to look into removing even more duplicate logic between project pages, but that's for a later time.
+      </p>
+
+
+      <!-- ── TYPEWRITER ──────────────────────────────────────────── -->
+      <h3>Hero Typewriter</h3>
+      <p>
+        The hero subtitle cycles through a list of descriptors using a simple async loop — type forward at 80ms per character,
+        hold for 3 seconds, erase at 45ms per character, repeat.
+        No library. The list includes the expected ones (<em>software developer</em>, <em>problem solver</em>) and a few that are less expected.
+      </p>
+
+
+      <!-- FINAL THOUGHTS -->
+      <h3>Final Thoughts</h3>
+      <p>
+        I actually enjoyed restricting myself to no dependencies or external libraries.
+        It means no install, no compile step. Open <code>index.html</code> in a browser.
+        ES6 modules require a local HTTP server for proper <code>import</code> resolution in most browsers:
+      </p>
+      <pre><code>npx serve .</code></pre>
+      <p>
+        That's it. No <code>node_modules</code>, no config files, no bundler.
+        There were a lot of areas of learning that pissed me off about web development.
+        But overall it was a great experience, and I'll keep adding to this site.
+      </p>
+
+    </div><!-- /.project-body -->
+
+
+    <!-- ── ACTION BUTTONS ──────────────────────────────────────── -->
+    <div class="project-action-links">
+      <a href="https://github.com/PJninja/iDotDot" target="_blank" rel="noopener" class="btn-primary">GITHUB</a>
+      <a href="https://www.idotdot.com/" target="_blank" rel="noopener">VIEW</a>
+    </div>
+
+  </div><!-- /.project-wrap -->
+
+  <script type="module">
+    import { initProject } from './project-shell.js';
+    initProject({ footerPrompt: 'C:\\iDotDot\\projects\\idotdot> ' });
+  </script>
+</body>
+</html>
