@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unspeakable Horrors Race Betting — iDotDot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="project.css">
+</head>
+<body class="theme">
+
+  <nav id="nav" class="nav">
+    <a href="../index.html" class="nav-title">
+      iDotDot
+    </a>
+    <ul class="nav-links">
+      <li><a href="../index.html#projects" aria-label="Projects"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="14" height="10"/><rect x="3" y="3" width="10" height="6"/><line x1="8" y1="11" x2="8" y2="13"/><line x1="4" y1="13" x2="12" y2="13"/></svg></a></li>
+      <li><a href="../blog.html" aria-label="Blog"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" shape-rendering="crispEdges" aria-hidden="true"><rect x="2" y="1" width="10" height="14"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="8" x2="10" y2="8"/><line x1="4" y1="11" x2="8" y2="11"/></svg></a></li>
+      <li><a href="../contact.html" aria-label="Contact"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="3" width="14" height="10"/><polyline points="1,3 8,9 15,3"/></svg></a></li>
+    </ul>
+  </nav>
+
+  <div class="project-wrap">
+
+    <a href="../index.html#projects" class="back-link">&lt; back to projects</a>
+
+    <h1>Unspeakable Horrors Race Betting</h1>
+
+    <div class="project-meta">
+      <span class="tag">Svelte 5</span>
+      <span class="tag">Fastify</span>
+      <span class="tag">WebSocket</span>
+      <span class="tag">Game</span>
+      <span class="tag">Node.js</span>
+      <span class="meta-date dim">2026</span>
+    </div>
+
+    <div class="project-body">
+
+      <!-- ── SUMMARY ──────────────────────────────────────────── -->
+      <p>A browser-based betting game where players wager "candies" on procedurally generated eldritch monsters racing each other.</p>
+
+
+      <!-- ── BACKGROUND ────────────────────────────────────────── -->
+      <h3>Background</h3>
+      <p>
+        I decided I needed to get better at front-end web development, and wanted to improve my back-end implementation know-how.
+        The best way for me to learn is by building a project that excites me and forces me to solve the specific problems I want to get better at.
+        I needed to build a full-stack web app with real-time features and (for the fun of it) procedural content generation.
+        The goal was laid out, next was to come up with the premise...
+      </p>
+      <p>
+        It started as a joke — what if there was a horse racing game but every horse was a cosmic horror? 
+        It grew into a full-stack experiment in procedural content generation, real-time multiplayer state, and deceptive UI design. 
+        The goal was a game that feels alive and mysterious: players should never see raw numbers, 
+        but should gradually learn to read the monsters the same way a gambler learns to read a horse.
+      </p>
+
+      <!-- ── SCREENSHOTS ──────────────────────────────────────── -->
+      <h3>Screenshots</h3>
+      <div class="screenshot-grid">
+        <img src="images/UHRB_home.png" alt="Betting lobby screen">
+        <img src="images/UHRB_bio.png" alt="Monster bio screen">
+        <img src="images/UHRB_race.png" alt="Live race screen">
+        <img src="images/UHRB_results.png" alt="Results and payout screen">
+      </div>
+
+      <!-- ── HOW IT WORKS ─────────────────────────────────────── -->
+      <h3>How It Works</h3>
+      <ul>
+        <p>
+          <li>Races trigger every 30–300 seconds</li>
+          <li>Pitting 4–6 uniquely generated creatures against one another</li>
+          <li>Players can read their bios, decode hidden stat signals, and bet on a winner</li>
+          <li>Every monster is generated server-side from seeded catalog entries with hidden letter tags that encodes a stat category</li>
+          <li>A single server so everyone sees the same Horrors, the same race outcomes, and the same betting pool</li>
+        </p>
+        <div class="callout">
+          <p>No stat numbers are ever shown to the player. 
+          The entire information layer — power tier, dominant stat, crowd sentiment, return odds — is communicated through prose, 
+          glowing text effects, and alchemical symbols. Build intuition over time by cross-referencing bios with race outcomes.</p>
+        </div>
+        <li><strong>Structure</strong> — a <code>Svelte 5</code> SPA and a <code>Fastify</code> REST + WebSocket API. The server drives everything; the client just reacts.</li>
+        <li><strong>Race state machine</strong> — server cycles <code>waiting → racing → finished</code> and broadcasts each transition over WebSocket. Client navigation is forced by state (e.g. entering <code>racing</code> hard-redirects any page to <code>/race</code>).</li>
+        <li><strong>Anti-cheat</strong> — the <code>POST /api/race/:id/payout/validate</code> endpoint ignores whatever the client claims and recomputes <code>bet × odds</code> from server-stored data. You can't fake a win.</li>
+        <li><strong>Two-simulation design</strong> — the server picks the authoritative winner; the client runs a separate visual simulation driven by <code>serverRankings</code> from the WebSocket payload. Monsters always cross the finish line in the correct order, but the race itself still looks contested.</li>
+      
+      </ul>
+
+      <!-- ── HIDDEN STAT SYSTEM ────────────────────────────────── -->
+      <h3>The Hidden Stat System</h3>
+      <p>
+        Each Horror has four stats — Speed, Endurance, Madness, and Strength — that determine its performance in the race (with a little touch of randomization as well).
+        Each Horror is constructed from several catalog entries such as: Origin, Physical Traits, Race Style, Temperment, etc.
+        Each catalog entry is tagged with a Letter (A, C, G, T) that corresponds to a stat category. Each letter adds to that stat's total.
+        Luck is derived from letter variety — the number of unique stat letters present across all entries.
+        Using this system, the bio page for Horrors actually can describe the detailed stats of the Horror without ever showing raw numbers. 
+        Given time and attention, this can be "decoded" by players to understand each horror's race potential.
+      </p>
+
+      <p>
+        There is a 'value' attached to each Horror that is hidden but contributes to the odds calculation about %70, while their stats contribute about %30.
+        This means that a Horror with low stats may be favored and thus not have a good return, giving more liklihood of an upset and encouraging players to consider more than just the visible stat signals when placing bets.
+      </p>
+
+      <p>
+        There is a <code>RichText</code>system for Horror bios that allows for inline styling of specific words or phrases. 
+        Each stat category has a corresponding RichText style that visually hints at the monster's strengths. 
+        For example, a monster with high Speed (A) might have more <code>&lt;glow&gt;</code> tags in its bio, 
+        while a high Endurance (C) monster might have more <code>&lt;ancient&gt;</code> tags. 
+        This creates a layered information system where players can pick up on visual cues.
+      </p>
+
+      <div class="callout">
+        <p>Legendaries are injected at a 5% chance per race and are capped at 1.5× their base stat total to prevent total stat dominance — they are favored but not guaranteed to win.</p>
+      </div>
+
+
+      <!-- ── SIMULATION ────────────────────────────────────────── -->
+      <h3>Simulation Tool</h3>
+      <p>
+        <strong>Problem: How can I confirm the balance of the existing features?</strong>
+        <u2>Solution: Since all generation and calculation is separate, create a simulation tool to run through 1000's of iterations and report results.</u2>
+        The simulator is a standalone CLI that runs hundreds or thousands of races with no server, 
+        calling the <code>generateHorrors</code>, <code>calculateOdds</code>, and <code>simulateRace</code> 
+        directly against the same production logic. Due to the previous winner returning as champion, 
+        it can identify a dynasty mechanic that only shows up at scale. It is fully deterministic using <code>--seed</code> arg, 
+        useful for before/after comparisons when tuning weights.
+      </p>
+      <div class="callout">
+      <p>This tool helped identify that the Madness stat was too influential on outcomes, leading to a rework of the formula to reduce its impact and ensure that high-Madness monsters are more volatile but not strictly more likely to win.</p>
+      </div>
+      <pre><code>node server/scripts/simulate.js --races 1000 --quiet
+node server/scripts/simulate.js --races 500 --seed my-seed --quiet
+node server/scripts/simulate.js --races 1000 --format csv --output results.csv</code></pre>
+
+      <!-- ── TECH STACK ────────────────────────────────────────── -->
+      <h3>Stack</h3>
+      <ul>
+        <li><strong>Frontend</strong> — <code>Svelte 5</code>, <code>svelte-spa-router</code>, <code>Vite</code></li>
+        <li><strong>Backend</strong> — <code>Fastify</code>, <code>@fastify/websocket</code>, <code>@fastify/rate-limit</code></li>
+        <li><strong>No database</strong> — in-memory session store, 24-hour TTL, hourly purge</li>
+        <li><strong>Bet history</strong> — <code>localStorage</code>, capped at 50 races</li>
+        <li><strong>Logging</strong> — <code>Pino</code>, structured + module-labeled, level-controlled via <code>LOG_LEVEL</code></li>
+        <li><strong>Tests</strong> — >150 total across both packages, <code>Vitest 2.x</code></li>
+      </ul>
+
+      <!-- AI USE -->
+      <h3>AI Use</h3>
+      <u1>
+        <li>Strongly assisted with teaching me front-end implementation after the design was finalized</li>
+        <li>Brainstormed tool for handling procdural generation of the horrors</li>
+        <li>Created documentation and flavor text for the horrors</li>
+        <li>Created %75 of the unit tests based on the existing test suite</li>
+        <li>Added <code>Pino</code> and log calls throughout</li>
+        <li>Identified performance bottlenecks and areas for improvement</li>
+      </u1>
+
+      <!-- FINAL THOUGHTS -->
+      <h3>Final Thoughts</h3>
+      <p>
+        Coming from system-level / application development, this project was a great learning experience. 
+        The real-time networking, procedural content generation, and hidden information design were all things I have done before and am comfortable with.
+        But the front-end implementation was a new challenge that forced me to learn how to build UI and manage client-side state effectively.
+        In the end, I am happy with how it turned out - but I still <strong>hate</strong> web development... just a little less than before.
+      </p>
+    </div><!-- /.project-body -->
+
+
+    <!-- ── ACTION BUTTONS ──────────────────────────────────────── -->
+    <div class="project-action-links">
+      <a href="#" target="_blank" rel="noopener" class="btn-primary">GITHUB</a>
+      <a href="#" target="_blank" rel="noopener">LIVE DEMO</a>
+    </div>
+
+  </div><!-- /.project-wrap -->
+
+  <script type="module">
+    import { initProject } from './project-shell.js';
+    initProject({ footerPrompt: 'C:\\iDotDot\\projects\\uhrb> ' });
+  </script>
+</body>
+</html>
