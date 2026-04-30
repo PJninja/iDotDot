@@ -38,7 +38,7 @@ tbd
 
 ## PROJECT STRUCTURE
 
-```
+```cs
 index.html          Homepage — hero + projects grid + blog list
 style.css           Global styles and CSS variables (theme)
 main.js             Renders project cards and blog post list from data.js
@@ -53,11 +53,13 @@ posts/              One HTML file per blog post
 ```
 
 ### Adding a project
+
 1. Create `projects/your-project.html` (copy `project-alpha.html` as a template).
 2. Add an entry to the `PROJECTS` array in `data.js` with `file: "projects/your-project.html"`.
    Set `file: null` to show a card without a detail page.
 
 ### Adding a blog post
+
 1. Create `posts/your-post.html` (copy `hello-world.html` as a template).
 2. Add an entry to the `POSTS` array in `data.js` with the matching `file` path.
 
@@ -72,14 +74,16 @@ All colors are defined as CSS variables on `:root` in `style.css` for easy adjus
 
 Follows the [Google HTML/CSS Style Guide](https://google.github.io/styleguide/htmlcssguide.html). Key rules:
 
-**HTML**
+### HTML
+
 - `<!doctype html>` and `charset="utf-8"` — always lowercase
 - No inline styles — all styling in `style.css` or a page-level `<style>` block
 - No `type` attribute on `<link>` or `<script>` tags (exception: `type="module"` is required for ES modules)
 - No unnecessary entity references — use literal characters except where `<` or `&` must be escaped
 - Double quotes for all HTML attribute values
 
-**CSS**
+### CSS
+
 - Class selectors only — no ID selectors (e.g. `.nav`, not `#nav`)
 - Declarations sorted alphabetically within each rule block
 - Hyphen-delimited class names (`kebab-case`)
