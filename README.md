@@ -9,7 +9,8 @@ This is a static website built with HTML, CSS, and JavaScript featuring a retro 
 - Open `index.html` directly in your browser.
 - For proper ES6 module resolution in some browsers, consider using a local HTTP server:
   - You can use any static file server, e.g., `npx serve .` or the VS Code Live Server extension.
-
+  - Or run `dev.ps1` via PowerShell on Windows.
+  
 ## Key Files
 
 - **index.html**: Homepage displaying hero section, projects grid, and blog list.
