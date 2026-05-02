@@ -40,95 +40,58 @@
     <div class="project-body">
 
       <!-- ── SUMMARY ──────────────────────────────────────────── -->
-      <p>A static portfolio and playground site built from scratch with no frameworks and no build step — just HTML, CSS, and vanilla JavaScript with a retro DOS/CRT aesthetic.</p>
-
+      <p>A static portfolio and playground built from scratch — no frameworks, no build step. Just HTML, CSS, and vanilla JavaScript with a retro DOS/CRT aesthetic.</p>
 
       <!-- ── BACKGROUND ────────────────────────────────────────── -->
       <h3>Background</h3>
-      <p>
-        I wanted a portfolia site that was <em>me</em> — not based on a theme, not a template, not a SaaS portfolio builder.
-        I must preface: I do not come from web development, so I used this as a learning experience - and the structure is pretty messy.
-        The DOS terminal aesthetic stems from my system and app-level expertise.
-        Sprinkled around are also little <strong>easter eggs</strong>, a by-product of my game design passion.
-      </p>
-      <p>
-        The constraint of zero dependencies and no build tooling was intentional.
-        Frameworks are fine — I use them plenty elsewhere — but for a personal site I wanted to showcase my capability.
-      </p>
-
+      <p>I wanted a portfolio site that was <em>me</em> — not a theme, not a template. The DOS terminal aesthetic comes from my system and app-level background, and there are a few <strong>easter eggs</strong> in there from my game design side.</p>
+      <p>Zero dependencies and no build tooling was intentional. Frameworks are fine, but for a personal site I wanted to show what I could do without them.</p>
 
       <!-- ── DESIGN ─────────────────────────────────────────────── -->
       <h3>Design</h3>
-      <p>
-        The visual language is phthalo green on black, monospaced type throughout, and CRT scanlines applied in pure CSS.
-        Every color is a CSS variable on <code>:root</code> so the entire palette can be swapped at runtime — which is exactly what the theme switcher does.
-        The priority was to establish a "tone" and stick with it. Only breaking it for real accessbility purposes.
-        Some functionality exists purely just to force me to learn something new. For example: I never worked with web canvas drawing before.
-        Heading elements run through a glitch pass on an interval, randomly corrupting one to three characters for ~300ms to simulate phosphor decay.
-      </p>
+      <p>Phthalo green on black, monospaced type throughout, CRT scanlines in pure CSS. Every color is a CSS variable on <code>:root</code> so the entire palette swaps at runtime — which is exactly what the theme switcher does.</p>
+      <p>Some features exist just to make me learn something new. Headings run through a glitch pass on an interval, randomly corrupting characters for ~300ms to simulate phosphor decay.</p>
       <div class="callout">
-        <p>Type <code>theme amber</code>, <code>theme cyan</code>, <code>theme white</code>, or <code>theme red</code> into the terminal footer to switch palettes. The choice persists in <code>localStorage</code> across pages.</p>
+        <p>Type <code>theme amber</code>, <code>theme cyan</code>, <code>theme white</code>, or <code>theme red</code> into the terminal footer to switch palettes. Persists in <code>localStorage</code>.</p>
       </div>
-
 
       <!-- ── TERMINAL FOOTER ─────────────────────────────────────── -->
       <h3>Terminal Footer</h3>
-      <p>
-        The footer was made for... well, me. I have no rhyme or reason as to why it exists or why it does what it does. But I really like it.
-        It reads like a shell prompt and reacts to everything happening in the page above it.
-        Hovering a link or project card auto-completes a <code>cd</code> command reflecting the navigation target.
-        Selecting text on the page shows a <code>copy "..."</code> preview.
-        Clicking the footer activates keyboard input — type characters, hit <strong>Enter</strong> to run a command, <strong>Escape</strong> to clear.
-      </p>
-      <p>
-        A small <code>commands.js</code> module handles dispatch: built-in commands like <code>cd home</code>, <code>theme 'name'</code>,
-        and a few easter eggs route to navigation, theme changes, flash messages, or dynamically imported game modules.
-        Unknown input flashes an error. The whole system is about 130 lines and zero dependencies.
-      </p>
-
+      <p>The footer reads like a shell prompt and reacts to what's happening on the page. Hover a link → <code>cd</code> auto-completes. Select text → <code>copy "..."</code> preview. Click the footer to type — <strong>Enter</strong> to run, <strong>Escape</strong> to clear.</p>
+      <p>Commands dispatch through a small <code>commands.js</code> module: <code>cd home</code>, <code>theme 'name'</code>, and a few easter eggs. Unknown input flashes an error. About 130 lines, zero dependencies.</p>
+      <p>Why does this feature exist? Because I want it to. That is all.</p>
 
       <!-- ── ARCHITECTURE ────────────────────────────────────────── -->
       <h3>Architecture</h3>
-      <p>
-        Content lives in <code>data.js</code> — two arrays, <code>PROJECTS</code> and <code>POSTS</code>.
-        Adding a project is two steps: create the HTML file, add one object to the array.
-        <code>main.js</code> renders the project grid and post list from that data at runtime; there is no static generation step.
-      </p>
+      <p>Content lives in <code>data.js</code> — two arrays, <code>PROJECTS</code> and <code>POSTS</code>. Adding a project is two steps: create the HTML file, add one object to the array.</p>
       <ul>
         <li><strong><code>main.js</code></strong> — renders the project grid and post list, runs the typewriter effect</li>
-        <li><strong><code>footer.js</code></strong> — terminal footer interactions and keyboard handling</li>
-        <li><strong><code>commands.js</code></strong> — command dispatch and routing logic</li>
+        <li><strong><code>footer.js</code></strong> — terminal interactions and keyboard handling</li>
+        <li><strong><code>commands.js</code></strong> — command dispatch and routing</li>
         <li><strong><code>glitch.js</code></strong> — periodic character corruption on headings</li>
-        <li><strong><code>theme.js</code></strong> — reads/writes <code>localStorage</code>, applies theme class on load</li>
+        <li><strong><code>theme.js</code></strong> — reads/writes <code>localStorage</code>, applies theme on load</li>
         <li><strong><code>data.js</code></strong> — the only file you need to touch to add content</li>
       </ul>
-      <p>
-        Project detail pages each import a shared <code>project-shell.js</code> that re-initializes the footer with the correct prompt path,
-        keeping the terminal context consistent as you navigate between pages. I want to look into removing even more duplicate logic between project pages, but that's for a later time.
-      </p>
 
+      <!-- ── TIDBITS ───────────────────────────────────────────── -->
+      <h3>Tidbits</h3>
+      <ul>
+        <li><strong>Scanlines are pure CSS</strong> — a repeating linear gradient on a <code>::after</code> pseudo-element covering the viewport. No canvas, no JS, no image.</li>
+        <li><strong>Glitch avoids innerHTML</strong> — it surgically replaces a <code>TEXT_NODE</code> in-place with three nodes (before, glitch span, after), then swaps them back after 300ms. Safer and faster than string manipulation.</li>
+        <li><strong>Footer tracks selections</strong> — it listens to the <code>selectionchange</code> event on <code>document</code> rather than polling. Zero overhead when nothing is selected.</li>
+        <li><strong>These folders are runtime DOM restructuring</strong> — there are no <code>section</code> wrappers in the HTML source. <code>project-shell.js</code> walks the <code>h3</code> elements at load time, groups each one with its following siblings, and wraps them into collapsible sections before the first paint.</li>
+        <li><strong>Theme switching is a single class swap</strong> — all palette values are CSS variables on <code>:root</code>. Switching themes just toggles a class on <code>&lt;body&gt;</code> and writes the choice to <code>localStorage</code>. No style recalculation, no re-render.</li>
+        <li><strong>Hero Typewriter</strong> — The hero subtitle cycles through descriptors — type at 80ms per character, hold 3 seconds, erase at 45ms, repeat. No library. The list includes the expected ones (<em>software developer</em>, <em>problem solver</em>) and a few that are less expected.</li>
+      </ul>
 
-      <!-- ── TYPEWRITER ──────────────────────────────────────────── -->
-      <h3>Hero Typewriter</h3>
-      <p>
-        The hero subtitle cycles through a list of descriptors using a simple async loop — type forward at 80ms per character,
-        hold for 3 seconds, erase at 45ms per character, repeat.
-        No library. The list includes the expected ones (<em>software developer</em>, <em>problem solver</em>) and a few that are less expected.
-      </p>
-
-
-      <!-- FINAL THOUGHTS -->
+      <!-- ── FINAL THOUGHTS ────────────────────────────────────── -->
       <h3>Final Thoughts</h3>
       <p>
-        I actually enjoyed restricting myself to no dependencies or external libraries.
-        It means no install, no compile step. Open <code>index.html</code> in a browser.
-        ES6 modules require a local HTTP server for proper <code>import</code> resolution in most browsers:
-      </p>
-      <pre><code>npx serve .</code></pre>
-      <p>
-        That's it. No <code>node_modules</code>, no config files, no bundler.
-        There were a lot of areas of learning that pissed me off about web development.
-        But overall it was a great experience, and I'll keep adding to this site.
+        This project took me out of my comfort zone.
+        It pulled me into the world of pure css, html, and js without relying on libraries.
+        With already a disdain for web development, and some practices that genuinely pissed me off,
+        it took me a long time to get something functional and working completed. But here we are.
+        And overall, I enjoyed the process and will keep adding to this.
       </p>
 
     </div><!-- /.project-body -->

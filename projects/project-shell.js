@@ -42,4 +42,53 @@ export function initProject({ footerPrompt = 'C:\\iDotDot\\projects> ' } = {}) {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') lightboxEl.classList.remove('open');
   });
+
+  initFolders();
+}
+
+function initFolders() {
+  const body = document.querySelector('.project-body');
+  if (!body) return;
+
+  const allChildren = [...body.children];
+  const h3Indices = allChildren.reduce((acc, el, i) => {
+    if (el.tagName === 'H3') acc.push(i);
+    return acc;
+  }, []);
+  if (!h3Indices.length) return;
+
+  [...h3Indices].reverse().forEach((h3Idx, ri) => {
+    const i = h3Indices.length - 1 - ri;
+    const h3 = allChildren[h3Idx];
+    const nextH3Idx = h3Indices[i + 1] ?? allChildren.length;
+    const contentEls = allChildren.slice(h3Idx + 1, nextH3Idx);
+
+    const section = document.createElement('section');
+    section.className = 'project-folder';
+
+    const originalText = h3.textContent;
+    h3.className = 'project-folder-header';
+    h3.setAttribute('data-open', 'true');
+    h3.textContent = '';
+    const btn = document.createElement('button');
+    btn.setAttribute('aria-expanded', 'true');
+    btn.setAttribute('aria-controls', `folder-content-${i}`);
+    btn.textContent = originalText;
+    h3.append(btn);
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'project-folder-content';
+    contentDiv.id = `folder-content-${i}`;
+    contentEls.forEach(el => contentDiv.append(el));
+
+    body.insertBefore(section, h3);
+    section.append(h3, contentDiv);
+
+    btn.addEventListener('click', () => {
+      const open = h3.getAttribute('data-open') === 'true';
+      h3.setAttribute('data-open', String(!open));
+      btn.setAttribute('aria-expanded', String(!open));
+      contentDiv.classList.toggle('project-folder-content--hidden', open);
+    });
+  });
 }
