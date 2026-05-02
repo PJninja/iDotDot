@@ -366,6 +366,143 @@ section + section {
   outline: none;
 }
 
+/* ── WHOIS CARD ────────────────────────────────────────────────── */
+
+.contact-wrap {
+  max-width: 600px;
+  padding: 4rem 2rem 6rem;
+}
+
+.whois-card {
+  border: 1px solid var(--border);
+  font-family: var(--font);
+  font-size: 1.1rem;
+  margin: 1.5rem 0;
+  padding: 1rem 1.5rem;
+}
+
+.whois-comment {
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.whois-key {
+  color: var(--text-dim);
+  flex-shrink: 0;
+  min-width: 11ch;
+}
+
+.whois-row {
+  display: flex;
+  gap: 0.5rem;
+  line-height: 1.7;
+}
+
+.whois-spacer {
+  height: 0.4rem;
+}
+
+.whois-val {
+  color: var(--text);
+}
+
+.whois-val a {
+  border-bottom: 1px solid var(--border);
+  color: var(--accent);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.whois-val a:hover {
+  border-color: var(--accent);
+}
+
+.whois-available {
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--glow);
+}
+
+/* ── TERMINAL CONTACT FORM ─────────────────────────────────────── */
+
+.term-form-wrap {
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+}
+
+.term-field {
+  align-items: baseline;
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.term-field--msg {
+  align-items: flex-start;
+}
+
+.term-input {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1.1rem;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.term-input:focus {
+  border-color: var(--accent);
+}
+
+.term-label {
+  color: var(--text-dim);
+  flex-shrink: 0;
+  font-family: var(--font);
+  font-size: 1.1rem;
+  min-width: 11ch;
+}
+
+.term-submit {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  margin-top: 0.5rem;
+  padding: 0.45rem 1.5rem;
+  transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+}
+
+.term-submit:hover,
+.term-submit:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 14px var(--glow);
+  color: var(--accent);
+  outline: none;
+}
+
+.term-submit:disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.term-textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.term-success {
+  margin-top: 1rem;
+}
+
 /* ── FOOTER ────────────────────────────────────────────────────── */
 
 footer {
@@ -441,6 +578,10 @@ footer.terminal-active {
 
   .contact-links {
     gap: 0.75rem;
+  }
+
+  .contact-wrap {
+    padding: 2.5rem 1rem 4rem;
   }
 
   footer {

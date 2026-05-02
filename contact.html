@@ -23,12 +23,77 @@
   </nav>
 
   <main>
-    <section id="contact">
-      <h2 class="section-heading"><span class="dim">// </span>CONTACT</h2>
-      <div class="contact-links">
-        <a href="mailto:anthony@idotdot.com" class="contact-link">EMAIL</a>
-        <a href="https://github.com/PJninja" class="contact-link" target="_blank" rel="noopener">GITHUB</a>
+    <section id="contact" class="contact-wrap">
+
+      <p class="whois-comment">% IDOTDOT WHOIS SERVER</p>
+      <p class="whois-comment">% Query: whois pjninja</p>
+      <p class="whois-comment">% Last updated: 2026-05-01</p>
+
+      <div class="whois-card">
+        <div class="whois-row">
+          <span class="whois-key">Handle:</span>
+          <span class="whois-val">PJNINJA</span>
+        </div>
+        <div class="whois-row">
+          <span class="whois-key">Name:</span>
+          <span class="whois-val">Anthony</span>
+        </div>
+        <div class="whois-row">
+          <span class="whois-key">Role:</span>
+          <span class="whois-val">Software Developer / Simulation Engineer</span>
+        </div>
+        <div class="whois-row">
+          <span class="whois-key">Location:</span>
+          <span class="whois-val">Georgia, USA</span>
+        </div>
+        <div class="whois-row whois-spacer" aria-hidden="true"></div>
+        <div class="whois-row">
+          <span class="whois-key">Email:</span>
+          <span class="whois-val"><a href="mailto:anthony@idotdot.com">anthony@idotdot.com</a></span>
+        </div>
+        <div class="whois-row">
+          <span class="whois-key">GitHub:</span>
+          <span class="whois-val"><a href="https://github.com/PJninja" target="_blank" rel="noopener">github.com/PJninja</a></span>
+        </div>
+        <div class="whois-row">
+          <span class="whois-key">Website:</span>
+          <span class="whois-val"><a href="https://www.idotdot.com/" target="_blank" rel="noopener">idotdot.com</a></span>
+        </div>
+        <div class="whois-row whois-spacer" aria-hidden="true"></div>
+        <div class="whois-row">
+          <span class="whois-key">Available:</span>
+          <span class="whois-val whois-available">Yes</span>
+        </div>
       </div>
+
+      <p class="whois-comment">% Remarks:</p>
+      <p class="whois-comment">% Best reached via email.</p>
+
+      <div class="term-form-wrap">
+        <p class="whois-comment">% initiate_contact --interactive</p>
+
+        <form id="contact-form" class="term-form" novalidate>
+          <div class="term-field">
+            <label for="contact-email" class="term-label">FROM:</label>
+            <input id="contact-email" class="term-input" name="email" type="email" required autocomplete="email">
+          </div>
+          <div class="term-field">
+            <label for="contact-subject" class="term-label">SUBJECT:</label>
+            <input id="contact-subject" class="term-input" name="subject" type="text" required>
+          </div>
+          <div class="term-field term-field--msg">
+            <label for="contact-message" class="term-label">MESSAGE:</label>
+            <textarea id="contact-message" class="term-input term-textarea" name="message" required></textarea>
+          </div>
+          <button type="submit" class="term-submit">[ TRANSMIT ]</button>
+        </form>
+
+        <div id="contact-success" class="term-success" hidden>
+          <p class="whois-comment">% Transmission sent.</p>
+          <p class="whois-comment">% Awaiting response...</p>
+        </div>
+      </div>
+
     </section>
   </main>
 
@@ -41,6 +106,35 @@
     import { initTheme } from './theme.js';
     initTheme();
     initFooter();
+
+    const form = document.getElementById('contact-form');
+    const success = document.getElementById('contact-success');
+    const btn = form.querySelector('button[type=submit]');
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      btn.textContent = '[ TRANSMITTING... ]';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('https://formspree.io/f/xdabkwba', {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { Accept: 'application/json' },
+        });
+
+        if (res.ok) {
+          form.hidden = true;
+          success.hidden = false;
+        } else {
+          btn.textContent = '[ FAILED — try again ]';
+          btn.disabled = false;
+        }
+      } catch {
+        btn.textContent = '[ FAILED — try again ]';
+        btn.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>

@@ -19,6 +19,8 @@ const COMMANDS = {
   'cd projects': () => ({ navigate: resolveUrl('index.html') + '#projects' }),
   'cd blog':     () => ({ navigate: resolveUrl('blog.html') }),
   'cd contact':  () => ({ navigate: resolveUrl('contact.html') }),
+  'whois':       () => ({ navigate: resolveUrl('contact.html') }),
+  'whois pjninja': () => ({ navigate: resolveUrl('contact.html') }),
   'date':        () => ({ flash: printDateTime() }),
   'time':        () => ({ flash: printDateTime() }),
   'theme green': () => { setTheme('green'); return { flash: `theme: green  ${SWATCH}` }; },
@@ -28,7 +30,7 @@ const COMMANDS = {
   'theme red':   () => { setTheme('red');   return { flash: `theme: red    ${SWATCH}` }; },
   'themes':      () => ({ flash: `Use 'theme <color>' to swap: ${THEME_NAMES.join(' | ')}` }),
   'play cube11': () => ({ game: 'cube11' }),
-  'help':        () => ({ flash: 'commands: cd home | cd blog | cd contact | cd projects | themes | clear' }),
+  'help':        () => ({ flash: 'commands: cd home | cd blog | cd contact | cd projects | whois | themes | clear' }),
   'clear':       () => ({ clear: true }),
   'cls':         () => ({ clear: true }),
 };

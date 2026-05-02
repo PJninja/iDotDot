@@ -64,6 +64,63 @@
   text-shadow: 0 0 8px var(--glow);
 }
 
+/* ── FOLDER SECTIONS ──────────────────────────────────────────── */
+
+.project-folder {
+  border-top: 1px solid var(--border);
+}
+
+.project-folder-header {
+  margin: 0;
+}
+
+.project-folder-header button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: block;
+  font-family: var(--font);
+  font-size: clamp(1.4rem, 3.5vw, 2rem);
+  padding: 0.6rem 0;
+  text-align: left;
+  text-shadow: 0 0 8px var(--glow);
+  transition: color 0.15s, text-shadow 0.15s;
+  width: 100%;
+}
+
+.project-folder-header button::before {
+  color: var(--accent);
+  content: '▼ ';
+  text-shadow: 0 0 6px var(--glow);
+}
+
+.project-folder-header button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.project-folder-header button:hover,
+.project-folder-header button:focus-visible {
+  color: var(--accent);
+  outline: none;
+  text-shadow: 0 0 12px var(--glow);
+}
+
+.project-folder-header[data-open='false'] button::before {
+  content: '▶ ';
+}
+
+.project-folder-content {
+  opacity: 1;
+  transition: opacity 0.15s;
+}
+
+.project-folder-content--hidden {
+  display: none;
+  opacity: 0;
+}
+
 /* ── INLINE CODE ───────────────────────────────────────────── */
 
 .project-body code {
@@ -246,6 +303,10 @@
 /* ── MOBILE ────────────────────────────────────────────────── */
 
 @media (max-width: 600px) {
+  .project-folder-header button {
+    padding: 0.5rem 0;
+  }
+
   .project-wrap {
     padding: 2.5rem 1rem 4rem;
   }
