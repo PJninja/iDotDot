@@ -494,6 +494,20 @@ section + section {
   cursor: default;
 }
 
+.term-error {
+  color: var(--accent);
+  display: block;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  padding-left: 11ch;
+}
+
+.term-error--form {
+  margin-bottom: 1rem;
+  padding-left: 0;
+}
+
 .term-textarea {
   min-height: 6rem;
   resize: vertical;

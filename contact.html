@@ -72,23 +72,27 @@
       <div class="term-form-wrap">
         <p class="whois-comment">% initiate_contact --interactive</p>
 
+        <div data-fs-error class="term-error term-error--form"></div>
+
         <form id="contact-form" class="term-form" novalidate>
           <div class="term-field">
             <label for="contact-email" class="term-label">FROM:</label>
-            <input id="contact-email" class="term-input" name="email" type="email" required autocomplete="email">
+            <input id="contact-email" class="term-input" name="email" type="email" required autocomplete="email" data-fs-field>
           </div>
+          <span data-fs-error="email" class="term-error"></span>
           <div class="term-field">
             <label for="contact-subject" class="term-label">SUBJECT:</label>
-            <input id="contact-subject" class="term-input" name="subject" type="text" required>
+            <input id="contact-subject" class="term-input" name="subject" type="text" required data-fs-field>
           </div>
           <div class="term-field term-field--msg">
             <label for="contact-message" class="term-label">MESSAGE:</label>
-            <textarea id="contact-message" class="term-input term-textarea" name="message" required></textarea>
+            <textarea id="contact-message" class="term-input term-textarea" name="message" required data-fs-field></textarea>
           </div>
-          <button type="submit" class="term-submit">[ TRANSMIT ]</button>
+          <span data-fs-error="message" class="term-error"></span>
+          <button type="submit" class="term-submit" data-fs-submit-btn>[ TRANSMIT ]</button>
         </form>
 
-        <div id="contact-success" class="term-success" hidden>
+        <div class="term-success" data-fs-success>
           <p class="whois-comment">% Transmission sent.</p>
           <p class="whois-comment">% Awaiting response...</p>
         </div>
@@ -106,35 +110,11 @@
     import { initTheme } from './theme.js';
     initTheme();
     initFooter();
-
-    const form = document.getElementById('contact-form');
-    const success = document.getElementById('contact-success');
-    const btn = form.querySelector('button[type=submit]');
-
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
-      btn.textContent = '[ TRANSMITTING... ]';
-      btn.disabled = true;
-
-      try {
-        const res = await fetch('https://formspree.io/f/xdabkwba', {
-          method: 'POST',
-          body: new FormData(form),
-          headers: { Accept: 'application/json' },
-        });
-
-        if (res.ok) {
-          form.hidden = true;
-          success.hidden = false;
-        } else {
-          btn.textContent = '[ FAILED — try again ]';
-          btn.disabled = false;
-        }
-      } catch {
-        btn.textContent = '[ FAILED — try again ]';
-        btn.disabled = false;
-      }
-    });
   </script>
+  <script>
+    window.formspree = window.formspree || function () { (formspree.q = formspree.q || []).push(arguments); };
+    formspree('initForm', { formElement: '#contact-form', formId: 'xdabkwba' });
+  </script>
+  <script src="https://unpkg.com/@formspree/ajax@1" defer></script>
 </body>
 </html>
