@@ -40,28 +40,39 @@ tbd
 
 ```cs
 index.html          Homepage — hero + projects grid + blog list
+blog.html           Blog post index page
+contact.html        Contact / whois page
 style.css           Global styles and CSS variables (theme)
-main.js             Renders project cards and blog post list from data.js
-footer.js           Interactive terminal footer (hover/selection behavior)
-data.js             Content source — edit this to add/remove projects and posts
+
+js/                 All JavaScript modules
+  main.js           Renders project cards and blog post list from data.js
+  footer.js         Interactive terminal footer (hover/selection behavior)
+  data.js           Content source — edit this to add/remove projects and posts
+  commands.js       Terminal command handlers (cd, theme, help, etc.)
+  theme.js          Theme management with localStorage persistence
+  glitch.js         CRT glitch effect for headings
+  cube11.js         ASCII tower-defense game (launched via terminal "play cube11")
 
 projects/           One HTML file per project detail page
-  project-alpha.html
+  project.css       Shared project page styles
+  project-shell.js  Collapsible sections, lightbox, footer init for project pages
+  _template.html    Starter template — copy to add a new project
 
 posts/              One HTML file per blog post
-  hello-world.html
+  post.css          Shared post page styles
+  _template.html    Starter template — copy to add a new post
 ```
 
 ### Adding a project
 
-1. Create `projects/your-project.html` (copy `project-alpha.html` as a template).
-2. Add an entry to the `PROJECTS` array in `data.js` with `file: "projects/your-project.html"`.
+1. Copy `projects/_template.html` to `projects/your-project.html`.
+2. Add an entry to the `PROJECTS` array in `js/data.js` with `file: "projects/your-project.html"`.
    Set `file: null` to show a card without a detail page.
 
 ### Adding a blog post
 
-1. Create `posts/your-post.html` (copy `hello-world.html` as a template).
-2. Add an entry to the `POSTS` array in `data.js` with the matching `file` path.
+1. Copy `posts/_template.html` to `posts/your-post.html`.
+2. Add an entry to the `POSTS` array in `js/data.js` with the matching `file` path.
 
 ## UI
 
