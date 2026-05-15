@@ -1,6 +1,6 @@
-import { initFooter } from '../footer.js';
-import { initGlitch } from '../glitch.js';
-import { initTheme } from '../theme.js';
+import { initFooter } from '../js/footer.js';
+import { initGlitch } from '../js/glitch.js';
+import { initTheme } from '../js/theme.js';
 
 /**
  * @param {object} [options]

@@ -1,0 +1,9 @@
+# Dev tooling
+.kilo/
+
+# Local IDE / Claude config
+.claude/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
