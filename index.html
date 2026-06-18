@@ -29,7 +29,19 @@
   <main>
     <section id="projects">
       <h2 class="section-heading"><span class="dim">// </span>PROJECTS</h2>
+      <div id="project-filter" class="project-filter">
+        <div class="filter-row">
+          <input type="text" id="filter-search" class="filter-search" placeholder="filter projects..." aria-label="filter projects">
+          <div id="filter-tags" class="filter-tags"></div>
+          <div class="filter-add-wrap">
+            <button type="button" id="filter-add" class="filter-add" aria-label="add tag filter" aria-expanded="false">+</button>
+            <div id="filter-popover" class="filter-popover" hidden></div>
+          </div>
+          <button type="button" id="filter-clear" class="filter-clear" aria-label="clear all filters" hidden>X</button>
+        </div>
+      </div>
       <div id="project-grid" class="project-grid"></div>
+      <nav id="project-pager" class="project-pager" aria-label="project pages" hidden></nav>
     </section>
 
   </main>
