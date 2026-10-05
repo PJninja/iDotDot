@@ -1,5 +1,6 @@
 import { PROJECTS, POSTS } from './data.js';
 import { FlipBoard } from './flipdot.js';
+import { initFluid } from './fluid.js';
 import { initFooter } from './footer.js';
 import { initGlitch } from './glitch.js';
 import { initTheme } from './theme.js';
@@ -284,6 +285,7 @@ function renderPosts() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
+  initFluid();
   initFilters();
   initPager();
   initGridNav();

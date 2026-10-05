@@ -52,6 +52,9 @@ js/                 All JavaScript modules
   theme.js          Theme management with localStorage persistence
   glitch.js         CRT glitch effect for headings
   flipdot.js        Flip-dot display board for the homepage hero title/subtitle
+  fluid.js          Homepage background liquid: canvas setup, worker bridge, resize/theme
+  fluid-sim.js      FLIP liquid sim + pixel renderer (shared by worker and fallback)
+  fluid-worker.js   Runs fluid-sim.js off the main thread via OffscreenCanvas
   cube11.js         ASCII tower-defense game (launched via terminal "play cube11")
 
 projects/           One HTML file per project detail page
