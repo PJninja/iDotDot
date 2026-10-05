@@ -4,7 +4,8 @@
   --bg-card:     #0d1a0d;
   --border:      #1a4a2a;
   --fluid:       #0a130a;
-  --fluid-hi:    #0c170c;
+  --fluid-glow:  #1a8a35;
+  --fluid-hi:    #0f1d0f;
   --fluid-foam:  #1e3c26;
   --fluid-tint:  #3cf;
   --font:        'VT323', 'Courier New', monospace;
@@ -216,13 +217,6 @@ body::after {
 
 /* ── HERO ──────────────────────────────────────────────────────── */
 
-@keyframes hero-drift {
-  0%   { transform: translate(-10%, -8%); }
-  33%  { transform: translate(15%,  12%); }
-  66%  { transform: translate(3%,  -15%); }
-  100% { transform: translate(-10%, -8%); }
-}
-
 .hero {
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -233,18 +227,6 @@ body::after {
   padding: 2.5rem clamp(2rem, 8vw, 6rem);
   position: relative;
   transform: translateZ(0);  /* Force GPU compositing */
-}
-
-.hero::before {
-  animation: hero-drift 18s ease-in-out infinite;
-  backface-visibility: hidden;
-  background: radial-gradient(ellipse 40% 35% at 50% 50%, rgba(26, 138, 53, 0.13) 0%, transparent 70%);
-  content: '';
-  inset: -25%;
-  pointer-events: none;
-  position: absolute;
-  will-change: transform;
-  z-index: 0;
 }
 
 .hero > * {

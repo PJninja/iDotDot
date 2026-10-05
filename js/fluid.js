@@ -47,6 +47,7 @@ function readColors() {
     hi: parseHex(styles.getPropertyValue('--fluid-hi'), [12, 23, 12]),
     tint: parseHex(styles.getPropertyValue('--fluid-tint'), [51, 204, 255]),
     foam: parseHex(styles.getPropertyValue('--fluid-foam'), [30, 60, 38]),
+    glow: parseHex(styles.getPropertyValue('--fluid-glow'), [26, 138, 53]),
   };
 }
 
