@@ -195,6 +195,7 @@ export function initFluid() {
       else if (type === 'remove') engine.removeAt(payload.x, payload.y);
       else if (type === 'pointer') engine.pointer(payload.x, payload.y, payload.vx, payload.vy);
       else if (type === 'drain') engine.setDraining(payload.on);
+      else if (type === 'splash') engine.splash(payload.points);
     }
   };
 
@@ -261,6 +262,12 @@ export function initFluid() {
     reconfigure();
   });
   document.addEventListener('themechange', () => send('colors', { colors: readColors() }));
+  // Other modules can release bubbles into the water: detail.points is a
+  // list of { x, y, t } in viewport px, t = delay in ms.
+  document.addEventListener('fluid-splash', e => {
+    if (!started) return;
+    send('splash', { points: e.detail.points });
+  });
   document.addEventListener('visibilitychange', () => {
     send('visible', { visible: !document.hidden });
   });

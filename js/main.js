@@ -61,7 +61,11 @@ function initSubtitleRotator() {
   setInterval(() => {
     i = (i + 1) % SUBTITLES.length;
     label.textContent = SUBTITLES[i];
-    board.show(SUBTITLES[i]);
+    const flips = board.show(SUBTITLES[i]);
+    // Flipping dots let air out into any water over the board.
+    const rect = board.el.getBoundingClientRect();
+    const points = flips.map(({ i: dot, t }) => ({ ...board.dotCenter(dot, rect), t }));
+    document.dispatchEvent(new CustomEvent('fluid-splash', { detail: { points } }));
   }, 4000);
 }
 
