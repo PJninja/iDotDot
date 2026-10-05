@@ -51,6 +51,7 @@ js/                 All JavaScript modules
   commands.js       Terminal command handlers (cd, theme, help, etc.)
   theme.js          Theme management with localStorage persistence
   glitch.js         CRT glitch effect for headings
+  flipdot.js        Flip-dot display board for the homepage hero title/subtitle
   cube11.js         ASCII tower-defense game (launched via terminal "play cube11")
 
 projects/           One HTML file per project detail page
