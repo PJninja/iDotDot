@@ -75,31 +75,42 @@ body {
   z-index: 55;
 }
 
-/* Drain toggle, pinned to the right edge just above the spout. */
-.fluid-valve {
+/* Liquid controls, pinned to the right edge just above the spout (but
+   below the nav on short screens): the drain toggle and, on touch devices,
+   the tilt toggle beside it. */
+.fluid-control {
   background: none;
   border: 0;
   color: var(--text-dim);
   cursor: pointer;
   padding: 0.4rem;
   position: fixed;
-  right: 0.75rem;
-  top: calc(var(--spout-y, 20vh) - 2.5rem);
+  top: max(calc(var(--spout-y, 20vh) - 2.5rem), 3.5rem);
   transition: color 0.15s, filter 0.15s;
   z-index: 60;
 }
 
-.fluid-valve svg {
+.fluid-control svg {
   display: block;
   height: 20px;
   width: 20px;
 }
 
-.fluid-valve:hover,
-.fluid-valve:focus-visible {
+.fluid-control:hover,
+.fluid-control:focus-visible,
+.fluid-tilt[aria-pressed='true'] {
   color: var(--accent);
   filter: drop-shadow(0 0 5px var(--glow));
   outline: none;
+}
+
+.fluid-valve {
+  right: 0.75rem;
+}
+
+/* One button width (20px icon + padding) left of the valve. */
+.fluid-tilt {
+  right: calc(1.8rem + 20px);
 }
 
 .fluid-valve .valve-pour,

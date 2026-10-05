@@ -13,6 +13,10 @@ const STEP = 1 / 60;
 const MAX_STEPS_PER_FRAME = 2;
 const MAX_SUBSTEPS = 2;
 const GRAVITY = 1800;
+// Gravity can point any way in the screen plane (tilt, fed from the device
+// orientation by js/fluid.js); the sim eases toward a new direction.
+const GRAVITY_EASE = 0.15;        // share of the way to a new direction per step
+const GRAVITY_WAKE = 0.035;       // rad (~2°) of change that wakes a sleeping pool
 const MAX_SPEED = 2400;
 const FLIP_RATIO = 0.9;
 const OVER_RELAX = 1.9;
@@ -164,6 +168,8 @@ class Flip {
 
     this.meanSpeed = 0;
     this.maxSpeed = 0;
+    this.gx = 0;
+    this.gy = GRAVITY;
   }
 
   // Swaps the last particle into slot i.
@@ -198,9 +204,11 @@ class Flip {
   integrate(dt) {
     const { pos, vel, count } = this;
     const max2 = MAX_SPEED * MAX_SPEED;
+    const gx = this.gx * dt;
+    const gy = this.gy * dt;
     for (let i = 0; i < count; i++) {
-      let vx = vel[2 * i];
-      let vy = vel[2 * i + 1] + GRAVITY * dt;
+      let vx = vel[2 * i] + gx;
+      let vy = vel[2 * i + 1] + gy;
       const sp2 = vx * vx + vy * vy;
       if (sp2 > max2) {
         const k = MAX_SPEED / Math.sqrt(sp2);
@@ -521,6 +529,11 @@ export class FluidEngine {
     this.bias = 0;
     this.tier = 0;
     this.pendingBubbles = [];
+    // Unit vectors in screen space: where gravity is headed, where it points
+    // now, and where it pointed at the last wake.
+    this.gravityTarget = [0, 1];
+    this.down = [0, 1];
+    this.gravityAnchor = [0, 1];
   }
 
   setColors({ fluid, hi, tint, foam, froth, glow }) {
@@ -555,11 +568,16 @@ export class FluidEngine {
   }
 
   // cfg: { cols, rows, pitch, width, height, floor, reducedMotion, debug,
-  //        draining, initialFill?, fillSeconds? }
+  //        draining, initialFill?, fillSeconds?, rotate? }
+  // rotate: degrees the screen turned (90, 180 or 270) since the last
+  // configure; the water then keeps its place in the device and pours to
+  // the new bottom.
   configure(cfg) {
     this.draining = !!cfg.draining;
     const fill = cfg.reducedMotion ? (this.draining ? 0 : 1)
       : this.sim ? this.fill() : Math.min(1, Math.max(0, cfg.initialFill || 0));
+    const carry = this.sim && !cfg.reducedMotion && [90, 180, 270].includes(cfg.rotate)
+      ? { sim: this.sim, cfg: this.cfg } : null;
     this.stop();
     this.cfg = cfg;
 
@@ -599,8 +617,9 @@ export class FluidEngine {
 
     this.build(Math.max(levelFor(fill), this.bias));
     this.poured = 0;
-    this.seed(fill * this.target);
-    this.emitting = !this.draining && fill < 1;
+    if (carry) this.carry(carry.sim, carry.cfg, cfg.rotate);
+    else this.seed(fill * this.target);
+    this.emitting = !this.draining && this.fill() < 1;
     this.drainAcc = 0;
     this.savedLevel = Math.round(fill * FILL_STEPS) / FILL_STEPS;
 
@@ -639,6 +658,8 @@ export class FluidEngine {
     // Headroom for the pool compressing under its own weight.
     const capacity = Math.ceil(2 * target / (h * h / PPC)) + 1024;
     this.sim = new Flip(width, floor, h, capacity);
+    this.sim.gx = this.down[0] * GRAVITY;
+    this.sim.gy = this.down[1] * GRAVITY;
     this.level = level;
     this.target = (this.sim.nx - 2) * h * this.depth;
   }
@@ -659,6 +680,42 @@ export class FluidEngine {
         this.poured += this.cfg.reducedMotion ? sim.area : h * h / SETTLED_DENSITY;
       }
     }
+  }
+
+  // Moves the particles of a sim built for the screen before a rotation of
+  // rotate degrees into this one, keeping their place in the device: the
+  // old frame is turned, then lined up on the new floor and right wall.
+  // Each particle's area holds, thinned or doubled if the cell size moved.
+  carry(old, oldCfg, rotate) {
+    const sim = this.sim;
+    const { width, floor } = this.cfg;
+    const w0 = oldCfg.width;
+    const h0 = oldCfg.floor;
+    const turned = rotate === 180 ? [w0, h0] : [h0, w0];
+    const shiftX = width - turned[0];
+    const shiftY = floor - turned[1];
+    const ratio = old.area / sim.area;
+    let want = 0;
+    for (let i = 0; i < old.count; i++) {
+      const x = old.pos[2 * i] - old.ox;
+      const y = old.pos[2 * i + 1] - old.oy;
+      const vx = old.vel[2 * i];
+      const vy = old.vel[2 * i + 1];
+      let p;
+      if (rotate === 90) p = [y, w0 - x, vy, -vx];
+      else if (rotate === 180) p = [w0 - x, h0 - y, -vx, -vy];
+      else p = [h0 - y, x, -vy, vx];
+      want += ratio;
+      for (; want >= 1; want--) {
+        const jitter = want >= 2 ? (Math.random() - 0.5) * sim.r : 0;
+        if (!sim.add(p[0] + shiftX + sim.ox + jitter, p[1] + shiftY + sim.oy + jitter, p[2], p[3])) break;
+      }
+    }
+    this.poured = sim.count * sim.area;
+    sim.collide();
+    sim.transfer(true);
+    sim.updateDensity();
+    sim.measure();
   }
 
   start() {
@@ -717,6 +774,41 @@ export class FluidEngine {
     this.draining = on;
     this.emitting = !on && this.fill() < 1;
     this.wake();
+  }
+
+  // Points gravity along (x, y) in screen space; any length but zero.
+  setGravity(x, y) {
+    const len = Math.hypot(x, y);
+    if (!len) return;
+    this.gravityTarget = [x / len, y / len];
+    if (!this.sim || this.cfg.reducedMotion) return;
+    // Wake for a real turn, not for a hand's tremor.
+    const [ax, ay] = this.gravityAnchor;
+    const [tx, ty] = this.gravityTarget;
+    if (Math.abs(Math.atan2(ax * ty - ay * tx, ax * tx + ay * ty)) > GRAVITY_WAKE) {
+      this.gravityAnchor = this.gravityTarget;
+      this.wake();
+    }
+  }
+
+  // Turns the current gravity a step toward its target.
+  easeGravity() {
+    const [tx, ty] = this.gravityTarget;
+    let [x, y] = this.down;
+    if (x === tx && y === ty) return;
+    x += (tx - x) * GRAVITY_EASE;
+    y += (ty - y) * GRAVITY_EASE;
+    let len = Math.hypot(x, y);
+    // A half turn would pass through zero; go round the side instead.
+    if (len < 0.05) {
+      x = -ty;
+      y = tx;
+      len = 1;
+    }
+    if (Math.abs(x / len - tx) + Math.abs(y / len - ty) < 1e-4) this.down = [tx, ty];
+    else this.down = [x / len, y / len];
+    this.sim.gx = this.down[0] * GRAVITY;
+    this.sim.gy = this.down[1] * GRAVITY;
   }
 
   // Schedules bubbles from points [{ x, y, t }]: viewport px, t = delay in ms.
@@ -838,6 +930,7 @@ export class FluidEngine {
     const t0 = performance.now();
     const q = QUALITY[this.tier];
     this.time += STEP;
+    this.easeGravity();
     this.emit(STEP);
 
     const sim = this.sim;
@@ -1059,6 +1152,7 @@ export class FluidEngine {
     const { width, floor, pitch } = this.cfg;
     const live = !this.sleeping;
     const h2 = 0.5 * sim.h;
+    const [gx, gy] = this.down;
     this.fxTime += dt;
     this.releaseBubbles();
 
@@ -1075,35 +1169,47 @@ export class FluidEngine {
       const y = f[k + 1];
       if (this.wet(x, y)) {
         // Carried by the current while drifting up to the surface.
-        f[k + 2] = live ? sim.sample(sim.u, x + sim.ox, y + sim.oy, 0, h2) : 0;
-        f[k + 3] = (live ? sim.sample(sim.v, x + sim.ox, y + sim.oy, h2, 0) : 0) - FOAM_RISE;
+        f[k + 2] = (live ? sim.sample(sim.u, x + sim.ox, y + sim.oy, 0, h2) : 0) - gx * FOAM_RISE;
+        f[k + 3] = (live ? sim.sample(sim.v, x + sim.ox, y + sim.oy, h2, 0) : 0) - gy * FOAM_RISE;
       } else {
-        // Spray: falls back under gravity.
-        f[k + 2] *= 0.99;
-        f[k + 3] = Math.min(f[k + 3] + GRAVITY * dt, SPRAY_MAX_FALL);
+        // Spray: falls back under gravity, slowing across the fall.
+        const along = f[k + 2] * gx + f[k + 3] * gy;
+        const fall = Math.min(along + GRAVITY * dt, SPRAY_MAX_FALL);
+        f[k + 2] = (f[k + 2] - along * gx) * 0.99 + fall * gx;
+        f[k + 3] = (f[k + 3] - along * gy) * 0.99 + fall * gy;
       }
       f[k] = Math.min(Math.max(x + f[k + 2] * dt, 0), width);
-      f[k + 1] = Math.min(y + f[k + 3] * dt, floor);
+      f[k + 1] = Math.min(Math.max(y + f[k + 3] * dt, 0), floor);
     }
 
+    // Bubbles start along whichever wall is lowest and rise against gravity,
+    // wobbling across it.
     const b = this.bubbles;
-    const floorY = floor - 0.5 * pitch;
-    this.bubbleAcc += BUBBLE_RATE * width / 1000 * dt;
+    const level = Math.abs(gy) >= Math.abs(gx);
+    const edge = 0.5 * pitch;
+    this.bubbleAcc += BUBBLE_RATE * (level ? width : floor) / 1000 * dt;
     while (this.bubbleAcc >= 1) {
       this.bubbleAcc--;
-      const x = Math.random() * width;
-      if (this.wet(x, floorY)) this.addBubble(x, floorY);
+      const t = Math.random();
+      const x = level ? t * width : gx > 0 ? width - edge : edge;
+      const y = level ? (gy > 0 ? floor - edge : edge) : t * floor;
+      if (this.wet(x, y)) this.addBubble(x, y);
     }
     for (let i = this.bubbleCount - 1; i >= 0; i--) {
       const k = 5 * i;
-      let y = b[k + 1] - b[k + 2] * dt;
+      let bx = b[k] - gx * b[k + 2] * dt;
+      let by = b[k + 1] - gy * b[k + 2] * dt;
       if (live) {
-        b[k] += BUBBLE_DRIFT * sim.sample(sim.u, b[k] + sim.ox, y + sim.oy, 0, h2) * dt;
-        y += BUBBLE_DRIFT * sim.sample(sim.v, b[k] + sim.ox, y + sim.oy, h2, 0) * dt;
+        bx += BUBBLE_DRIFT * sim.sample(sim.u, bx + sim.ox, by + sim.oy, 0, h2) * dt;
+        by += BUBBLE_DRIFT * sim.sample(sim.v, bx + sim.ox, by + sim.oy, h2, 0) * dt;
       }
-      b[k + 1] = y;
-      const x = b[k] + Math.sin(b[k + 3] + this.fxTime * 3) * BUBBLE_WOBBLE;
-      if (!this.wet(x, y - b[k + 4] * pitch * 0.5)) {
+      b[k] = bx;
+      b[k + 1] = by;
+      const wobble = Math.sin(b[k + 3] + this.fxTime * 3) * BUBBLE_WOBBLE;
+      const x = bx + gy * wobble;
+      const y = by - gx * wobble;
+      const lead = b[k + 4] * pitch * 0.5;
+      if (!this.wet(x - gx * lead, y - gy * lead)) {
         // Popped at the surface.
         for (let n = 0; n < 2; n++) {
           this.addFoam(x + (Math.random() - 0.5) * pitch, y, 0, 0, 0.8 + Math.random() * 0.8);
@@ -1160,10 +1266,12 @@ export class FluidEngine {
       mark(foamBuf, marks, this.cellAt(foam[6 * i], foam[6 * i + 1]),
         FOAM_WEIGHT * Math.min(1, life / FOAM_FADE));
     }
+    const [gx, gy] = this.down;
     for (let i = 0; i < this.bubbleCount; i++) {
       const k = 5 * i;
-      const x = bubbles[k] + Math.sin(bubbles[k + 3] + this.fxTime * 3) * BUBBLE_WOBBLE;
-      const y = bubbles[k + 1];
+      const wobble = Math.sin(bubbles[k + 3] + this.fxTime * 3) * BUBBLE_WOBBLE;
+      const x = bubbles[k] + gy * wobble;
+      const y = bubbles[k + 1] - gx * wobble;
       mark(bubbleSum, bubbleMarks, this.cellAt(x, y), BUBBLE_WEIGHT);
       if (bubbles[k + 4] > 1) {
         mark(bubbleSum, bubbleMarks, this.cellAt(x + pitch, y), BUBBLE_WEIGHT);
@@ -1298,6 +1406,17 @@ export class FluidEngine {
       if (wallR - x < R) splat(2 * wallR - x, y, speed);
     }
 
+    // The surface froths on whichever side faces up: the neighbor one and
+    // two cells against gravity's main axis. Off the canvas counts as wet.
+    const [gx, gy] = this.down;
+    const upCol = Math.abs(gx) > Math.abs(gy) ? -Math.sign(gx) : 0;
+    const upRow = upCol ? 0 : gy > 0 ? -1 : 1;
+    const dryAt = (col, row, n) => {
+      const c = col + n * upCol;
+      const r = row + n * upRow;
+      return c >= 0 && c < cols && r >= 0 && r < rows && dens[r * cols + c] < SURFACE;
+    };
+
     const top = SHADES - 1;
     for (let k = 0; k < dens.length; k++) {
       const d = dens[k];
@@ -1317,10 +1436,11 @@ export class FluidEngine {
       const t = Math.min(1, Math.max(0, (speed - FAST_LO) / (FAST_HI - FAST_LO)));
       shade[k] = 1 + Math.round(t * top);
       froth[k] = 0;
-      if (k >= cols && dens[k - cols] < SURFACE) {
+      const row = (k - col) / cols;
+      if (dryAt(col, row, 1)) {
         const n = noise(k, seed);
         froth[k] = 1 + Math.round((FROTH_TOP + (1 - FROTH_TOP) * n) * top);
-      } else if (k >= 2 * cols && dens[k - 2 * cols] < SURFACE) {
+      } else if (dryAt(col, row, 2)) {
         const n = noise(k, seed);
         if (n < FROTH_UNDER) froth[k] = 1 + Math.round((0.15 + 0.4 * n / FROTH_UNDER) * top);
       }

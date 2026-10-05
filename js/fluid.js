@@ -10,9 +10,14 @@ const RESIZE_DELAY = 150;
 const POINTER_INTERVAL = 16;      // ms between pointer updates sent to the sim
 const MAX_POINTER_SPEED = 2500;   // px/s
 
-// The fill level (in 20% steps) and drain mode survive reloads.
+// The fill level (in 20% steps), drain mode and tilt survive reloads.
 const FILL_KEY = 'fluid-fill';
 const DRAIN_KEY = 'fluid-drain';
+const TILT_KEY = 'fluid-tilt';
+
+// Tilt: on touch devices the water's gravity follows the phone.
+const TILT_INTERVAL = 33;         // ms between gravity updates sent to the sim
+const TILT_FLAT = 0.2;            // in-screen share of gravity below which the phone counts as flat
 
 function load(key) {
   try {
@@ -53,6 +58,29 @@ function readColors() {
 }
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const touchOnly = window.matchMedia('(hover: none) and (pointer: coarse)');
+
+// The screen's rotation from the device's natural orientation, in degrees
+// counterclockwise.
+function screenAngle() {
+  const angle = screen.orientation?.angle ?? window.orientation ?? 0;
+  return ((angle % 360) + 360) % 360;
+}
+
+// Gravity in screen space (x right, y down) from a deviceorientation event,
+// or null when the phone lies too flat to tell. In the device frame, down is
+// (cos β sin γ, -sin β) with y toward the top edge; flip y to point down,
+// then undo the screen's rotation.
+function screenGravity(e) {
+  if (e.beta == null || e.gamma == null) return null;
+  const beta = e.beta * Math.PI / 180;
+  const gamma = e.gamma * Math.PI / 180;
+  const x = Math.cos(beta) * Math.sin(gamma);
+  const y = Math.sin(beta);
+  if (Math.hypot(x, y) < TILT_FLAT) return null;
+  const a = screenAngle() * Math.PI / 180;
+  return [x * Math.cos(a) + y * Math.sin(a), y * Math.cos(a) - x * Math.sin(a)];
+}
 
 // The height with mobile browser toolbars retracted, so the water still
 // reaches the bottom edge after they slide away.
@@ -86,7 +114,10 @@ function measure(host, canvases, debug) {
   document.documentElement.style.setProperty('--spout-y', `${floor * (1 - SPOUT_RISE)}px`);
   // ?fluid-debug=fast pours in 15s for testing.
   const fillSeconds = debug === 'fast' ? 15 : 0;
-  return { cols, rows, pitch, width, height, floor, reducedMotion: reduceMotion.matches, debug, fillSeconds };
+  return {
+    cols, rows, pitch, width, height, floor, angle: screenAngle(),
+    reducedMotion: reduceMotion.matches, debug, fillSeconds,
+  };
 }
 
 function startWorker(canvases, roles, cfg, colors, onMessage, onFail) {
@@ -158,6 +189,7 @@ export function initFluid() {
   let draining = load(DRAIN_KEY) === '1';
   const savedFill = parseFloat(load(FILL_KEY));
   const valve = document.querySelector('.fluid-valve');
+  const tiltButton = document.querySelector('.fluid-tilt');
 
   const fallback = () => {
     worker?.terminate();
@@ -179,7 +211,7 @@ export function initFluid() {
     if (cfg.cols < 1 || cfg.rows < 1 || cfg.floor < 1) return false;
     worker = startWorker(canvases, roles, cfg, readColors(), onMessage, fallback);
     if (!worker) engine = startLocal(canvases, roles, cfg, readColors(), onMessage);
-    showValve();
+    showControls();
     return true;
   };
   // The valve toggles drain mode: the spout stops and a drain opens in the
@@ -190,10 +222,15 @@ export function initFluid() {
     valve.dataset.cmd = draining ? 'pour' : 'drain';
   }
 
-  function showValve() {
-    if (!valve) return;
-    syncValve();
-    valve.hidden = reduceMotion.matches;
+  function showControls() {
+    if (valve) {
+      syncValve();
+      valve.hidden = reduceMotion.matches;
+    }
+    if (tiltButton) {
+      tiltButton.hidden = reduceMotion.matches || !touchOnly.matches
+        || typeof DeviceOrientationEvent === 'undefined';
+    }
   }
 
   valve?.addEventListener('click', () => {
@@ -215,13 +252,82 @@ export function initFluid() {
       else if (type === 'pointer') engine.pointer(payload.x, payload.y, payload.vx, payload.vy);
       else if (type === 'drain') engine.setDraining(payload.on);
       else if (type === 'splash') engine.splash(payload.points);
+      else if (type === 'gravity') engine.setGravity(payload.x, payload.y);
     }
   };
 
+  // A rotated screen tells the sim how far it turned, so the water keeps
+  // its place in the phone and pours to the new bottom.
   const reconfigure = () => {
+    const angle = cfg.angle;
     cfg = { ...measure(host, canvases, debug), draining };
+    cfg.rotate = (cfg.angle - angle + 360) % 360;
     send('config', { cfg });
   };
+
+  // The tilt toggle makes gravity follow the phone. iOS asks permission
+  // first, and only from a tap; elsewhere the events just flow.
+  let tilting = false;
+  let lastTilt = 0;
+  const needsPermission = typeof DeviceOrientationEvent !== 'undefined'
+    && typeof DeviceOrientationEvent.requestPermission === 'function';
+
+  const onOrientation = e => {
+    if (!started || reduceMotion.matches || e.timeStamp - lastTilt < TILT_INTERVAL) return;
+    const g = screenGravity(e);
+    if (!g) return;
+    lastTilt = e.timeStamp;
+    send('gravity', { x: g[0], y: g[1] });
+  };
+
+  async function allowTilt() {
+    if (!needsPermission) return true;
+    try {
+      return await DeviceOrientationEvent.requestPermission() === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  function setTilt(on) {
+    tilting = on;
+    save(TILT_KEY, on ? '1' : '0');
+    tiltButton?.setAttribute('aria-pressed', String(on));
+    if (on) {
+      window.addEventListener('deviceorientation', onOrientation);
+    } else {
+      window.removeEventListener('deviceorientation', onOrientation);
+      send('gravity', { x: 0, y: 1 });
+    }
+  }
+
+  // Tilt left on last visit comes back on: right away where no permission is
+  // needed, else with the first tap on the page.
+  const resumeTilt = e => {
+    if (e.target.closest?.('.fluid-tilt')) return;
+    document.removeEventListener('click', resumeTilt, true);
+    allowTilt().then(ok => {
+      if (ok && !tilting) setTilt(true);
+    });
+  };
+
+  tiltButton?.addEventListener('click', () => {
+    document.removeEventListener('click', resumeTilt, true);
+    if (tilting) {
+      setTilt(false);
+      return;
+    }
+    allowTilt().then(ok => {
+      if (ok) setTilt(true);
+    });
+  });
+
+  const restoreTilt = () => {
+    if (!tiltButton || tiltButton.hidden || load(TILT_KEY) !== '1') return;
+    if (needsPermission) document.addEventListener('click', resumeTilt, true);
+    else setTilt(true);
+  };
+  if (started) restoreTilt();
 
   let resizeTimer;
   window.addEventListener('resize', () => {
@@ -229,6 +335,7 @@ export function initFluid() {
     resizeTimer = setTimeout(() => {
       if (!started) {
         started = begin();
+        if (started) restoreTilt();
         return;
       }
       const width = document.documentElement.clientWidth;
@@ -277,7 +384,8 @@ export function initFluid() {
 
   reduceMotion.addEventListener('change', () => {
     if (!started) return;
-    showValve();
+    showControls();
+    if (reduceMotion.matches) send('gravity', { x: 0, y: 1 });
     reconfigure();
   });
   document.addEventListener('themechange', () => send('colors', { colors: readColors() }));
