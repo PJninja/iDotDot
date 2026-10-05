@@ -10,13 +10,12 @@ let engine = null;
 self.onmessage = ({ data }) => {
   switch (data.type) {
     case 'init': {
-      const ctx = data.canvas.getContext('2d');
-      if (!ctx) {
+      const layers = data.canvases.map(canvas => ({ canvas, ctx: canvas.getContext('2d') }));
+      if (layers.some(l => !l.ctx)) {
         self.postMessage({ type: 'fail' });
         return;
       }
-      engine = new FluidEngine(data.canvas, ctx, requestFrame,
-        stats => self.postMessage({ type: 'stats', stats }));
+      engine = new FluidEngine(layers, requestFrame, msg => self.postMessage(msg));
       engine.setColors(data.colors);
       engine.configure(data.cfg);
       self.postMessage({ type: 'ready' });
@@ -36,6 +35,9 @@ self.onmessage = ({ data }) => {
       break;
     case 'pointer':
       engine?.pointer(data.x, data.y, data.vx, data.vy);
+      break;
+    case 'drain':
+      engine?.setDraining(data.on);
       break;
   }
 };
