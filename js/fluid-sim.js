@@ -75,6 +75,19 @@ const BUBBLE_DRIFT = 0.5;         // share of the current a bubble follows
 const BUBBLE_WEIGHT = 0.6;
 const IDLE_FX_MS = 1000 / 30;     // effects frame rate once the water sleeps
 
+// The surface is froth: its top cell is always foam, the cell under it
+// patchy. The pattern reshuffles a few times a second while the water moves.
+const FROTH_TOP = 0.55;           // lowest foam shade on the top cell
+const FROTH_UNDER = 0.45;         // share of second-row cells that froth
+const FROTH_RATE = 3;             // reshuffles per second
+
+// A soft glow wanders through the water (it used to sit behind the hero),
+// mixed in up to GLOW_ALPHA at its center.
+const GLOW_PERIOD = 18;           // s per loop
+const GLOW_ALPHA = 0.13;
+const GLOW_FADE = 0.7;            // glow is gone at this share of the radius
+const GLOW_LEVELS = 8;
+
 // Drain mode: the spout stops and a drain in the bottom-left corner pulls
 // the pool out over about DRAIN_SECONDS.
 const DRAIN_SECONDS = 35;
@@ -456,6 +469,13 @@ class Flip {
   }
 }
 
+// Cheap repeatable hash of a cell and a seed, in [0, 1).
+function noise(k, seed) {
+  let n = Math.imul(k ^ Math.imul(seed, 0x9e3779b1), 0x85ebca6b);
+  n = Math.imul(n ^ (n >>> 13), 0xc2b2ae35);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+}
+
 function pack([r, g, b]) {
   return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
 }
@@ -474,6 +494,8 @@ export class FluidEngine {
     this.sim = null;
     this.palette = new Uint32Array(SHADES);
     this.foamPalette = new Uint32Array(SHADES);
+    // Water then foam shades, each at every glow level.
+    this.lit = new Uint32Array(2 * SHADES * GLOW_LEVELS);
     this.visible = true;
     this.running = false;
     this.gen = 0;
@@ -481,15 +503,24 @@ export class FluidEngine {
     this.tier = 0;
   }
 
-  setColors({ fluid, hi, tint, foam }) {
+  setColors({ fluid, hi, tint, foam, glow }) {
     if (tint) this.tintColor = pack(tint);
+    const shades = [];
     for (let k = 0; k < SHADES; k++) {
       const t = k / (SHADES - 1);
-      this.palette[k] = pack(fluid.map((c, n) => Math.round(c + (hi[n] - c) * t)));
+      shades[k] = fluid.map((c, n) => Math.round(c + (hi[n] - c) * t));
       // Foam shades run from just past the highlight up to the foam color.
       const f = (k + 1) / SHADES;
-      this.foamPalette[k] = pack((foam || hi).map((c, n) => Math.round(hi[n] + (c - hi[n]) * f)));
+      shades[SHADES + k] = (foam || hi).map((c, n) => Math.round(hi[n] + (c - hi[n]) * f));
+      this.palette[k] = pack(shades[k]);
+      this.foamPalette[k] = pack(shades[SHADES + k]);
     }
+    shades.forEach((rgb, s) => {
+      for (let g = 0; g < GLOW_LEVELS; g++) {
+        const a = glow ? g / (GLOW_LEVELS - 1) * GLOW_ALPHA : 0;
+        this.lit[s * GLOW_LEVELS + g] = pack(rgb.map((c, n) => Math.round(c + ((glow?.[n] ?? c) - c) * a)));
+      }
+    });
     if (this.sim) {
       this.renderWater();
       this.compose(true);
@@ -521,7 +552,11 @@ export class FluidEngine {
     this.tintPixels = this.layers[1]?.pixels;
     this.dens = new Float32Array(cfg.cols * cfg.rows);
     this.fast = new Float32Array(cfg.cols * cfg.rows);
-    this.base = new Uint32Array(cfg.cols * cfg.rows);
+    // Per display cell: 0 for no water, else 1 + an index into this.lit's
+    // shades (water shades, then foam shades).
+    this.shade = new Uint8Array(cfg.cols * cfg.rows);
+    this.glowX = new Float32Array(cfg.cols);
+    this.glowY = new Float32Array(cfg.rows);
     this.foamBuf = new Float32Array(cfg.cols * cfg.rows);
     this.foam = new Float32Array(FOAM_MAX * 6);
     this.foamCount = 0;
@@ -1007,12 +1042,33 @@ export class FluidEngine {
     }
   }
 
-  // Draws foam and bubbles over the rendered water and pushes the layers.
-  // The tint layer only changes when the water does.
+  // Colors the water with the wandering glow, draws foam and bubbles over
+  // it, and pushes the layers. The tint layer only changes with the water.
   compose(waterChanged) {
-    const { pitch } = this.cfg;
-    const { pixels, base, foamBuf, foamPalette, foam, bubbles } = this;
-    pixels.set(base);
+    const { cols, rows, pitch, width, height } = this.cfg;
+    const { pixels, shade, lit, glowX, glowY, foamBuf, foamPalette, foam, bubbles } = this;
+
+    const phase = this.fxTime * 2 * Math.PI / GLOW_PERIOD;
+    const cx = width * (0.5 + 0.22 * Math.sin(phase));
+    const cy = height * (0.4 + 0.18 * Math.sin(1.7 * phase + 1));
+    const rx = 0.35 * width * GLOW_FADE;
+    const ry = 0.3 * height * GLOW_FADE;
+    for (let col = 0; col < cols; col++) glowX[col] = (((col + 0.5) * pitch - cx) / rx) ** 2;
+    for (let row = 0; row < rows; row++) glowY[row] = (((row + 0.5) * pitch - cy) / ry) ** 2;
+    const levels = GLOW_LEVELS - 1;
+    for (let row = 0, k = 0; row < rows; row++) {
+      const gy = glowY[row];
+      for (let col = 0; col < cols; col++, k++) {
+        const s = shade[k];
+        if (s === 0) {
+          pixels[k] = 0;
+          continue;
+        }
+        const e2 = glowX[col] + gy;
+        const g = e2 < 1 ? Math.round((1 - Math.sqrt(e2)) * levels) : 0;
+        pixels[k] = lit[(s - 1) * GLOW_LEVELS + g];
+      }
+    }
 
     // Accumulate, paint, then clear only the touched cells.
     const marks = [];
@@ -1103,12 +1159,12 @@ export class FluidEngine {
     } });
   }
 
-  // Splats the particles into display cells and shades the water into
-  // this.base and the tint mask; compose() puts them on screen.
+  // Splats the particles into display cells and picks each cell's shade
+  // (this.shade) and tint; compose() colors them and puts them on screen.
   renderWater() {
     const { cols, rows, pitch } = this.cfg;
-    const { dens, fast, palette, tintPixels, tintColor } = this;
-    const pixels = this.base;
+    const { dens, fast, shade, tintPixels, tintColor } = this;
+    const froth = Math.floor(this.time * FROTH_RATE);
     const sim = this.sim;
     const { pos, vel, count, ox, oy } = sim;
 
@@ -1161,15 +1217,26 @@ export class FluidEngine {
         (col > 0 && col < cols - 1 && dens[k - 1] >= SURFACE && dens[k + 1] >= SURFACE)
         || (k >= cols && k < dens.length - cols && dens[k - cols] >= SURFACE && dens[k + cols] >= SURFACE));
       if (gap) {
-        pixels[k] = 0;
+        shade[k] = 0;
         if (tintPixels) tintPixels[k] = 0;
         continue;
       }
       if (tintPixels) tintPixels[k] = tintColor;
+      if (k >= cols && dens[k - cols] < SURFACE) {
+        const n = noise(k, froth);
+        shade[k] = 1 + SHADES + Math.round((FROTH_TOP + (1 - FROTH_TOP) * n) * top);
+        continue;
+      }
+      if (k >= 2 * cols && dens[k - 2 * cols] < SURFACE) {
+        const n = noise(k, froth);
+        if (n < FROTH_UNDER) {
+          shade[k] = 1 + SHADES + Math.round((0.15 + 0.4 * n / FROTH_UNDER) * top);
+          continue;
+        }
+      }
       const speed = d > 0 ? fast[k] / d : 0;
-      let t = Math.min(1, Math.max(0, (speed - FAST_LO) / (FAST_HI - FAST_LO)));
-      if (k >= cols && dens[k - cols] < SURFACE) t = Math.max(t, 0.7);
-      pixels[k] = palette[Math.round(t * top)];
+      const t = Math.min(1, Math.max(0, (speed - FAST_LO) / (FAST_HI - FAST_LO)));
+      shade[k] = 1 + Math.round(t * top);
     }
   }
 }
