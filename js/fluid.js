@@ -54,15 +54,29 @@ function readColors() {
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
+// The height with mobile browser toolbars retracted, so the water still
+// reaches the bottom edge after they slide away.
+function viewportHeight() {
+  const probe = document.createElement('div');
+  probe.className = 'fluid-probe';
+  document.body.appendChild(probe);
+  const large = probe.offsetHeight;
+  probe.remove();
+  return Math.max(large, window.innerHeight);
+}
+
 // Display cells are whole device pixels so the scaled canvas stays crisp.
 function measure(host, canvases, debug) {
   const want = parseFloat(getComputedStyle(host).getPropertyValue('--fluid-pitch')) || 6;
   const dpr = window.devicePixelRatio || 1;
   const pitch = Math.max(2, Math.round(want * dpr)) / dpr;
   const width = document.documentElement.clientWidth;
-  const height = window.innerHeight;
+  const height = viewportHeight();
+  // The floor is the footer's top edge, or the bottom of the viewport when
+  // the footer is hidden (touch devices).
   const footer = document.querySelector('footer');
-  const floor = footer ? Math.min(height, footer.getBoundingClientRect().top) : height;
+  const floor = footer?.getClientRects().length
+    ? Math.min(height, footer.getBoundingClientRect().top) : height;
   const cols = Math.ceil(width / pitch);
   const rows = Math.ceil(height / pitch);
   for (const canvas of canvases) {
@@ -218,7 +232,7 @@ export function initFluid() {
         return;
       }
       const width = document.documentElement.clientWidth;
-      const height = window.innerHeight;
+      const height = viewportHeight();
       const dpr = window.devicePixelRatio || 1;
       const want = parseFloat(getComputedStyle(host).getPropertyValue('--fluid-pitch')) || 6;
       const pitch = Math.max(2, Math.round(want * dpr)) / dpr;
