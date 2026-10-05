@@ -46,5 +46,8 @@ self.onmessage = ({ data }) => {
     case 'splash':
       engine?.splash(data.points);
       break;
+    case 'gravity':
+      engine?.setGravity(data.x, data.y);
+      break;
   }
 };
