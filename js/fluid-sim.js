@@ -38,6 +38,19 @@ const STIR_RADIUS = 56;
 const STIR_STRENGTH = 0.35;       // share of pointer velocity blended in per step
 const POINTER_STEPS = 6;          // steps a pointer move keeps stirring
 
+// Stirring (pointer or splash) churns up foam and spray from the water it
+// moves, more for faster strokes, and drags bubbles in under the pointer.
+const STIR_FOAM = 0.35;           // foam chance per touched particle per step, at full pull and speed
+const STIR_FOAM_SPEED = 900;      // px/s stroke speed for the full foam rate
+const STIR_FOAM_PER_STEP = 40;
+const STIR_SPRAY = 220;           // px/s random kick given to churned-up foam
+const STIR_BUBBLES = 0.5;         // bubbles dragged in per step at full stroke speed
+
+// A splash releases bubbles from a set of points, each after its own delay,
+// wherever there's water: flip dots flipping underwater letting out air.
+// The water isn't moved.
+const SPLASH_BUBBLE_SHARE = 0.25; // share of points that release a bubble
+
 // Quality tiers dropped one at a time while a step runs over budget.
 const QUALITY = [
   { pressure: 40, separate: 2 },
@@ -56,7 +69,7 @@ const SHADES = 8;
 // Foam is thrown off by fast water and floats up to the surface; bubbles
 // rise from the floor and pop into foam at the surface. Both are drawn in
 // display cells on top of the water.
-const FOAM_MAX = 1500;
+const FOAM_MAX = 2500;
 const FOAM_SPEED = 450;           // px/s above which water throws off foam
 const FOAM_RATE = 2;              // spawn chance per second at twice FOAM_SPEED
 const FOAM_PER_STEP = 30;
@@ -66,7 +79,7 @@ const FOAM_FADE = 0.6;            // s of fade-out at the end of a foam's life
 const FOAM_RISE = 70;             // px/s drift up through the water
 const FOAM_WEIGHT = 0.55;         // foam shade added per particle
 const SPRAY_MAX_FALL = 600;       // px/s
-const BUBBLE_MAX = 160;
+const BUBBLE_MAX = 300;
 const BUBBLE_RATE = 2.5;          // per second per 1000px of wet floor
 const BUBBLE_RISE_MIN = 60;       // px/s
 const BUBBLE_RISE_MAX = 140;
@@ -501,6 +514,7 @@ export class FluidEngine {
     this.gen = 0;
     this.bias = 0;
     this.tier = 0;
+    this.pendingBubbles = [];
   }
 
   setColors({ fluid, hi, tint, foam, glow }) {
@@ -563,6 +577,7 @@ export class FluidEngine {
     this.bubbles = new Float32Array(BUBBLE_MAX * 5);
     this.bubbleCount = 0;
     this.bubbleAcc = 0;
+    this.pendingBubbles = [];
     this.fxTime = 0;
 
     this.spoutY = cfg.floor * (1 - SPOUT_RISE);
@@ -693,6 +708,29 @@ export class FluidEngine {
     this.wake();
   }
 
+  // Schedules bubbles from points [{ x, y, t }]: viewport px, t = delay in ms.
+  splash(points) {
+    if (!this.sim || this.cfg.reducedMotion) return;
+    const now = this.fxTime;
+    for (const p of points) {
+      if (Math.random() < SPLASH_BUBBLE_SHARE) {
+        this.pendingBubbles.push({ x: p.x, y: p.y, at: now + p.t / 1000 });
+      }
+    }
+    // Soonest last, so release() can pop them.
+    this.pendingBubbles.sort((a, b) => b.at - a.at);
+  }
+
+  // Lets out the scheduled splash bubbles that are due, where there's water.
+  // Runs with the effects, so it works while the water sleeps.
+  releaseBubbles() {
+    const q = this.pendingBubbles;
+    while (q.length && q[q.length - 1].at <= this.fxTime) {
+      const p = q.pop();
+      if (this.wet(p.x, p.y)) this.addBubble(p.x, p.y);
+    }
+  }
+
   wake() {
     this.idle = 0;
     this.calm = 0;
@@ -714,7 +752,9 @@ export class FluidEngine {
     const R2 = R * R;
     const cx = p.x + sim.ox;
     const cy = p.y + sim.oy;
-    const { pos, vel, count } = sim;
+    const { pos, vel, count, ox, oy } = sim;
+    const churn = STIR_FOAM * Math.min(1, Math.hypot(p.vx, p.vy) / STIR_FOAM_SPEED);
+    let foamBudget = STIR_FOAM_PER_STEP;
     let hit = false;
     for (let i = 0; i < count; i++) {
       const dx = pos[2 * i] - cx;
@@ -727,9 +767,24 @@ export class FluidEngine {
       const w = f * f * STIR_STRENGTH;
       vel[2 * i] += (p.vx - vel[2 * i]) * w;
       vel[2 * i + 1] += (p.vy - vel[2 * i + 1]) * w;
+      if (foamBudget > 0 && Math.random() < churn * Math.min(1, w / STIR_STRENGTH)) {
+        foamBudget--;
+        const life = FOAM_LIFE_MIN + Math.random() * (FOAM_LIFE_MAX - FOAM_LIFE_MIN);
+        this.addFoam(pos[2 * i] - ox, pos[2 * i + 1] - oy,
+          vel[2 * i] + (Math.random() - 0.5) * STIR_SPRAY,
+          vel[2 * i + 1] - Math.random() * STIR_SPRAY, life);
+      }
     }
-    // Stirring restarts the settle countdown and its damping ramp.
     if (hit) {
+      // Drag a bubble or two in under the stroke.
+      this.bubbleChurn = (this.bubbleChurn || 0) + STIR_BUBBLES * churn / STIR_FOAM;
+      while (this.bubbleChurn >= 1) {
+        this.bubbleChurn--;
+        const bx = p.x + (Math.random() - 0.5) * R;
+        const by = p.y + Math.random() * 0.5 * R;
+        if (this.wet(bx, by)) this.addBubble(bx, by);
+      }
+      // Stirring restarts the settle countdown and its damping ramp.
       this.idle = 0;
       this.calm = 0;
     }
@@ -930,6 +985,17 @@ export class FluidEngine {
     }
   }
 
+  addBubble(x, y) {
+    if (this.bubbleCount >= BUBBLE_MAX) return;
+    const b = this.bubbles;
+    const k = 5 * this.bubbleCount++;
+    b[k] = x;
+    b[k + 1] = y;
+    b[k + 2] = BUBBLE_RISE_MIN + Math.random() * (BUBBLE_RISE_MAX - BUBBLE_RISE_MIN);
+    b[k + 3] = Math.random() * Math.PI * 2;
+    b[k + 4] = Math.random() < 0.25 ? 2 : 1;
+  }
+
   addFoam(x, y, vx, vy, life) {
     if (this.foamCount >= FOAM_MAX) return;
     const k = 6 * this.foamCount++;
@@ -983,6 +1049,7 @@ export class FluidEngine {
     const live = !this.sleeping;
     const h2 = 0.5 * sim.h;
     this.fxTime += dt;
+    this.releaseBubbles();
 
     const f = this.foam;
     for (let i = this.foamCount - 1; i >= 0; i--) {
@@ -1014,13 +1081,7 @@ export class FluidEngine {
     while (this.bubbleAcc >= 1) {
       this.bubbleAcc--;
       const x = Math.random() * width;
-      if (this.bubbleCount >= BUBBLE_MAX || !this.wet(x, floorY)) continue;
-      const k = 5 * this.bubbleCount++;
-      b[k] = x;
-      b[k + 1] = floorY;
-      b[k + 2] = BUBBLE_RISE_MIN + Math.random() * (BUBBLE_RISE_MAX - BUBBLE_RISE_MIN);
-      b[k + 3] = Math.random() * Math.PI * 2;
-      b[k + 4] = Math.random() < 0.25 ? 2 : 1;
+      if (this.wet(x, floorY)) this.addBubble(x, floorY);
     }
     for (let i = this.bubbleCount - 1; i >= 0; i--) {
       const k = 5 * i;

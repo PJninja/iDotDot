@@ -39,5 +39,8 @@ self.onmessage = ({ data }) => {
     case 'drain':
       engine?.setDraining(data.on);
       break;
+    case 'splash':
+      engine?.splash(data.points);
+      break;
   }
 };

@@ -195,7 +195,8 @@ export class FlipBoard {
     const pitchDev = Math.max(2, Math.floor(Math.min(maxPitch, width / cols) * dpr));
     const gapDev = Math.max(1, Math.round(pitchDev * 0.2));
     const s = this.el.style;
-    s.setProperty('--pitch', `${pitchDev / dpr}px`);
+    this.pitch = pitchDev / dpr;
+    s.setProperty('--pitch', `${this.pitch}px`);
     s.setProperty('--disc', `${(pitchDev - gapDev) / dpr}px`);
     s.setProperty('--gap', `${gapDev / dpr}px`);
 
@@ -241,6 +242,7 @@ export class FlipBoard {
     return map;
   }
 
+  // Returns the animated flips as [{ i, t }]: dot index and delay in ms.
   show(text, animate = true) {
     this.text = text;
     const target = this.bitmap(text);
@@ -257,7 +259,8 @@ export class FlipBoard {
         this.queue.push({ i, on: target[i], t: col * COL_STEP + Math.random() * JITTER });
       }
     }
-    if (!this.queue.length) return;
+    if (!this.queue.length) return [];
+    const flips = this.queue.map(({ i, t }) => ({ i, t }));
 
     this.queue.sort((a, b) => b.t - a.t);
     const start = performance.now();
@@ -270,6 +273,15 @@ export class FlipBoard {
       if (this.queue.length) this.raf = requestAnimationFrame(tick);
     };
     this.raf = requestAnimationFrame(tick);
+    return flips;
+  }
+
+  // Viewport center of dot i.
+  dotCenter(i, rect = this.el.getBoundingClientRect()) {
+    return {
+      x: rect.left + (i % this.cols + 0.5) * this.pitch,
+      y: rect.top + (Math.floor(i / this.cols) + 0.5) * this.pitch,
+    };
   }
 
   flip(i, on, animate) {
