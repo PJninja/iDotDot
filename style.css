@@ -5,6 +5,8 @@
   --border:      #1a4a2a;
   --fluid:       #0a130a;
   --fluid-hi:    #0c170c;
+  --fluid-foam:  #1e3c26;
+  --fluid-tint:  #3cf;
   --font:        'VT323', 'Courier New', monospace;
   --font-body:   'Courier New', Courier, monospace;
   --glow:        rgba(57, 255, 102, 0.35);
@@ -44,6 +46,56 @@ body {
   pointer-events: none;
   position: fixed;
   z-index: -1;
+}
+
+/* Tint mask over the content, drawn wherever the water is. The color
+   blend shifts the hue of text, dots and borders below the waterline but
+   keeps their brightness, so the dark background is barely touched. Sits
+   under the nav and footer. */
+.fluid-tint {
+  inset: 0;
+  mix-blend-mode: color;
+  opacity: 0.4;
+  overflow: hidden;
+  pointer-events: none;
+  position: fixed;
+  z-index: 50;
+}
+
+/* Drain toggle, pinned to the right edge just above the spout. */
+.fluid-valve {
+  background: none;
+  border: 0;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0.4rem;
+  position: fixed;
+  right: 0.75rem;
+  top: calc(var(--spout-y, 20vh) - 2.5rem);
+  transition: color 0.15s, filter 0.15s;
+  z-index: 60;
+}
+
+.fluid-valve svg {
+  display: block;
+  height: 20px;
+  width: 20px;
+}
+
+.fluid-valve:hover,
+.fluid-valve:focus-visible {
+  color: var(--accent);
+  filter: drop-shadow(0 0 5px var(--glow));
+  outline: none;
+}
+
+.fluid-valve .valve-pour,
+.fluid-valve[aria-pressed='true'] .valve-drain {
+  display: none;
+}
+
+.fluid-valve[aria-pressed='true'] .valve-pour {
+  display: block;
 }
 
 .fluid-canvas {

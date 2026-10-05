@@ -1,11 +1,34 @@
 // Homepage background liquid: a low-res FLIP sim that pours in from the
 // top right and fills the page up to the spout. The sim lives in
 // js/fluid-sim.js and runs in a worker when OffscreenCanvas is available.
-import { FluidEngine } from './fluid-sim.js';
+// It draws two layers: the water behind the page (.fluid-bg) and a tint
+// mask above the content (.fluid-tint) that shifts the hue of whatever is
+// underwater.
+import { FluidEngine, SPOUT_RISE } from './fluid-sim.js';
 
 const RESIZE_DELAY = 150;
 const POINTER_INTERVAL = 16;      // ms between pointer updates sent to the sim
 const MAX_POINTER_SPEED = 2500;   // px/s
+
+// The fill level (in 20% steps) and drain mode survive reloads.
+const FILL_KEY = 'fluid-fill';
+const DRAIN_KEY = 'fluid-drain';
+
+function load(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function save(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage blocked; the water just starts over next visit.
+  }
+}
 
 // Clicks on these keep their normal job and leave the water alone.
 const INTERACTIVE = 'a, button, input, textarea, select, label, nav, footer, [data-href], [role="button"]';
@@ -22,13 +45,15 @@ function readColors() {
   return {
     fluid: parseHex(styles.getPropertyValue('--fluid'), [10, 19, 10]),
     hi: parseHex(styles.getPropertyValue('--fluid-hi'), [12, 23, 12]),
+    tint: parseHex(styles.getPropertyValue('--fluid-tint'), [51, 204, 255]),
+    foam: parseHex(styles.getPropertyValue('--fluid-foam'), [30, 60, 38]),
   };
 }
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 // Display cells are whole device pixels so the scaled canvas stays crisp.
-function measure(host, canvas, debug) {
+function measure(host, canvases, debug) {
   const want = parseFloat(getComputedStyle(host).getPropertyValue('--fluid-pitch')) || 6;
   const dpr = window.devicePixelRatio || 1;
   const pitch = Math.max(2, Math.round(want * dpr)) / dpr;
@@ -38,20 +63,23 @@ function measure(host, canvas, debug) {
   const floor = footer ? Math.min(height, footer.getBoundingClientRect().top) : height;
   const cols = Math.ceil(width / pitch);
   const rows = Math.ceil(height / pitch);
-  canvas.style.setProperty('--fluid-w', `${cols * pitch}px`);
-  canvas.style.setProperty('--fluid-h', `${rows * pitch}px`);
+  for (const canvas of canvases) {
+    canvas.style.setProperty('--fluid-w', `${cols * pitch}px`);
+    canvas.style.setProperty('--fluid-h', `${rows * pitch}px`);
+  }
+  document.documentElement.style.setProperty('--spout-y', `${floor * (1 - SPOUT_RISE)}px`);
   // ?fluid-debug=fast pours in 15s for testing.
   const fillSeconds = debug === 'fast' ? 15 : 0;
   return { cols, rows, pitch, width, height, floor, reducedMotion: reduceMotion.matches, debug, fillSeconds };
 }
 
-function startWorker(canvas, cfg, colors, onStats, onFail) {
-  if (!('transferControlToOffscreen' in canvas) || typeof Worker === 'undefined') return null;
+function startWorker(canvases, cfg, colors, onMessage, onFail) {
+  if (!('transferControlToOffscreen' in canvases[0]) || typeof Worker === 'undefined') return null;
   let worker;
   try {
     worker = new Worker(new URL('./fluid-worker.js', import.meta.url), { type: 'module' });
-    const offscreen = canvas.transferControlToOffscreen();
-    worker.postMessage({ type: 'init', canvas: offscreen, cfg, colors }, [offscreen]);
+    const offscreen = canvases.map(c => c.transferControlToOffscreen());
+    worker.postMessage({ type: 'init', canvases: offscreen, cfg, colors }, offscreen);
   } catch {
     worker?.terminate();
     return null;
@@ -59,8 +87,8 @@ function startWorker(canvas, cfg, colors, onStats, onFail) {
   let ready = false;
   worker.onmessage = ({ data }) => {
     if (data.type === 'ready') ready = true;
-    else if (data.type === 'stats') onStats(data.stats);
     else if (data.type === 'fail') onFail();
+    else onMessage(data);
   };
   worker.onerror = () => {
     if (!ready) onFail();
@@ -68,10 +96,10 @@ function startWorker(canvas, cfg, colors, onStats, onFail) {
   return worker;
 }
 
-function startLocal(canvas, cfg, colors, onStats) {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  const engine = new FluidEngine(canvas, ctx, cb => requestAnimationFrame(cb), onStats);
+function startLocal(canvases, cfg, colors, onMessage) {
+  const layers = canvases.map(canvas => ({ canvas, ctx: canvas.getContext('2d') }));
+  if (layers.some(l => !l.ctx)) return null;
+  const engine = new FluidEngine(layers, cb => requestAnimationFrame(cb), onMessage);
   engine.setColors(colors);
   engine.configure(cfg);
   return engine;
@@ -80,7 +108,10 @@ function startLocal(canvas, cfg, colors, onStats) {
 export function initFluid() {
   const host = document.querySelector('.fluid-bg');
   if (!host) return;
-  let canvas = host.querySelector('.fluid-canvas');
+  // Water first, then the optional tint layer.
+  let canvases = [host, document.querySelector('.fluid-tint')]
+    .filter(Boolean)
+    .map(el => el.querySelector('.fluid-canvas'));
   const debug = new URLSearchParams(location.search).get('fluid-debug');
 
   let readout = null;
@@ -96,30 +127,62 @@ export function initFluid() {
       + `\n${worker ? 'worker' : 'main thread'}${s.sleeping ? '\nasleep' : ''}`;
   };
 
+  const onMessage = msg => {
+    if (msg.type === 'stats') onStats(msg.stats);
+    else if (msg.type === 'fill') save(FILL_KEY, String(msg.level));
+  };
+
   let cfg = null;
   let worker = null;
   let engine = null;
+  let draining = load(DRAIN_KEY) === '1';
+  const savedFill = parseFloat(load(FILL_KEY));
+  const valve = document.querySelector('.fluid-valve');
 
   const fallback = () => {
     worker?.terminate();
     worker = null;
-    // A transferred canvas can't be drawn on here, so swap in a fresh one.
-    const fresh = canvas.cloneNode();
-    canvas.replaceWith(fresh);
-    canvas = fresh;
-    cfg = measure(host, canvas, debug);
-    engine = startLocal(canvas, cfg, readColors(), onStats);
+    // A transferred canvas can't be drawn on here, so swap in fresh ones.
+    canvases = canvases.map(canvas => {
+      const fresh = canvas.cloneNode();
+      canvas.replaceWith(fresh);
+      return fresh;
+    });
+    cfg = { ...measure(host, canvases, debug), draining, initialFill: savedFill };
+    engine = startLocal(canvases, cfg, readColors(), onMessage);
   };
 
   // A hidden or not-yet-laid-out page can report a zero-size viewport;
   // wait for a resize in that case.
   const begin = () => {
-    cfg = measure(host, canvas, debug);
+    cfg = { ...measure(host, canvases, debug), draining, initialFill: savedFill };
     if (cfg.cols < 1 || cfg.rows < 1 || cfg.floor < 1) return false;
-    worker = startWorker(canvas, cfg, readColors(), onStats, fallback);
-    if (!worker) engine = startLocal(canvas, cfg, readColors(), onStats);
+    worker = startWorker(canvases, cfg, readColors(), onMessage, fallback);
+    if (!worker) engine = startLocal(canvases, cfg, readColors(), onMessage);
+    showValve();
     return true;
   };
+  // The valve toggles drain mode: the spout stops and a drain opens in the
+  // bottom-left corner; pressing it again closes the drain and pours.
+  function syncValve() {
+    if (!valve) return;
+    valve.setAttribute('aria-pressed', String(draining));
+    valve.dataset.cmd = draining ? 'pour' : 'drain';
+  }
+
+  function showValve() {
+    if (!valve) return;
+    syncValve();
+    valve.hidden = reduceMotion.matches;
+  }
+
+  valve?.addEventListener('click', () => {
+    draining = !draining;
+    save(DRAIN_KEY, draining ? '1' : '0');
+    syncValve();
+    send('drain', { on: draining });
+  });
+
   let started = begin();
 
   const send = (type, payload) => {
@@ -130,11 +193,12 @@ export function initFluid() {
       else if (type === 'visible') engine.setVisible(payload.visible);
       else if (type === 'remove') engine.removeAt(payload.x, payload.y);
       else if (type === 'pointer') engine.pointer(payload.x, payload.y, payload.vx, payload.vy);
+      else if (type === 'drain') engine.setDraining(payload.on);
     }
   };
 
   const reconfigure = () => {
-    cfg = measure(host, canvas, debug);
+    cfg = { ...measure(host, canvases, debug), draining };
     send('config', { cfg });
   };
 
@@ -191,7 +255,9 @@ export function initFluid() {
   }, { passive: true });
 
   reduceMotion.addEventListener('change', () => {
-    if (started) reconfigure();
+    if (!started) return;
+    showValve();
+    reconfigure();
   });
   document.addEventListener('themechange', () => send('colors', { colors: readColors() }));
   document.addEventListener('visibilitychange', () => {

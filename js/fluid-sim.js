@@ -26,7 +26,7 @@ const CELL_SIZES = [10, 14, 20];
 const BASE_AREA = 1920 * 1080;
 const LEVEL_FILLS = [0.25, 0.55];
 
-const SPOUT_RISE = 0.8;           // spout height above the floor, share of floor depth
+export const SPOUT_RISE = 0.8;    // spout height above the floor, share of floor depth
 const FILL_SECONDS = 75;
 const TAPER_SECONDS = 1;
 const SETTLE_DAMPING = 0.015;     // per-step velocity loss once the pour stops
@@ -52,6 +52,37 @@ const SPLAT = 2.2;                // splat radius, in particle radii
 const FAST_LO = 250;              // speeds (px/s) blended toward the highlight
 const FAST_HI = 700;
 const SHADES = 8;
+
+// Foam is thrown off by fast water and floats up to the surface; bubbles
+// rise from the floor and pop into foam at the surface. Both are drawn in
+// display cells on top of the water.
+const FOAM_MAX = 1500;
+const FOAM_SPEED = 450;           // px/s above which water throws off foam
+const FOAM_RATE = 2;              // spawn chance per second at twice FOAM_SPEED
+const FOAM_PER_STEP = 30;
+const FOAM_LIFE_MIN = 1.2;        // s
+const FOAM_LIFE_MAX = 3.5;
+const FOAM_FADE = 0.6;            // s of fade-out at the end of a foam's life
+const FOAM_RISE = 70;             // px/s drift up through the water
+const FOAM_WEIGHT = 0.55;         // foam shade added per particle
+const SPRAY_MAX_FALL = 600;       // px/s
+const BUBBLE_MAX = 160;
+const BUBBLE_RATE = 2.5;          // per second per 1000px of wet floor
+const BUBBLE_RISE_MIN = 60;       // px/s
+const BUBBLE_RISE_MAX = 140;
+const BUBBLE_WOBBLE = 4;          // px
+const BUBBLE_DRIFT = 0.5;         // share of the current a bubble follows
+const BUBBLE_WEIGHT = 0.6;
+const IDLE_FX_MS = 1000 / 30;     // effects frame rate once the water sleeps
+
+// Drain mode: the spout stops and a drain in the bottom-left corner pulls
+// the pool out over about DRAIN_SECONDS.
+const DRAIN_SECONDS = 35;
+const DRAIN_WIDTH = 60;           // px, at least 3 cells
+const DRAIN_PULL_RADIUS = 160;    // px, at least 8 cells
+const DRAIN_PULL_SPEED = 220;     // px/s toward the drain
+const DRAIN_PULL = 0.04;          // share blended in per step
+const FILL_STEPS = 5;             // fill is reported in 20% steps
 
 function levelFor(fill) {
   let level = 0;
@@ -371,6 +402,24 @@ class Flip {
     }
   }
 
+  // Bilinear grid velocity component at sim-space (x, y); (dx, dy) is the
+  // component's offset from the cell corner.
+  sample(f, x, y, dx, dy) {
+    const { h, invH, nx, ny } = this;
+    x = Math.min(Math.max(x, h), (nx - 1) * h);
+    y = Math.min(Math.max(y, h), (ny - 1) * h);
+    const x0 = Math.min(Math.floor((x - dx) * invH), nx - 2);
+    const tx = (x - dx - x0 * h) * invH;
+    const x1 = Math.min(x0 + 1, nx - 2);
+    const y0 = Math.min(Math.floor((y - dy) * invH), ny - 2);
+    const ty = (y - dy - y0 * h) * invH;
+    const y1 = Math.min(y0 + 1, ny - 2);
+    const sx = 1 - tx;
+    const sy = 1 - ty;
+    return sx * sy * f[x0 * ny + y0] + tx * sy * f[x1 * ny + y0]
+      + tx * ty * f[x1 * ny + y1] + sx * ty * f[x0 * ny + y1];
+  }
+
   damp(factor) {
     const { vel } = this;
     for (let k = 0, n = 2 * this.count; k < n; k++) vel[k] *= factor;
@@ -412,15 +461,19 @@ function pack([r, g, b]) {
 }
 
 export class FluidEngine {
-  // canvas/ctx: an OffscreenCanvas or HTMLCanvasElement and its 2D context.
-  // requestFrame: rAF or a timer stand-in. onStats: debug readout callback.
-  constructor(canvas, ctx, requestFrame, onStats) {
-    this.canvas = canvas;
-    this.ctx = ctx;
+  // layers: [{ canvas, ctx }] for the water and, optionally, the tint mask;
+  // each canvas is an OffscreenCanvas or HTMLCanvasElement.
+  // requestFrame: rAF or a timer stand-in. notify: receives
+  // { type: 'stats', stats } (debug only) and { type: 'fill', level }.
+  constructor(layers, requestFrame, notify) {
+    this.layers = layers;
+    this.notify = notify;
+    this.draining = false;
+    this.tintColor = 0;
     this.requestFrame = requestFrame;
-    this.onStats = onStats;
     this.sim = null;
     this.palette = new Uint32Array(SHADES);
+    this.foamPalette = new Uint32Array(SHADES);
     this.visible = true;
     this.running = false;
     this.gen = 0;
@@ -428,12 +481,19 @@ export class FluidEngine {
     this.tier = 0;
   }
 
-  setColors({ fluid, hi }) {
+  setColors({ fluid, hi, tint, foam }) {
+    if (tint) this.tintColor = pack(tint);
     for (let k = 0; k < SHADES; k++) {
       const t = k / (SHADES - 1);
       this.palette[k] = pack(fluid.map((c, n) => Math.round(c + (hi[n] - c) * t)));
+      // Foam shades run from just past the highlight up to the foam color.
+      const f = (k + 1) / SHADES;
+      this.foamPalette[k] = pack((foam || hi).map((c, n) => Math.round(hi[n] + (c - hi[n]) * f)));
     }
-    if (this.sim && !this.running) this.render();
+    if (this.sim) {
+      this.renderWater();
+      this.compose(true);
+    }
   }
 
   setVisible(visible) {
@@ -442,18 +502,33 @@ export class FluidEngine {
     else this.stop();
   }
 
-  // cfg: { cols, rows, pitch, width, height, floor, reducedMotion, debug, fillSeconds? }
+  // cfg: { cols, rows, pitch, width, height, floor, reducedMotion, debug,
+  //        draining, initialFill?, fillSeconds? }
   configure(cfg) {
-    const fill = cfg.reducedMotion ? 1 : this.sim ? this.fill() : 0;
+    this.draining = !!cfg.draining;
+    const fill = cfg.reducedMotion ? (this.draining ? 0 : 1)
+      : this.sim ? this.fill() : Math.min(1, Math.max(0, cfg.initialFill || 0));
     this.stop();
     this.cfg = cfg;
 
-    this.canvas.width = cfg.cols;
-    this.canvas.height = cfg.rows;
-    this.image = this.ctx.createImageData(cfg.cols, cfg.rows);
-    this.pixels = new Uint32Array(this.image.data.buffer);
+    for (const layer of this.layers) {
+      layer.canvas.width = cfg.cols;
+      layer.canvas.height = cfg.rows;
+      layer.image = layer.ctx.createImageData(cfg.cols, cfg.rows);
+      layer.pixels = new Uint32Array(layer.image.data.buffer);
+    }
+    this.pixels = this.layers[0].pixels;
+    this.tintPixels = this.layers[1]?.pixels;
     this.dens = new Float32Array(cfg.cols * cfg.rows);
     this.fast = new Float32Array(cfg.cols * cfg.rows);
+    this.base = new Uint32Array(cfg.cols * cfg.rows);
+    this.foamBuf = new Float32Array(cfg.cols * cfg.rows);
+    this.foam = new Float32Array(FOAM_MAX * 6);
+    this.foamCount = 0;
+    this.bubbles = new Float32Array(BUBBLE_MAX * 5);
+    this.bubbleCount = 0;
+    this.bubbleAcc = 0;
+    this.fxTime = 0;
 
     this.spoutY = cfg.floor * (1 - SPOUT_RISE);
     this.depth = cfg.floor - this.spoutY;
@@ -464,7 +539,9 @@ export class FluidEngine {
     this.build(Math.max(levelFor(fill), this.bias));
     this.poured = 0;
     this.seed(fill * this.target);
-    this.emitting = fill < 1;
+    this.emitting = !this.draining && fill < 1;
+    this.drainAcc = 0;
+    this.savedLevel = Math.round(fill * FILL_STEPS) / FILL_STEPS;
 
     this.time = 0;
     this.acc = 0;
@@ -480,7 +557,8 @@ export class FluidEngine {
     this.sleeping = false;
     this.ptr = null;
 
-    this.render();
+    this.renderWater();
+    this.compose(true);
     this.report();
     this.start();
   }
@@ -524,7 +602,7 @@ export class FluidEngine {
 
   start() {
     if (this.running || !this.visible || !this.sim) return;
-    if (this.cfg.reducedMotion || this.sleeping) return;
+    if (this.cfg.reducedMotion) return;
     this.running = true;
     this.last = null;
     const gen = ++this.gen;
@@ -559,9 +637,10 @@ export class FluidEngine {
     sim.transfer(true);
     sim.updateDensity();
     sim.measure();
-    this.emitting = this.fill() < 1;
+    this.emitting = !this.draining && this.fill() < 1;
     this.wake();
-    this.render();
+    this.renderWater();
+    this.compose(true);
   }
 
   // Pointer moved to viewport point (x, y) at velocity (vx, vy) px/s.
@@ -571,11 +650,20 @@ export class FluidEngine {
     if (this.sleeping && this.stir(true)) this.wake();
   }
 
+  // Drain mode stops the spout and opens the drain; off restarts the spout.
+  setDraining(on) {
+    if (!this.sim) return;
+    this.draining = on;
+    this.emitting = !on && this.fill() < 1;
+    this.wake();
+  }
+
   wake() {
     this.idle = 0;
     this.calm = 0;
     if (this.sleeping) {
       this.sleeping = false;
+      this.acc = 0;
       this.start();
     }
   }
@@ -618,20 +706,31 @@ export class FluidEngine {
     this.gen++;
   }
 
+  // Steps the physics while awake; foam and bubbles keep animating after
+  // the water sleeps, at a lower frame rate and without physics.
   tick(now) {
     if (this.last == null) {
-      this.last = now;
+      this.last = this.lastFx = now;
       return;
     }
-    this.acc += Math.min((now - this.last) / 1000, 0.1);
+    const dt = Math.min((now - this.last) / 1000, 0.1);
     this.last = now;
-    if (this.acc < STEP) return;
-    for (let n = 0; this.acc >= STEP && n < MAX_STEPS_PER_FRAME && this.running; n++) {
-      this.step();
-      this.acc -= STEP;
+    let stepped = false;
+    if (!this.sleeping) {
+      this.acc += dt;
+      for (let n = 0; this.acc >= STEP && n < MAX_STEPS_PER_FRAME && this.running; n++) {
+        this.step();
+        this.acc -= STEP;
+        stepped = true;
+      }
+      if (this.acc > STEP) this.acc = 0;
     }
-    if (this.acc > STEP) this.acc = 0;
-    this.render();
+    if (!stepped && this.sleeping && now - this.lastFx < IDLE_FX_MS) return;
+    const fxDt = Math.min((now - this.lastFx) / 1000, 0.1);
+    this.lastFx = now;
+    if (stepped) this.renderWater();
+    this.updateFx(fxDt);
+    this.compose(stepped);
   }
 
   step() {
@@ -646,12 +745,17 @@ export class FluidEngine {
     this.stir();
     if (this.emitting) this.nozzle();
     else sim.damp(1 - SETTLE_DAMPING * Math.min(1, this.idle / SETTLE_RAMP_STEPS));
+    if (this.draining) this.drain();
+    this.spawnFoam();
     sim.measure();
 
     this.adapt(performance.now() - t0);
     this.coarsen();
     this.settle();
-    if (++this.steps % 30 === 0) this.report();
+    if (++this.steps % 30 === 0) {
+      this.report();
+      this.saveFill();
+    }
   }
 
   emit(dt) {
@@ -781,19 +885,213 @@ export class FluidEngine {
 
   // Once the pour has stopped and the pool is still, stop stepping entirely.
   settle() {
-    if (this.emitting) return;
+    if (this.emitting || (this.draining && this.fill() > 0.03)) return;
     this.idle++;
     this.calm = this.sim.meanSpeed < 8 ? this.calm + 1 : 0;
     if (this.calm > 120 || this.idle > 60 * 20) {
       this.sleeping = true;
-      this.stop();
       this.report();
+      this.saveFill();
     }
   }
 
+  addFoam(x, y, vx, vy, life) {
+    if (this.foamCount >= FOAM_MAX) return;
+    const k = 6 * this.foamCount++;
+    const f = this.foam;
+    f[k] = x;
+    f[k + 1] = y;
+    f[k + 2] = vx;
+    f[k + 3] = vy;
+    f[k + 4] = life;
+  }
+
+  // Fast water throws off foam, more the faster it moves. Starts at a random
+  // particle so no part of the pool is favored when the budget runs out.
+  spawnFoam() {
+    const sim = this.sim;
+    const { pos, vel, count, ox, oy } = sim;
+    if (!count) return;
+    const min2 = FOAM_SPEED * FOAM_SPEED;
+    const first = Math.floor(Math.random() * count);
+    let budget = FOAM_PER_STEP;
+    for (let n = 0; n < count && budget > 0; n++) {
+      const i = (first + n) % count;
+      const vx = vel[2 * i];
+      const vy = vel[2 * i + 1];
+      const s2 = vx * vx + vy * vy;
+      if (s2 < min2) continue;
+      if (Math.random() > FOAM_RATE * STEP * (Math.sqrt(s2) / FOAM_SPEED - 1)) continue;
+      const life = FOAM_LIFE_MIN + Math.random() * (FOAM_LIFE_MAX - FOAM_LIFE_MIN);
+      this.addFoam(pos[2 * i] - ox, pos[2 * i + 1] - oy, vx, vy, life);
+      budget--;
+    }
+  }
+
+  // Display cell index at viewport point (x, y), or -1 off the canvas.
+  cellAt(x, y) {
+    const { cols, rows, pitch } = this.cfg;
+    const col = Math.floor(x / pitch);
+    const row = Math.floor(y / pitch);
+    if (col < 0 || row < 0 || col >= cols || row >= rows) return -1;
+    return row * cols + col;
+  }
+
+  wet(x, y) {
+    const k = this.cellAt(x, y);
+    return k >= 0 && this.dens[k] >= SURFACE;
+  }
+
+  updateFx(dt) {
+    const sim = this.sim;
+    const { width, floor, pitch } = this.cfg;
+    const live = !this.sleeping;
+    const h2 = 0.5 * sim.h;
+    this.fxTime += dt;
+
+    const f = this.foam;
+    for (let i = this.foamCount - 1; i >= 0; i--) {
+      const k = 6 * i;
+      f[k + 4] -= dt;
+      if (f[k + 4] <= 0) {
+        const last = 6 * --this.foamCount;
+        f.copyWithin(k, last, last + 6);
+        continue;
+      }
+      const x = f[k];
+      const y = f[k + 1];
+      if (this.wet(x, y)) {
+        // Carried by the current while drifting up to the surface.
+        f[k + 2] = live ? sim.sample(sim.u, x + sim.ox, y + sim.oy, 0, h2) : 0;
+        f[k + 3] = (live ? sim.sample(sim.v, x + sim.ox, y + sim.oy, h2, 0) : 0) - FOAM_RISE;
+      } else {
+        // Spray: falls back under gravity.
+        f[k + 2] *= 0.99;
+        f[k + 3] = Math.min(f[k + 3] + GRAVITY * dt, SPRAY_MAX_FALL);
+      }
+      f[k] = Math.min(Math.max(x + f[k + 2] * dt, 0), width);
+      f[k + 1] = Math.min(y + f[k + 3] * dt, floor);
+    }
+
+    const b = this.bubbles;
+    const floorY = floor - 0.5 * pitch;
+    this.bubbleAcc += BUBBLE_RATE * width / 1000 * dt;
+    while (this.bubbleAcc >= 1) {
+      this.bubbleAcc--;
+      const x = Math.random() * width;
+      if (this.bubbleCount >= BUBBLE_MAX || !this.wet(x, floorY)) continue;
+      const k = 5 * this.bubbleCount++;
+      b[k] = x;
+      b[k + 1] = floorY;
+      b[k + 2] = BUBBLE_RISE_MIN + Math.random() * (BUBBLE_RISE_MAX - BUBBLE_RISE_MIN);
+      b[k + 3] = Math.random() * Math.PI * 2;
+      b[k + 4] = Math.random() < 0.25 ? 2 : 1;
+    }
+    for (let i = this.bubbleCount - 1; i >= 0; i--) {
+      const k = 5 * i;
+      let y = b[k + 1] - b[k + 2] * dt;
+      if (live) {
+        b[k] += BUBBLE_DRIFT * sim.sample(sim.u, b[k] + sim.ox, y + sim.oy, 0, h2) * dt;
+        y += BUBBLE_DRIFT * sim.sample(sim.v, b[k] + sim.ox, y + sim.oy, h2, 0) * dt;
+      }
+      b[k + 1] = y;
+      const x = b[k] + Math.sin(b[k + 3] + this.fxTime * 3) * BUBBLE_WOBBLE;
+      if (!this.wet(x, y - b[k + 4] * pitch * 0.5)) {
+        // Popped at the surface.
+        for (let n = 0; n < 2; n++) {
+          this.addFoam(x + (Math.random() - 0.5) * pitch, y, 0, 0, 0.8 + Math.random() * 0.8);
+        }
+        const last = 5 * --this.bubbleCount;
+        b.copyWithin(k, last, last + 5);
+      }
+    }
+  }
+
+  // Draws foam and bubbles over the rendered water and pushes the layers.
+  // The tint layer only changes when the water does.
+  compose(waterChanged) {
+    const { pitch } = this.cfg;
+    const { pixels, base, foamBuf, foamPalette, foam, bubbles } = this;
+    pixels.set(base);
+
+    // Accumulate, paint, then clear only the touched cells.
+    const marks = [];
+    const mark = (k, w) => {
+      if (k < 0) return;
+      if (foamBuf[k] === 0) marks.push(k);
+      foamBuf[k] += w;
+    };
+    for (let i = 0; i < this.foamCount; i++) {
+      const life = foam[6 * i + 4];
+      mark(this.cellAt(foam[6 * i], foam[6 * i + 1]), FOAM_WEIGHT * Math.min(1, life / FOAM_FADE));
+    }
+    for (let i = 0; i < this.bubbleCount; i++) {
+      const k = 5 * i;
+      const x = bubbles[k] + Math.sin(bubbles[k + 3] + this.fxTime * 3) * BUBBLE_WOBBLE;
+      const y = bubbles[k + 1];
+      mark(this.cellAt(x, y), BUBBLE_WEIGHT);
+      if (bubbles[k + 4] > 1) {
+        mark(this.cellAt(x + pitch, y), BUBBLE_WEIGHT);
+        mark(this.cellAt(x, y - pitch), BUBBLE_WEIGHT);
+        mark(this.cellAt(x + pitch, y - pitch), BUBBLE_WEIGHT);
+      }
+    }
+    const top = SHADES - 1;
+    for (const k of marks) {
+      pixels[k] = foamPalette[Math.min(top, Math.round(foamBuf[k] * top))];
+      foamBuf[k] = 0;
+    }
+
+    this.layers[0].ctx.putImageData(this.layers[0].image, 0, 0);
+    if (waterChanged && this.layers[1]) {
+      this.layers[1].ctx.putImageData(this.layers[1].image, 0, 0);
+    }
+  }
+
+  // Reports the fill, rounded to 20% steps, whenever that step changes.
+  saveFill() {
+    const level = Math.round(this.fill() * FILL_STEPS) / FILL_STEPS;
+    if (level === this.savedLevel) return;
+    this.savedLevel = level;
+    this.notify?.({ type: 'fill', level });
+  }
+
+  // Pulls water toward the bottom-left corner and removes what reaches it,
+  // no faster than DRAIN_SECONDS for a full pool.
+  drain() {
+    const sim = this.sim;
+    const { floor } = this.cfg;
+    const w = Math.max(DRAIN_WIDTH, 3 * sim.h);
+    const reach = Math.max(DRAIN_PULL_RADIUS, 8 * sim.h);
+    const reach2 = reach * reach;
+    const cx = sim.ox;
+    const cy = floor + sim.oy;
+    const { pos, vel } = sim;
+
+    const rate = this.target / DRAIN_SECONDS * STEP / sim.area;
+    this.drainAcc += rate;
+    for (let i = sim.count - 1; i >= 0; i--) {
+      const dx = cx - pos[2 * i];
+      const dy = cy - pos[2 * i + 1];
+      const d2 = dx * dx + dy * dy;
+      if (d2 > reach2) continue;
+      if (-dx < w && dy < w && this.drainAcc >= 1) {
+        sim.remove(i);
+        this.drainAcc--;
+        continue;
+      }
+      const d = Math.sqrt(d2) || 1;
+      const f = 1 - d / reach;
+      vel[2 * i] += (dx / d * DRAIN_PULL_SPEED - vel[2 * i]) * DRAIN_PULL * f;
+      vel[2 * i + 1] += (dy / d * DRAIN_PULL_SPEED - vel[2 * i + 1]) * DRAIN_PULL * f;
+    }
+    // Don't bank removals while nothing is reaching the drain.
+    this.drainAcc = Math.min(this.drainAcc, Math.max(4, 2 * rate));
+  }
+
   report() {
-    if (this.cfg.debug == null || !this.onStats) return;
-    this.onStats({
+    if (this.cfg.debug == null || !this.notify) return;
+    this.notify({ type: 'stats', stats: {
       cell: this.sim.h,
       fill: this.fill(),
       ms: this.msEma,
@@ -802,12 +1100,15 @@ export class FluidEngine {
       particles: this.sim.count,
       sleeping: this.sleeping || !!this.cfg.reducedMotion,
       tier: this.tier,
-    });
+    } });
   }
 
-  render() {
+  // Splats the particles into display cells and shades the water into
+  // this.base and the tint mask; compose() puts them on screen.
+  renderWater() {
     const { cols, rows, pitch } = this.cfg;
-    const { dens, fast, pixels, palette } = this;
+    const { dens, fast, palette, tintPixels, tintColor } = this;
+    const pixels = this.base;
     const sim = this.sim;
     const { pos, vel, count, ox, oy } = sim;
 
@@ -861,13 +1162,14 @@ export class FluidEngine {
         || (k >= cols && k < dens.length - cols && dens[k - cols] >= SURFACE && dens[k + cols] >= SURFACE));
       if (gap) {
         pixels[k] = 0;
+        if (tintPixels) tintPixels[k] = 0;
         continue;
       }
+      if (tintPixels) tintPixels[k] = tintColor;
       const speed = d > 0 ? fast[k] / d : 0;
       let t = Math.min(1, Math.max(0, (speed - FAST_LO) / (FAST_HI - FAST_LO)));
       if (k >= cols && dens[k - cols] < SURFACE) t = Math.max(t, 0.7);
       pixels[k] = palette[Math.round(t * top)];
     }
-    this.ctx.putImageData(this.image, 0, 0);
   }
 }

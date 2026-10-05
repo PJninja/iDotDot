@@ -82,7 +82,7 @@ export function initFooter() {
   document.addEventListener('mouseover', e => {
     const link = e.target.closest('a, button');
     if (link) {
-      const label = hrefLabel(link.getAttribute('href'));
+      const label = link.dataset.cmd || hrefLabel(link.getAttribute('href'));
       if (label) cmd.textContent = `${DEFAULT_TEXT}${label} `;
       return;
     }
