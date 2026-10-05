@@ -1009,7 +1009,9 @@ footer.terminal-active {
 }
 
 /* Touch-only devices: the terminal footer reacts to hover and typing, so
-   it's dropped and the page (and the water) runs to the bottom edge. */
+   it's dropped and the page (and the water) runs to the bottom edge. The
+   nav drops its blur, which phones redraw every frame the water moves
+   under it; its background is nearly opaque anyway. */
 @media (hover: none) and (pointer: coarse) {
   body {
     padding-bottom: 0;
@@ -1017,5 +1019,9 @@ footer.terminal-active {
 
   footer {
     display: none;
+  }
+
+  .nav {
+    backdrop-filter: none;
   }
 }

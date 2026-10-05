@@ -11,6 +11,22 @@ const SOLID = 2;
 
 const STEP = 1 / 60;
 const MAX_STEPS_PER_FRAME = 2;
+// Display frames arrive close to a whole or half number of steps apart (60
+// or 120Hz, or after a dropped frame), but their timestamps jitter, and
+// Safari rounds them to the millisecond. A gap that close is snapped to the
+// exact multiple, so each frame keeps its one step instead of now and then
+// getting none followed by two, which shows as a stutter.
+const SNAP_WHOLE = 0.12;          // share of a step around a whole number of steps (~2ms)
+const SNAP_HALF = 0.06;           // around a half step (~1ms), clear of 144Hz frames
+
+function snapFrame(dt) {
+  const steps = dt / STEP;
+  const whole = Math.round(steps);
+  if (whole >= 1 && Math.abs(steps - whole) < SNAP_WHOLE) return whole * STEP;
+  const half = Math.round(steps * 2) / 2;
+  if (Math.abs(steps - half) < SNAP_HALF) return half * STEP;
+  return dt;
+}
 const MAX_SUBSTEPS = 2;
 const GRAVITY = 1800;
 // Gravity can point any way in the screen plane (tilt, fed from the device
@@ -906,7 +922,7 @@ export class FluidEngine {
       this.last = this.lastFx = now;
       return;
     }
-    const dt = Math.min((now - this.last) / 1000, 0.1);
+    const dt = snapFrame(Math.min((now - this.last) / 1000, 0.1));
     this.last = now;
     let stepped = false;
     if (!this.sleeping) {
