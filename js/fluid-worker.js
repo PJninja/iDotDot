@@ -10,7 +10,11 @@ let engine = null;
 self.onmessage = ({ data }) => {
   switch (data.type) {
     case 'init': {
-      const layers = data.canvases.map(canvas => ({ canvas, ctx: canvas.getContext('2d') }));
+      const layers = data.canvases.map((canvas, i) => ({
+        role: data.roles[i],
+        canvas,
+        ctx: canvas.getContext('2d'),
+      }));
       if (layers.some(l => !l.ctx)) {
         self.postMessage({ type: 'fail' });
         return;

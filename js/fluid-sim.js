@@ -68,7 +68,7 @@ const SHADES = 8;
 
 // Foam is thrown off by fast water and floats up to the surface; bubbles
 // rise from the floor and pop into foam at the surface. Both are drawn in
-// display cells on top of the water.
+// display cells: foam on top of the water, bubbles on the froth layer.
 const FOAM_MAX = 2500;
 const FOAM_SPEED = 450;           // px/s above which water throws off foam
 const FOAM_RATE = 2;              // spawn chance per second at twice FOAM_SPEED
@@ -90,6 +90,8 @@ const IDLE_FX_MS = 1000 / 30;     // effects frame rate once the water sleeps
 
 // The surface is froth: its top cell is always foam, the cell under it
 // patchy. The pattern reshuffles a few times a second while the water moves.
+// Froth and bubbles go on their own layer over the page content when there
+// is one, with alpha rising with the foam shade.
 const FROTH_TOP = 0.55;           // lowest foam shade on the top cell
 const FROTH_UNDER = 0.45;         // share of second-row cells that froth
 const FROTH_RATE = 3;             // reshuffles per second
@@ -489,17 +491,19 @@ function noise(k, seed) {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
 }
 
-function pack([r, g, b]) {
-  return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+function pack([r, g, b], a = 255) {
+  return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
 }
 
 export class FluidEngine {
-  // layers: [{ canvas, ctx }] for the water and, optionally, the tint mask;
+  // layers: [{ role, canvas, ctx }] with role 'water' and, optionally,
+  // 'tint' (the tint mask) and 'froth' (froth and bubbles over the content);
   // each canvas is an OffscreenCanvas or HTMLCanvasElement.
   // requestFrame: rAF or a timer stand-in. notify: receives
   // { type: 'stats', stats } (debug only) and { type: 'fill', level }.
   constructor(layers, requestFrame, notify) {
     this.layers = layers;
+    this.layer = Object.fromEntries(layers.map(l => [l.role, l]));
     this.notify = notify;
     this.draining = false;
     this.tintColor = 0;
@@ -507,6 +511,7 @@ export class FluidEngine {
     this.sim = null;
     this.palette = new Uint32Array(SHADES);
     this.foamPalette = new Uint32Array(SHADES);
+    this.frothPalette = new Uint32Array(SHADES);
     // Water then foam shades, each at every glow level.
     this.lit = new Uint32Array(2 * SHADES * GLOW_LEVELS);
     this.visible = true;
@@ -517,7 +522,7 @@ export class FluidEngine {
     this.pendingBubbles = [];
   }
 
-  setColors({ fluid, hi, tint, foam, glow }) {
+  setColors({ fluid, hi, tint, foam, froth, glow }) {
     if (tint) this.tintColor = pack(tint);
     const shades = [];
     for (let k = 0; k < SHADES; k++) {
@@ -528,6 +533,7 @@ export class FluidEngine {
       shades[SHADES + k] = (foam || hi).map((c, n) => Math.round(hi[n] + (c - hi[n]) * f));
       this.palette[k] = pack(shades[k]);
       this.foamPalette[k] = pack(shades[SHADES + k]);
+      this.frothPalette[k] = pack(froth || foam || hi, Math.round(255 * f));
     }
     shades.forEach((rgb, s) => {
       for (let g = 0; g < GLOW_LEVELS; g++) {
@@ -562,13 +568,17 @@ export class FluidEngine {
       layer.image = layer.ctx.createImageData(cfg.cols, cfg.rows);
       layer.pixels = new Uint32Array(layer.image.data.buffer);
     }
-    this.pixels = this.layers[0].pixels;
-    this.tintPixels = this.layers[1]?.pixels;
+    this.pixels = this.layer.water.pixels;
+    this.tintPixels = this.layer.tint?.pixels;
+    this.frothPixels = this.layer.froth?.pixels;
     this.dens = new Float32Array(cfg.cols * cfg.rows);
     this.fast = new Float32Array(cfg.cols * cfg.rows);
-    // Per display cell: 0 for no water, else 1 + an index into this.lit's
-    // shades (water shades, then foam shades).
+    // Per display cell. shade: 0 for no water, else 1 + a water shade.
+    // froth: 0 for none, else 1 + a foam shade drawn over the water.
     this.shade = new Uint8Array(cfg.cols * cfg.rows);
+    this.froth = new Uint8Array(cfg.cols * cfg.rows);
+    this.bubbleBuf = new Float32Array(cfg.cols * cfg.rows);
+    this.hadBubbles = false;
     this.glowX = new Float32Array(cfg.cols);
     this.glowY = new Float32Array(cfg.rows);
     this.foamBuf = new Float32Array(cfg.cols * cfg.rows);
@@ -1103,11 +1113,13 @@ export class FluidEngine {
     }
   }
 
-  // Colors the water with the wandering glow, draws foam and bubbles over
-  // it, and pushes the layers. The tint layer only changes with the water.
+  // Colors the water with the wandering glow, draws foam over it and froth
+  // and bubbles on the froth layer (or over the water without one), and
+  // pushes the layers. The tint layer only changes with the water.
   compose(waterChanged) {
     const { cols, rows, pitch, width, height } = this.cfg;
-    const { pixels, shade, lit, glowX, glowY, foamBuf, foamPalette, foam, bubbles } = this;
+    const { pixels, shade, froth, lit, glowX, glowY, foamBuf, foamPalette, foam, bubbles } = this;
+    const { frothPixels, frothPalette, bubbleBuf } = this;
 
     const phase = this.fxTime * 2 * Math.PI / GLOW_PERIOD;
     const cx = width * (0.5 + 0.22 * Math.sin(phase));
@@ -1121,36 +1133,41 @@ export class FluidEngine {
       const gy = glowY[row];
       for (let col = 0; col < cols; col++, k++) {
         const s = shade[k];
+        const f = froth[k];
+        if (frothPixels) frothPixels[k] = f ? frothPalette[f - 1] : 0;
         if (s === 0) {
           pixels[k] = 0;
           continue;
         }
         const e2 = glowX[col] + gy;
         const g = e2 < 1 ? Math.round((1 - Math.sqrt(e2)) * levels) : 0;
-        pixels[k] = lit[(s - 1) * GLOW_LEVELS + g];
+        pixels[k] = lit[(f && !frothPixels ? SHADES + f - 1 : s - 1) * GLOW_LEVELS + g];
       }
     }
 
     // Accumulate, paint, then clear only the touched cells.
     const marks = [];
-    const mark = (k, w) => {
+    const bubbleMarks = frothPixels ? [] : marks;
+    const bubbleSum = frothPixels ? bubbleBuf : foamBuf;
+    const mark = (buf, list, k, w) => {
       if (k < 0) return;
-      if (foamBuf[k] === 0) marks.push(k);
-      foamBuf[k] += w;
+      if (buf[k] === 0) list.push(k);
+      buf[k] += w;
     };
     for (let i = 0; i < this.foamCount; i++) {
       const life = foam[6 * i + 4];
-      mark(this.cellAt(foam[6 * i], foam[6 * i + 1]), FOAM_WEIGHT * Math.min(1, life / FOAM_FADE));
+      mark(foamBuf, marks, this.cellAt(foam[6 * i], foam[6 * i + 1]),
+        FOAM_WEIGHT * Math.min(1, life / FOAM_FADE));
     }
     for (let i = 0; i < this.bubbleCount; i++) {
       const k = 5 * i;
       const x = bubbles[k] + Math.sin(bubbles[k + 3] + this.fxTime * 3) * BUBBLE_WOBBLE;
       const y = bubbles[k + 1];
-      mark(this.cellAt(x, y), BUBBLE_WEIGHT);
+      mark(bubbleSum, bubbleMarks, this.cellAt(x, y), BUBBLE_WEIGHT);
       if (bubbles[k + 4] > 1) {
-        mark(this.cellAt(x + pitch, y), BUBBLE_WEIGHT);
-        mark(this.cellAt(x, y - pitch), BUBBLE_WEIGHT);
-        mark(this.cellAt(x + pitch, y - pitch), BUBBLE_WEIGHT);
+        mark(bubbleSum, bubbleMarks, this.cellAt(x + pitch, y), BUBBLE_WEIGHT);
+        mark(bubbleSum, bubbleMarks, this.cellAt(x, y - pitch), BUBBLE_WEIGHT);
+        mark(bubbleSum, bubbleMarks, this.cellAt(x + pitch, y - pitch), BUBBLE_WEIGHT);
       }
     }
     const top = SHADES - 1;
@@ -1158,11 +1175,22 @@ export class FluidEngine {
       pixels[k] = foamPalette[Math.min(top, Math.round(foamBuf[k] * top))];
       foamBuf[k] = 0;
     }
-
-    this.layers[0].ctx.putImageData(this.layers[0].image, 0, 0);
-    if (waterChanged && this.layers[1]) {
-      this.layers[1].ctx.putImageData(this.layers[1].image, 0, 0);
+    if (frothPixels) {
+      for (const k of bubbleMarks) {
+        const level = Math.min(top, Math.round(bubbleBuf[k] * top));
+        frothPixels[k] = frothPalette[Math.max(level, froth[k] - 1)];
+        bubbleBuf[k] = 0;
+      }
     }
+
+    const { water, tint, froth: frothLayer } = this.layer;
+    water.ctx.putImageData(water.image, 0, 0);
+    if (waterChanged && tint) tint.ctx.putImageData(tint.image, 0, 0);
+    // The froth layer only changes with the water or while bubbles move.
+    if (frothLayer && (waterChanged || this.bubbleCount > 0 || this.hadBubbles)) {
+      frothLayer.ctx.putImageData(frothLayer.image, 0, 0);
+    }
+    this.hadBubbles = this.bubbleCount > 0;
   }
 
   // Reports the fill, rounded to 20% steps, whenever that step changes.
@@ -1224,8 +1252,8 @@ export class FluidEngine {
   // (this.shade) and tint; compose() colors them and puts them on screen.
   renderWater() {
     const { cols, rows, pitch } = this.cfg;
-    const { dens, fast, shade, tintPixels, tintColor } = this;
-    const froth = Math.floor(this.time * FROTH_RATE);
+    const { dens, fast, shade, froth, tintPixels, tintColor } = this;
+    const seed = Math.floor(this.time * FROTH_RATE);
     const sim = this.sim;
     const { pos, vel, count, ox, oy } = sim;
 
@@ -1279,25 +1307,22 @@ export class FluidEngine {
         || (k >= cols && k < dens.length - cols && dens[k - cols] >= SURFACE && dens[k + cols] >= SURFACE));
       if (gap) {
         shade[k] = 0;
+        froth[k] = 0;
         if (tintPixels) tintPixels[k] = 0;
         continue;
       }
       if (tintPixels) tintPixels[k] = tintColor;
-      if (k >= cols && dens[k - cols] < SURFACE) {
-        const n = noise(k, froth);
-        shade[k] = 1 + SHADES + Math.round((FROTH_TOP + (1 - FROTH_TOP) * n) * top);
-        continue;
-      }
-      if (k >= 2 * cols && dens[k - 2 * cols] < SURFACE) {
-        const n = noise(k, froth);
-        if (n < FROTH_UNDER) {
-          shade[k] = 1 + SHADES + Math.round((0.15 + 0.4 * n / FROTH_UNDER) * top);
-          continue;
-        }
-      }
       const speed = d > 0 ? fast[k] / d : 0;
       const t = Math.min(1, Math.max(0, (speed - FAST_LO) / (FAST_HI - FAST_LO)));
       shade[k] = 1 + Math.round(t * top);
+      froth[k] = 0;
+      if (k >= cols && dens[k - cols] < SURFACE) {
+        const n = noise(k, seed);
+        froth[k] = 1 + Math.round((FROTH_TOP + (1 - FROTH_TOP) * n) * top);
+      } else if (k >= 2 * cols && dens[k - 2 * cols] < SURFACE) {
+        const n = noise(k, seed);
+        if (n < FROTH_UNDER) froth[k] = 1 + Math.round((0.15 + 0.4 * n / FROTH_UNDER) * top);
+      }
     }
   }
 }

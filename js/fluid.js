@@ -1,9 +1,9 @@
 // Homepage background liquid: a low-res FLIP sim that pours in from the
 // top right and fills the page up to the spout. The sim lives in
 // js/fluid-sim.js and runs in a worker when OffscreenCanvas is available.
-// It draws two layers: the water behind the page (.fluid-bg) and a tint
+// It draws three layers: the water behind the page (.fluid-bg), a tint
 // mask above the content (.fluid-tint) that shifts the hue of whatever is
-// underwater.
+// underwater, and the surface froth and bubbles over both (.fluid-froth).
 import { FluidEngine, SPOUT_RISE } from './fluid-sim.js';
 
 const RESIZE_DELAY = 150;
@@ -47,6 +47,7 @@ function readColors() {
     hi: parseHex(styles.getPropertyValue('--fluid-hi'), [12, 23, 12]),
     tint: parseHex(styles.getPropertyValue('--fluid-tint'), [51, 204, 255]),
     foam: parseHex(styles.getPropertyValue('--fluid-foam'), [30, 60, 38]),
+    froth: parseHex(styles.getPropertyValue('--fluid-froth'), [159, 232, 180]),
     glow: parseHex(styles.getPropertyValue('--fluid-glow'), [26, 138, 53]),
   };
 }
@@ -74,13 +75,13 @@ function measure(host, canvases, debug) {
   return { cols, rows, pitch, width, height, floor, reducedMotion: reduceMotion.matches, debug, fillSeconds };
 }
 
-function startWorker(canvases, cfg, colors, onMessage, onFail) {
+function startWorker(canvases, roles, cfg, colors, onMessage, onFail) {
   if (!('transferControlToOffscreen' in canvases[0]) || typeof Worker === 'undefined') return null;
   let worker;
   try {
     worker = new Worker(new URL('./fluid-worker.js', import.meta.url), { type: 'module' });
     const offscreen = canvases.map(c => c.transferControlToOffscreen());
-    worker.postMessage({ type: 'init', canvases: offscreen, cfg, colors }, offscreen);
+    worker.postMessage({ type: 'init', canvases: offscreen, roles, cfg, colors }, offscreen);
   } catch {
     worker?.terminate();
     return null;
@@ -97,8 +98,8 @@ function startWorker(canvases, cfg, colors, onMessage, onFail) {
   return worker;
 }
 
-function startLocal(canvases, cfg, colors, onMessage) {
-  const layers = canvases.map(canvas => ({ canvas, ctx: canvas.getContext('2d') }));
+function startLocal(canvases, roles, cfg, colors, onMessage) {
+  const layers = canvases.map((canvas, i) => ({ role: roles[i], canvas, ctx: canvas.getContext('2d') }));
   if (layers.some(l => !l.ctx)) return null;
   const engine = new FluidEngine(layers, cb => requestAnimationFrame(cb), onMessage);
   engine.setColors(colors);
@@ -109,10 +110,14 @@ function startLocal(canvases, cfg, colors, onMessage) {
 export function initFluid() {
   const host = document.querySelector('.fluid-bg');
   if (!host) return;
-  // Water first, then the optional tint layer.
-  let canvases = [host, document.querySelector('.fluid-tint')]
-    .filter(Boolean)
-    .map(el => el.querySelector('.fluid-canvas'));
+  // The water layer is required; the tint and froth layers are optional.
+  const found = [
+    ['water', host],
+    ['tint', document.querySelector('.fluid-tint')],
+    ['froth', document.querySelector('.fluid-froth')],
+  ].filter(([, el]) => el);
+  const roles = found.map(([role]) => role);
+  let canvases = found.map(([, el]) => el.querySelector('.fluid-canvas'));
   const debug = new URLSearchParams(location.search).get('fluid-debug');
 
   let readout = null;
@@ -150,7 +155,7 @@ export function initFluid() {
       return fresh;
     });
     cfg = { ...measure(host, canvases, debug), draining, initialFill: savedFill };
-    engine = startLocal(canvases, cfg, readColors(), onMessage);
+    engine = startLocal(canvases, roles, cfg, readColors(), onMessage);
   };
 
   // A hidden or not-yet-laid-out page can report a zero-size viewport;
@@ -158,8 +163,8 @@ export function initFluid() {
   const begin = () => {
     cfg = { ...measure(host, canvases, debug), draining, initialFill: savedFill };
     if (cfg.cols < 1 || cfg.rows < 1 || cfg.floor < 1) return false;
-    worker = startWorker(canvases, cfg, readColors(), onMessage, fallback);
-    if (!worker) engine = startLocal(canvases, cfg, readColors(), onMessage);
+    worker = startWorker(canvases, roles, cfg, readColors(), onMessage, fallback);
+    if (!worker) engine = startLocal(canvases, roles, cfg, readColors(), onMessage);
     showValve();
     return true;
   };
