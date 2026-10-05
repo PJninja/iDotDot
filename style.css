@@ -7,6 +7,7 @@
   --fluid-glow:  #1a8a35;
   --fluid-hi:    #0f1d0f;
   --fluid-foam:  #1e3c26;
+  --fluid-froth: #9fe8b4;
   --fluid-tint:  #3cf;
   --font:        'VT323', 'Courier New', monospace;
   --font-body:   'Courier New', Courier, monospace;
@@ -61,6 +62,17 @@ body {
   pointer-events: none;
   position: fixed;
   z-index: 50;
+}
+
+/* Surface froth and bubbles, drawn over the content (and over the tint so
+   they keep their own color) but under the nav and footer. */
+.fluid-froth {
+  inset: 0;
+  opacity: 0.6;
+  overflow: hidden;
+  pointer-events: none;
+  position: fixed;
+  z-index: 55;
 }
 
 /* Drain toggle, pinned to the right edge just above the spout. */
