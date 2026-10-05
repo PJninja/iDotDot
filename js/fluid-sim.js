@@ -2,7 +2,8 @@
 // Runs inside js/fluid-worker.js, or on the main thread when OffscreenCanvas
 // isn't available. Positions are CSS px in "sim space": the grid is padded
 // with one solid cell on every side and offset (ox, oy) so its right wall
-// sits on the viewport's right edge and its floor on the footer's top edge.
+// sits on the viewport's right edge and its floor on the footer's top edge
+// (or the viewport's bottom edge when the footer is hidden).
 
 const FLUID = 0;
 const AIR = 1;
