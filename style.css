@@ -166,22 +166,95 @@ body::after {
   z-index: 1;
 }
 
-.hero-prompt {
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  margin-bottom: 0.25rem;
-}
-
+/* Title and subtitle render as flip-dot boards (js/flipdot.js).
+   --dot-max / --dot-min bound the dot pitch; the board wraps lines
+   when it can't fit at --dot-min, up to --dot-lines, then shrinks
+   the dots instead. */
 .hero-title {
-  font-size: clamp(2rem, 6vw, 4rem);
+  --dot-lines: 1;
+  --dot-max: 13px;
+  --dot-min: 6px;
+  --dot-on: var(--accent);
   line-height: 1;
-  margin-bottom: 0.4rem;
-  text-shadow: 0 0 16px var(--glow), 0 0 32px rgba(57, 255, 102, 0.12);
+  margin-bottom: 0.8rem;
 }
 
 .hero-sub {
-  color: var(--text-dim);
-  font-size: clamp(0.85rem, 2.2vw, 1.15rem);
+  --dot-lines: 2;
+  --dot-max: 6.5px;
+  --dot-min: 4.5px;
+  --dot-on: var(--text-dim);
+}
+
+/* ── FLIP DOTS ─────────────────────────────────────────────────── */
+
+.flip-board {
+  --dot-off: color-mix(in srgb, var(--border) 45%, var(--bg));
+  --shine-off: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.18), transparent 60%);
+  --shine-on: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.45), transparent 55%);
+  display: grid;
+  gap: var(--gap);
+  grid-auto-rows: var(--disc);
+  grid-template-columns: repeat(var(--cols), var(--disc));
+  width: max-content;
+}
+
+/* Highlight gradient sits over the face colour so each disc reads as a
+   slightly domed circle rather than a flat pixel. */
+.dot {
+  background-color: var(--dot-off);
+  background-image: var(--shine-off);
+  border-radius: 50%;
+}
+
+.dot.on {
+  background-color: var(--dot-on);
+  background-image: var(--shine-on);
+  box-shadow: 0 0 calc(var(--pitch) * 0.7) var(--glow);
+}
+
+/* Discs flip about their horizontal axis: squash to edge-on, swap face,
+   open back up with a small settle like a magnet catching the disc. */
+.dot.flip {
+  animation: dot-flip-off 0.18s ease-in-out;
+}
+
+.dot.flip.on {
+  animation-name: dot-flip-on;
+}
+
+@keyframes dot-flip-on {
+  0%    { background-color: var(--dot-off); background-image: var(--shine-off); box-shadow: none; transform: scaleY(1); }
+  45%   { background-color: var(--dot-off); background-image: var(--shine-off); box-shadow: none; transform: scaleY(0); }
+  45.1% { background-color: var(--dot-on); background-image: var(--shine-on); transform: scaleY(0); }
+  80%   { transform: scaleY(1); }
+  90%   { transform: scaleY(0.8); }
+  100%  { background-color: var(--dot-on); background-image: var(--shine-on); transform: scaleY(1); }
+}
+
+@keyframes dot-flip-off {
+  0%    { background-color: var(--dot-on); background-image: var(--shine-on); transform: scaleY(1); }
+  45%   { background-color: var(--dot-on); background-image: var(--shine-on); transform: scaleY(0); }
+  45.1% { background-color: var(--dot-off); background-image: var(--shine-off); transform: scaleY(0); }
+  80%   { transform: scaleY(1); }
+  90%   { transform: scaleY(0.8); }
+  100%  { background-color: var(--dot-off); background-image: var(--shine-off); transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot.flip,
+  .dot.flip.on {
+    animation: none;
+  }
+}
+
+.visually-hidden {
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 
 /* ── MAIN LAYOUT ───────────────────────────────────────────────── */
@@ -200,16 +273,6 @@ section + section {
   border-top: 1px solid var(--border);
 }
 
-.section-heading {
-  font-size: clamp(1.6rem, 4vw, 2.2rem);
-  letter-spacing: 0.15em;
-  margin-bottom: 2rem;
-  text-shadow: 0 0 8px var(--glow);
-}
-
-.dim {
-  color: var(--text-dim);
-}
 
 /* ── PROJECT FILTER ────────────────────────────────────────────── */
 
@@ -783,10 +846,6 @@ footer.terminal-active {
   .hero {
     min-height: 18vh;
     padding: 0.75rem 1rem;
-  }
-
-  .hero-title {
-    font-size: 2.3rem;
   }
 
   main {

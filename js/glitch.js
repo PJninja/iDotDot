@@ -1,4 +1,4 @@
-const TARGETS = ['.hero-title', '.nav-title', '.section-heading', 'h3'];
+const TARGETS = ['.nav-title', 'h3'];
 const DURATION = 300;
 
 function rand(min, max) {

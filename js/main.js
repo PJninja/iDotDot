@@ -1,4 +1,5 @@
 import { PROJECTS, POSTS } from './data.js';
+import { FlipBoard } from './flipdot.js';
 import { initFooter } from './footer.js';
 import { initGlitch } from './glitch.js';
 import { initTheme } from './theme.js';
@@ -29,31 +30,38 @@ const SUBTITLES = [
   "error 0x0000001a fixer",
 ];
 
-function initTypewriter() {
-  const el = document.getElementById('hero-typewriter');
+// Swaps an element's text for a flip-dot board, keeping the real text
+// available to screen readers and text selection tools.
+function mountFlipBoard(el, messages) {
+  const label = document.createElement('span');
+  label.className = 'visually-hidden';
+  el.replaceChildren(label);
+  return { board: new FlipBoard(el, messages), label };
+}
+
+function initHeroTitle() {
+  const el = document.querySelector('.hero-title');
+  if (!el) return;
+  const text = el.textContent.trim();
+  const { board, label } = mountFlipBoard(el, [text]);
+  label.textContent = text;
+  board.show(text);
+}
+
+function initSubtitleRotator() {
+  const el = document.getElementById('hero-sub');
   if (!el) return;
 
   let i = 0;
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const { board, label } = mountFlipBoard(el, SUBTITLES);
+  label.textContent = SUBTITLES[0];
+  setTimeout(() => board.show(SUBTITLES[0]), 250);
 
-  async function run() {
-    while (true) {
-      const str = SUBTITLES[i % SUBTITLES.length];
-      for (let c = 0; c <= str.length; c++) {
-        el.textContent = str.slice(0, c);
-        await sleep(80);
-      }
-      await sleep(3000);
-      for (let c = str.length; c >= 0; c--) {
-        el.textContent = str.slice(0, c);
-        await sleep(45);
-      }
-      await sleep(200);
-      i++;
-    }
-  }
-
-  run();
+  setInterval(() => {
+    i = (i + 1) % SUBTITLES.length;
+    label.textContent = SUBTITLES[i];
+    board.show(SUBTITLES[i]);
+  }, 4000);
 }
 
 const PAGE_SIZE = 9;
@@ -282,6 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderProjects();
   renderPosts();
   initFooter();
-  initTypewriter();
+  initHeroTitle();
+  initSubtitleRotator();
   initGlitch();
 });
