@@ -40,13 +40,19 @@ body {
 
 /* Background liquid sim (js/fluid.js). The canvas holds one pixel per
    cell and is scaled up whole device pixels at a time, so it overflows the
-   viewport slightly and is clipped here. */
+   viewport slightly and is clipped here. The water layers are sized to the
+   large viewport rather than pinned with inset: 0, which iOS Safari ends
+   above its bottom toolbar, so the water runs on behind it. */
 .fluid-bg {
   --fluid-pitch: 6px;
-  inset: 0;
+  height: 100vh;
+  height: 100lvh;
+  left: 0;
   overflow: hidden;
   pointer-events: none;
   position: fixed;
+  right: 0;
+  top: 0;
   z-index: -1;
 }
 
@@ -55,23 +61,31 @@ body {
    keeps their brightness, so the dark background is barely touched. Sits
    under the nav and footer. */
 .fluid-tint {
-  inset: 0;
+  height: 100vh;
+  height: 100lvh;
+  left: 0;
   mix-blend-mode: color;
   opacity: 0.4;
   overflow: hidden;
   pointer-events: none;
   position: fixed;
+  right: 0;
+  top: 0;
   z-index: 50;
 }
 
 /* Surface froth and bubbles, drawn over the content (and over the tint so
    they keep their own color) but under the nav and footer. */
 .fluid-froth {
-  inset: 0;
+  height: 100vh;
+  height: 100lvh;
+  left: 0;
   opacity: 0.6;
   overflow: hidden;
   pointer-events: none;
   position: fixed;
+  right: 0;
+  top: 0;
   z-index: 55;
 }
 
