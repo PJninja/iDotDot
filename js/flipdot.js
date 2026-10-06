@@ -1,6 +1,8 @@
 // Flip-dot display: renders text as a grid of discs that flip between an
 // "off" and "on" face. Changing the message sweeps across the board column
-// by column, flipping only the dots that differ.
+// by column, flipping only the dots that differ. The board is drawn on one
+// canvas from pre-rendered disc images: as hundreds of animated elements it
+// stalled phones' main thread (and the water with it) on every change.
 
 const GLYPH_H = 9;    // 7 rows cap height + 2 rows descender
 const LETTER_GAP = 1;
@@ -136,6 +138,49 @@ function cssPx(styles, prop, fallback) {
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
+// Disc faces: a highlight over the face colour domes each disc, matching a
+// CSS radial-gradient(circle at 35% 30%, white at alpha, transparent at
+// stop). Lit discs glow, blurred like a box-shadow of GLOW_BLUR pitches.
+const SHINE_OFF = { alpha: 0.18, stop: 0.6 };
+const SHINE_ON = { alpha: 0.45, stop: 0.55 };
+const GLOW_BLUR = 0.7;
+// Distance from the highlight centre to the disc box's farthest corner,
+// in disc widths: the gradient's full radius.
+const SHINE_REACH = Math.hypot(0.65, 0.7);
+
+// Discs flip about their horizontal axis: squash to edge-on, swap face,
+// open back up with a small settle like a magnet catching the disc. Scale
+// keyframes are [time share, vertical scale], eased in and out within each
+// span. A disc turning on fades its glow in after the swap; one turning off
+// drops it at once.
+const FLIP_MS = 180;
+const FLIP_SWAP = 0.45;
+const FLIP_SCALE = [[0, 1], [0.45, 0], [0.8, 1], [0.9, 0.8], [1, 1]];
+
+// CSS ease-in-out, cubic-bezier(0.42, 0, 0.58, 1): solve x(u) = t, return y(u).
+function easeInOut(t) {
+  let lo = 0;
+  let hi = 1;
+  let u = t;
+  for (let n = 0; n < 16; n++) {
+    u = (lo + hi) / 2;
+    const x = 3 * u * (1 - u) * (1 - u) * 0.42 + 3 * u * u * (1 - u) * 0.58 + u * u * u;
+    if (x < t) lo = u;
+    else hi = u;
+  }
+  return 3 * u * u * (1 - u) + u * u * u;
+}
+
+function flipScale(p) {
+  for (let k = 1; k < FLIP_SCALE.length; k++) {
+    const [t1, s1] = FLIP_SCALE[k];
+    if (p > t1) continue;
+    const [t0, s0] = FLIP_SCALE[k - 1];
+    return s0 + (s1 - s0) * easeInOut((p - t0) / (t1 - t0));
+  }
+  return 1;
+}
+
 export class FlipBoard {
   // host: block element the board fills; its --dot-max / --dot-min set the
   // dot pitch range and --dot-lines caps wrapping. messages: every string
@@ -146,16 +191,30 @@ export class FlipBoard {
     this.messages = messages;
     this.text = '';
     this.queue = [];
+    // Dot index -> start time of its flip, for discs mid-flip.
+    this.anims = new Map();
+    this.state = new Uint8Array(0);
     this.raf = 0;
     this.width = -1;
 
     this.el = document.createElement('div');
     this.el.className = 'flip-board';
     this.el.setAttribute('aria-hidden', 'true');
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = 'flip-canvas';
+    this.ctx = this.canvas.getContext('2d');
+    // Resolves the colour custom properties for the canvas.
+    this.probe = document.createElement('span');
+    this.probe.hidden = true;
+    this.el.append(this.canvas, this.probe);
     host.appendChild(this.el);
 
     this.layout();
     new ResizeObserver(() => this.layout()).observe(host);
+    document.addEventListener('themechange', () => {
+      this.paintSprites();
+      this.draw(performance.now());
+    });
   }
 
   layout() {
@@ -194,34 +253,157 @@ export class FlipBoard {
     // which makes the grid look uneven.
     const pitchDev = Math.max(2, Math.floor(Math.min(maxPitch, width / cols) * dpr));
     const gapDev = Math.max(1, Math.round(pitchDev * 0.2));
-    const s = this.el.style;
+    const discDev = pitchDev - gapDev;
+    // Room around the discs for the glow of lit ones at the board's edge.
+    const padDev = Math.ceil(GLOW_BLUR * pitchDev) + 1;
     this.pitch = pitchDev / dpr;
-    s.setProperty('--pitch', `${this.pitch}px`);
-    s.setProperty('--disc', `${(pitchDev - gapDev) / dpr}px`);
-    s.setProperty('--gap', `${gapDev / dpr}px`);
+    this.dev = { pitch: pitchDev, disc: discDev, pad: padDev };
 
-    if (cols === this.cols && rows === this.rows && maxTextCols === this.maxTextCols) return;
+    const resized = cols !== this.cols || rows !== this.rows || maxTextCols !== this.maxTextCols;
     this.cols = cols;
     this.rows = rows;
     this.maxTextCols = maxTextCols;
-    s.setProperty('--cols', cols);
-    this.build();
+    const boardW = cols * pitchDev - gapDev;
+    const boardH = rows * pitchDev - gapDev;
+    const s = this.el.style;
+    s.setProperty('--board-w', `${boardW / dpr}px`);
+    s.setProperty('--board-h', `${boardH / dpr}px`);
+    s.setProperty('--glow-pad', `${padDev / dpr}px`);
+    this.canvas.width = boardW + 2 * padDev;
+    this.canvas.height = boardH + 2 * padDev;
+    this.paintSprites();
+
+    if (resized) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.queue = [];
+      this.anims.clear();
+      this.state = new Uint8Array(cols * rows);
+      if (this.text) {
+        this.show(this.text, false);
+        return;
+      }
+    }
+    this.draw(performance.now());
   }
 
-  build() {
-    cancelAnimationFrame(this.raf);
-    this.queue = [];
-    const frag = document.createDocumentFragment();
-    this.dots = [];
-    for (let i = 0; i < this.cols * this.rows; i++) {
-      const d = document.createElement('span');
-      d.className = 'dot';
-      this.dots.push(d);
-      frag.appendChild(d);
+  color(value, fallback) {
+    this.probe.style.color = '';
+    this.probe.style.color = value.trim();
+    return this.probe.style.color ? getComputedStyle(this.probe).color : fallback;
+  }
+
+  // Renders the off face, the on face and the glow once per size and theme;
+  // each image is a disc centred in a square with room for the glow.
+  paintSprites() {
+    if (!this.ctx || !this.dev) return;
+    const styles = getComputedStyle(this.el);
+    const onColor = this.color(styles.getPropertyValue('--dot-on'), '#7fd99a');
+    const offColor = this.color(styles.getPropertyValue('--dot-off'), '#0f240f');
+    const glowColor = this.color(styles.getPropertyValue('--glow'), 'rgba(57, 255, 102, 0.35)');
+    const { pitch, disc, pad } = this.dev;
+    const size = disc + 2 * pad;
+    const mid = pad + disc / 2;
+    const sprite = () => {
+      const c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      return c.getContext('2d');
+    };
+    const disk = (ctx, x) => {
+      ctx.beginPath();
+      ctx.arc(x, mid, disc / 2, 0, 2 * Math.PI);
+    };
+    const face = (fill, shine) => {
+      const ctx = sprite();
+      disk(ctx, mid);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      const hx = pad + 0.35 * disc;
+      const hy = pad + 0.3 * disc;
+      const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, SHINE_REACH * disc * shine.stop);
+      g.addColorStop(0, `rgba(255, 255, 255, ${shine.alpha})`);
+      g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = g;
+      ctx.fill();
+      return ctx.canvas;
+    };
+    // Glow alone: the disc is drawn off the image and only its shadow,
+    // offset back, lands on it.
+    const glow = sprite();
+    glow.shadowColor = glowColor;
+    glow.shadowBlur = GLOW_BLUR * pitch;
+    glow.shadowOffsetX = 2 * size;
+    disk(glow, mid - 2 * size);
+    glow.fillStyle = '#000';
+    glow.fill();
+    this.sprites = { off: face(offColor, SHINE_OFF), on: face(onColor, SHINE_ON), glow: glow.canvas };
+  }
+
+  // Redraws the board: all of it, or with band set, only the columns the
+  // discs mid-flip reach (a sweep moves through a few dozen at a time),
+  // clipped so the rest stays as it is.
+  draw(now, band = false) {
+    const { ctx, sprites, cols, state } = this;
+    if (!ctx || !sprites) return;
+    const { pitch, disc, pad } = this.dev;
+    const size = disc + 2 * pad;
+    let c0 = 0;
+    let c1 = cols - 1;
+    if (band) {
+      if (!this.anims.size) return;
+      c0 = cols;
+      c1 = 0;
+      for (const i of this.anims.keys()) {
+        c0 = Math.min(c0, i % cols);
+        c1 = Math.max(c1, i % cols);
+      }
     }
-    this.el.replaceChildren(frag);
-    this.state = new Uint8Array(this.cols * this.rows);
-    if (this.text) this.show(this.text, false);
+    // A disc's image (with its glow) reaches into the neighbouring columns.
+    const x0 = c0 * pitch;
+    const x1 = c1 * pitch + size;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, 0, x1 - x0, this.canvas.height);
+    ctx.clip();
+    ctx.clearRect(x0, 0, x1 - x0, this.canvas.height);
+    const first = Math.max(0, Math.floor((x0 - size) / pitch) + 1);
+    const last = Math.min(cols - 1, Math.floor(x1 / pitch));
+    const moving = [];
+    for (let row = 0, base = 0; row < this.rows; row++, base += cols) {
+      for (let col = first; col <= last; col++) {
+        const i = base + col;
+        if (this.anims.has(i)) {
+          moving.push(i);
+          continue;
+        }
+        const x = col * pitch;
+        const y = row * pitch;
+        if (state[i]) {
+          ctx.drawImage(sprites.glow, x, y);
+          ctx.drawImage(sprites.on, x, y);
+        } else {
+          ctx.drawImage(sprites.off, x, y);
+        }
+      }
+    }
+    // Discs mid-flip go over the still ones.
+    for (const i of moving) {
+      const p = Math.min(1, (now - this.anims.get(i)) / FLIP_MS);
+      if (p >= 1) this.anims.delete(i);
+      const lit = state[i] === 1;
+      const swapped = p >= FLIP_SWAP;
+      const h = size * flipScale(p);
+      const x = (i % cols) * pitch;
+      const y = Math.floor(i / cols) * pitch + (size - h) / 2;
+      if (lit && swapped) {
+        ctx.globalAlpha = easeInOut((p - FLIP_SWAP) / (1 - FLIP_SWAP));
+        ctx.drawImage(sprites.glow, x, y, size, h);
+        ctx.globalAlpha = 1;
+      }
+      if (h > 0.01) ctx.drawImage(lit === swapped ? sprites.on : sprites.off, x, y, size, h);
+    }
+    ctx.restore();
   }
 
   bitmap(text) {
@@ -247,33 +429,40 @@ export class FlipBoard {
     this.text = text;
     const target = this.bitmap(text);
     cancelAnimationFrame(this.raf);
+    this.raf = 0;
     this.queue = [];
 
     const instant = !animate || reduceMotion.matches;
     for (let i = 0; i < target.length; i++) {
       if (target[i] === this.state[i]) continue;
       if (instant) {
-        this.flip(i, target[i], false);
+        this.flip(i, target[i], null);
       } else {
         const col = i % this.cols;
         this.queue.push({ i, on: target[i], t: col * COL_STEP + Math.random() * JITTER });
       }
     }
-    if (!this.queue.length) return [];
     const flips = this.queue.map(({ i, t }) => ({ i, t }));
-
     this.queue.sort((a, b) => b.t - a.t);
-    const start = performance.now();
+    this.run(performance.now());
+    return flips;
+  }
+
+  // Lets the queued flips out as they come due and redraws every frame
+  // until the last disc settles.
+  run(start) {
     const tick = now => {
+      this.raf = 0;
       const elapsed = now - start;
       while (this.queue.length && this.queue[this.queue.length - 1].t <= elapsed) {
         const { i, on } = this.queue.pop();
-        this.flip(i, on, true);
+        this.flip(i, on, now);
       }
-      if (this.queue.length) this.raf = requestAnimationFrame(tick);
+      this.draw(now, true);
+      if (this.queue.length || this.anims.size) this.raf = requestAnimationFrame(tick);
     };
-    this.raf = requestAnimationFrame(tick);
-    return flips;
+    if (this.queue.length || this.anims.size) this.raf = requestAnimationFrame(tick);
+    else this.draw(performance.now());
   }
 
   // Viewport center of dot i.
@@ -284,8 +473,10 @@ export class FlipBoard {
     };
   }
 
-  flip(i, on, animate) {
+  // Sets dot i, flipping it from time `start` (ms), or at once if null.
+  flip(i, on, start) {
     this.state[i] = on;
-    this.dots[i].className = 'dot' + (on ? ' on' : '') + (animate ? ' flip' : '');
+    if (start == null) this.anims.delete(i);
+    else this.anims.set(i, start);
   }
 }
