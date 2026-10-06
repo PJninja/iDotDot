@@ -308,62 +308,21 @@ body::after {
 
 .flip-board {
   --dot-off: color-mix(in srgb, var(--border) 45%, var(--bg));
-  --shine-off: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.18), transparent 60%);
-  --shine-on: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.45), transparent 55%);
-  display: grid;
-  gap: var(--gap);
-  grid-auto-rows: var(--disc);
-  grid-template-columns: repeat(var(--cols), var(--disc));
-  width: max-content;
+  height: var(--board-h);
+  position: relative;
+  width: var(--board-w);
 }
 
-/* Highlight gradient sits over the face colour so each disc reads as a
-   slightly domed circle rather than a flat pixel. */
-.dot {
-  background-color: var(--dot-off);
-  background-image: var(--shine-off);
-  border-radius: 50%;
-}
-
-.dot.on {
-  background-color: var(--dot-on);
-  background-image: var(--shine-on);
-  box-shadow: 0 0 calc(var(--pitch) * 0.7) var(--glow);
-}
-
-/* Discs flip about their horizontal axis: squash to edge-on, swap face,
-   open back up with a small settle like a magnet catching the disc. */
-.dot.flip {
-  animation: dot-flip-off 0.18s ease-in-out;
-}
-
-.dot.flip.on {
-  animation-name: dot-flip-on;
-}
-
-@keyframes dot-flip-on {
-  0%    { background-color: var(--dot-off); background-image: var(--shine-off); box-shadow: none; transform: scaleY(1); }
-  45%   { background-color: var(--dot-off); background-image: var(--shine-off); box-shadow: none; transform: scaleY(0); }
-  45.1% { background-color: var(--dot-on); background-image: var(--shine-on); transform: scaleY(0); }
-  80%   { transform: scaleY(1); }
-  90%   { transform: scaleY(0.8); }
-  100%  { background-color: var(--dot-on); background-image: var(--shine-on); transform: scaleY(1); }
-}
-
-@keyframes dot-flip-off {
-  0%    { background-color: var(--dot-on); background-image: var(--shine-on); transform: scaleY(1); }
-  45%   { background-color: var(--dot-on); background-image: var(--shine-on); transform: scaleY(0); }
-  45.1% { background-color: var(--dot-off); background-image: var(--shine-off); transform: scaleY(0); }
-  80%   { transform: scaleY(1); }
-  90%   { transform: scaleY(0.8); }
-  100%  { background-color: var(--dot-off); background-image: var(--shine-off); transform: scaleY(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dot.flip,
-  .dot.flip.on {
-    animation: none;
-  }
+/* Drawn by js/flipdot.js. Overhangs the board so the glow of lit discs at
+   the edges isn't cut off. */
+.flip-canvas {
+  display: block;
+  height: calc(100% + 2 * var(--glow-pad));
+  left: calc(-1 * var(--glow-pad));
+  pointer-events: none;
+  position: absolute;
+  top: calc(-1 * var(--glow-pad));
+  width: calc(100% + 2 * var(--glow-pad));
 }
 
 .visually-hidden {
