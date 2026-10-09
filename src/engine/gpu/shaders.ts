@@ -27,9 +27,10 @@ export const REACTION_BYTES = 32;
 /** Phase codes in TypeInfo.phase (see ElementPhase). */
 export const PHASE_CODES = { solid: 0, liquid: 1, gas: 2 } as const;
 
-/** TypeInfo.flags bits: some reaction consumes this type; fire sticks to this type. */
+/** TypeInfo.flags bits: some reaction consumes this type; fire sticks to this type; a falling type holds still next to flammable tiles. */
 export const FLAG_CONSUMED = 1;
 export const FLAG_FLAMMABLE = 2;
+export const FLAG_HOLDS_ON_FLAMMABLE = 4;
 
 /** TypeInfo.haze value for elements drawn as tiles. */
 export const HAZE_NONE = 255;
@@ -48,6 +49,7 @@ const PHASE_GAS : u32 = ${PHASE_CODES.gas}u;
 const HAZE_NONE : u32 = ${HAZE_NONE}u;
 const FLAG_CONSUMED : u32 = ${FLAG_CONSUMED}u;
 const FLAG_FLAMMABLE : u32 = ${FLAG_FLAMMABLE}u;
+const FLAG_HOLDS_ON_FLAMMABLE : u32 = ${FLAG_HOLDS_ON_FLAMMABLE}u;
 const SPARK_STUCK : u32 = 0xFFu;
 
 struct TypeInfo {
@@ -479,10 +481,14 @@ fn anchoredBeside(x : i32, y : i32) -> bool {
   return false;
 }
 
-// Whether the cohesive tile at (x, y) clings to an anchored cohesive neighbor this
-// step instead of falling into the open cell below it. Deterministic per step, so
-// the tiles stacked above agree with it (fallChain) and rest on it.
+// Whether the tile at (x, y) holds still this step instead of falling into the open
+// cell below it: a type that holds on flammable tiles next to one (burning wood), or a
+// cohesive tile that clings to an anchored cohesive neighbor. Deterministic per step,
+// so the tiles stacked above agree with it (fallChain) and rest on it.
 fn clings(x : i32, y : i32, t : u32) -> bool {
+  if ((u.types[t].flags & FLAG_HOLDS_ON_FLAMMABLE) != 0u && flammableAround(x, y)) {
+    return true;
+  }
   let c = u.types[t].cohesion;
   return c > 0.0 && enterable(t, x, y + 1)
     && rand(u32(x), u32(y), stepU.step ^ 0x3C6EF372u) < c && anchoredBeside(x, y);
