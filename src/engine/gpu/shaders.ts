@@ -27,6 +27,10 @@ export const REACTION_BYTES = 32;
 /** Phase codes in TypeInfo.phase (see ElementPhase). */
 export const PHASE_CODES = { solid: 0, liquid: 1, gas: 2 } as const;
 
+/** TypeInfo.flags bits: some reaction consumes this type; fire sticks to this type. */
+export const FLAG_CONSUMED = 1;
+export const FLAG_FLAMMABLE = 2;
+
 /** TypeInfo.haze value for elements drawn as tiles. */
 export const HAZE_NONE = 255;
 
@@ -42,6 +46,9 @@ const PHASE_SOLID : u32 = ${PHASE_CODES.solid}u;
 const PHASE_LIQUID : u32 = ${PHASE_CODES.liquid}u;
 const PHASE_GAS : u32 = ${PHASE_CODES.gas}u;
 const HAZE_NONE : u32 = ${HAZE_NONE}u;
+const FLAG_CONSUMED : u32 = ${FLAG_CONSUMED}u;
+const FLAG_FLAMMABLE : u32 = ${FLAG_FLAMMABLE}u;
+const SPARK_STUCK : u32 = 0xFFu;
 
 struct TypeInfo {
   gravity : u32,
@@ -53,7 +60,7 @@ struct TypeInfo {
   rise : f32,
   dissipation : f32,
   cohesion : f32,
-  consumed : u32,
+  flags : u32,
   ageRate : f32,
   agedInto : u32,
 }
@@ -613,7 +620,7 @@ fn offerOf(x : i32, y : i32) -> Offer {
 // The offer the tile at (x, y) (type t) takes this step: the first neighbor, in
 // scan order, whose offer targets it. Only a type some rule consumes can take one.
 fn takenOffer(x : i32, y : i32, t : u32) -> Offer {
-  if (u.types[t].consumed == 0u) {
+  if ((u.types[t].flags & FLAG_CONSUMED) == 0u) {
     return noOffer();
   }
   for (var dy = -1; dy <= 1; dy++) {
@@ -891,6 +898,24 @@ fn typeWithin(x : i32, y : i32, t : u32, r : i32) -> bool {
   return false;
 }
 
+fn flammableAt(x : i32, y : i32) -> bool {
+  if (!inBounds(x, y)) {
+    return false;
+  }
+  return (u.types[readBuf[u32(y) * u.width + u32(x)] & 0xFFu].flags & FLAG_FLAMMABLE) != 0u;
+}
+
+fn flammableAround(x : i32, y : i32) -> bool {
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      if ((dx != 0 || dy != 0) && flammableAt(x + dx, y + dy)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Pocket closing: the neighboring empty cell enclosed by the most tiles of
 // type t (at least minCount), if moving there leaves this tile better enclosed
 // than it is now. Returns the offset to it, or (0, 0) if there is none.
@@ -953,15 +978,17 @@ fn updateGas(x : i32, y : i32, t : u32, value : u32, rise : f32) -> Move {
 
 // Flame: rises with its type's riseSpeed and flickers sideways with FLICKER, both
 // rolled per tile (unlike updateGas's shared phase) so neighbors move independently.
-// Wind biases the sideways direction and makes flickers more likely. It tries
-// (dx, dy), (0, dy), (dx, 0) like updateGas's first candidates, then keeps its cell,
-// and vanishes if a falling tile took that.
+// Wind biases the sideways direction and makes flickers more likely. A flame under
+// a flammable tile holds still there instead of sliding off, so it stays lit long
+// enough to catch it. It tries (dx, dy), (0, dy), (dx, 0) like updateGas's first
+// candidates, then keeps its cell, and vanishes if a falling tile took that.
 fn updateFlame(x : i32, y : i32, t : u32) -> Move {
   let rise = rand(u32(x), u32(y), stepU.step ^ 0x68E31DA4u) < u.types[t].rise;
   let flicker = rand(u32(x), u32(y), stepU.step ^ 0xB5297A4Du) < FLAME_FLICKER + FLAME_WIND_FLICKER * abs(u.wind);
   let right = rand(u32(x), u32(y), stepU.step ^ 0x1B56C4E9u) < 0.5 + 0.5 * u.wind;
-  let dx = select(0, select(-1, 1, right), flicker);
-  let dy = select(0, -1, rise);
+  let held = flammableAt(x, y - 1);
+  let dx = select(0, select(-1, 1, right), flicker && !held);
+  let dy = select(0, -1, rise && !held);
   var cand = array<vec2i, 3>(vec2i(dx, dy), vec2i(0, dy), vec2i(dx, 0));
   for (var k = 0; k < 3; k++) {
     let c = cand[k];
@@ -987,8 +1014,20 @@ struct SparkResult {
 // down and drag decays vx; it then traces the cells toward (x + vx, y + vy) through
 // enterable cells (it passes through lighter gas) and claims the furthest one it
 // can, falling back to earlier path cells. If the path was blocked it lands, which
-// turns it into a flame in the cell it reached.
-fn updateSpark(x : i32, y : i32, t : u32, value : u32) -> SparkResult {
+// turns it into a flame in the cell it reached, unless the blocker is flammable: then
+// it sticks (value SPARK_STUCK, a vx no launch can produce) and stays put, so it keeps
+// trying to light the tile until it fades or the flammable tile around it is gone.
+fn updateSpark(x : i32, y : i32, t : u32, stored : u32) -> SparkResult {
+  var value = stored;
+  if ((value & 15u) == 15u) {
+    if (flammableAround(x, y)) {
+      if (claim(x, y)) {
+        return SparkResult(stay(SPARK_STUCK), false);
+      }
+      return SparkResult(tileGone(), false);
+    }
+    value = 0x88u;
+  }
   var vx = i32(value & 15u) - 8;
   var vy = i32((value >> 4u) & 15u) - 8;
   if (value == 0u) {
@@ -1008,11 +1047,13 @@ fn updateSpark(x : i32, y : i32, t : u32, value : u32) -> SparkResult {
   var path : array<vec2i, 7>;
   var reach = 0;
   var blocked = false;
+  var sticks = false;
   for (var k = 1; k <= n; k++) {
     let f = f32(k) / f32(n);
     let c = vec2i(x + i32(round(f32(vx) * f)), y + i32(round(f32(vy) * f)));
     if (!enterable(t, c.x, c.y)) {
       blocked = true;
+      sticks = flammableAt(c.x, c.y);
       break;
     }
     path[k - 1] = c;
@@ -1020,11 +1061,13 @@ fn updateSpark(x : i32, y : i32, t : u32, value : u32) -> SparkResult {
   }
   for (var k = reach; k > 0; k--) {
     if (claim(path[k - 1].x, path[k - 1].y)) {
-      return SparkResult(moveTo(path[k - 1].x, path[k - 1].y, packed), blocked && k == reach);
+      let end = blocked && k == reach;
+      return SparkResult(moveTo(path[k - 1].x, path[k - 1].y, select(packed, SPARK_STUCK, end && sticks)), end && !sticks);
     }
   }
   if (claim(x, y)) {
-    return SparkResult(stay(packed), blocked && reach == 0);
+    let end = blocked && reach == 0;
+    return SparkResult(stay(select(packed, SPARK_STUCK, end && sticks)), end && !sticks);
   }
   return SparkResult(tileGone(), false);
 }

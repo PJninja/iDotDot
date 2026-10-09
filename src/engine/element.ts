@@ -104,6 +104,12 @@ export abstract class Element {
   /** What an aging tile turns into once its age passes 255 (AIR = it vanishes). */
   readonly agedInto: number = SETTINGS.AIR_TYPE;
 
+  /**
+   * Fire sticks to this element: a flame rising into it holds still beneath it and a
+   * spark that hits it stays stuck to it (see updateFlame / updateSpark).
+   */
+  readonly flammable: boolean = false;
+
   /** One-sided reactions this element undergoes (see Reaction). */
   readonly reactions: readonly Reaction[] = [];
 }
