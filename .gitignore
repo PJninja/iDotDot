@@ -1,0 +1,29 @@
+# Ignore everything, then allow-list the files the project needs.
+*
+
+# Project root
+!.gitignore
+!AGENTS.md
+!index.html
+!package.json
+!package-lock.json
+!tsconfig.json
+!vite.config.ts
+!dev.bat
+!new-element.bat
+
+# Source and docs
+!src/
+!src/**
+!plans/
+!plans/**
+
+# Shared dev-server config (launch.json only; local settings stay ignored)
+!.claude/
+.claude/*
+!.claude/launch.json
+
+# Editor/OS noise that can appear inside allow-listed folders
+.DS_Store
+Thumbs.db
+*.local

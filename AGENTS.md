@@ -1,0 +1,112 @@
+# AGENTS.md — PJ.iDotDot
+
+Personal portfolio site where the entire page is a falling-sands simulation.
+TypeScript + Vite + **WebGPU compute**, **zero runtime dependencies** (devDeps: `typescript`, `vite` only).
+WebGPU is required; there is no CPU fallback (an unsupported browser sees a message).
+The canvas fills the viewport below a fixed 48px header; HTML overlays carry the UI.
+
+## Commands
+
+| Task | Command |
+|---|---|
+| Dev server | `npm run dev` (or `dev.bat` — kills stale servers, installs deps, opens browser) |
+| Type-check | `npx tsc --noEmit` |
+| Build | `npm run build` (`tsc && vite build`) |
+| Scaffold an element | `new-element.bat <kebab-case-name> [falling\|static\|bare] [yes\|no]` — generates `src/elements/<name>.ts` (display + tuning metadata) and auto-wires the `SETTINGS.*_TYPE` constant and the `index.ts` import + registration. Behavior still has to be added to the compute shader. |
+
+There is no test framework. Validate with `npx tsc --noEmit` + `npm run build`, and verify behavior in a WebGPU browser (the work happens on the GPU, so it cannot run in Node). Check GPU validation errors: the device logs `uncapturederror` to the console, and a failed shader/pipeline makes the whole command buffer silently do nothing, so an error scope (`device.pushErrorScope('validation')`) is the reliable check.
+
+`plans/` holds design docs: `webgpu-compute-port.md` (how the GPU architecture came about) and `fire.md` (a proposed, not yet implemented, fire/aging design). Treat plans as intent; this file and the code are the current state.
+
+## Architecture
+
+### GPU simulation (`src/engine/gpu/gpu-simulation.ts`)
+- `GpuSimulation.create(canvas, colliders, registry, cssW, cssH)` is async: it requests the adapter + device **before** `getContext('webgpu')`.
+- **Grid = storage buffers.** One packed `u32` per tile: `type` bits 0–7, `value` 8–15, `variant` 16–23, bits 24–31 unused (flat index `y*W+x`). Two buffers ping-pong (current = read, other = write). Zero-initialized = all air. Buffers rather than `r32uint` textures because WebGPU has `clearBuffer` but no texture clear/fill.
+- **Step loop:** fixed 60 Hz timestep (rAF accumulator, max 5 steps/frame, backlog dropped). Per frame, **one** command buffer: brush stamps (if any) → for each step a compute pass of four **indirect** dispatches over the awake chunks (`clearChunk`, `main`, `mainLiquid`, `mainGas`; one 16×16 workgroup per chunk, one thread per cell) + the chunk pass (`CHUNKS_WGSL`) → swap; then the haze pass (only on frames that stepped) and the render pass. `onFrame(steps)` runs before encoding with the frame's step count (0 on high-refresh frames between steps), so per-step work like brush stamping stays refresh-rate independent. The per-step counter is a dynamic-offset uniform (`stepBuf`, one 256-byte slot per step) because all steps share a command buffer.
+- **Conflict-free write model:** the awake chunks' write (and claim) cells are cleared to air by `clearChunk`; stayers write themselves, movers write their destination, air writes nothing. A mover's destination is air in the read state and claimed exclusively with an atomic (`atomicCompareExchangeWeak(...).exchanged`, first claim wins, loser stays — tiles are conserved). Tie-breaks are nondeterministic by design.
+- **Chunk sleeping:** the grid is split into 16×16 chunks (`CHUNK_SIZE`). Every write that changes a cell goes through `commit()`, which marks the chunk (`marksBuf`); the chunk pass keeps a chunk awake for `SETTINGS.CHUNK_KEEPALIVE_STEPS` (at least 2) after a mark in its 3×3 neighborhood (`awakeBuf` countdown) and compacts the awake chunks into `activeListBuf` + the indirect args (`argsBuf`). Sleeping chunks are not dispatched and need no copy: a chunk only sleeps after a step with no change in it, so both grid buffers already match there. Movers may write into air in a sleeping chunk (the write marks it), but a fluid in a sleeping chunk cannot be displaced or stack-followed (`enterable` / `fallsAlong` check `chunkAwake`; trying wakes it). Random moves that have not fired yet must keep their chunk awake with `mark()` (friction rolls, liquid spread, reactions; gases always do), so a new stochastic behavior must too. Painting and wake-all (wind, collider changes) run the chunk pass before the first step so the touched chunks are awake.
+- **Idle:** the awake chunk count is read back (`readActivity`); at 0 the sim stops stepping (`asleep`), the haze keeps blending for `SETTLE_STEPS`, then frames stop being submitted (`idle`; the canvas keeps its last frame and the rAF loop keeps running). `paintStroke`, `setWind`, collider changes and `resize` wake it; a readback from before a wake is ignored (`wakeGeneration`). `prefers-reduced-motion` freezes the wisp animation clock.
+- `resize(cssW, cssH)` rebuilds all size-dependent resources (grid state resets). `rebuildSolidMask()` re-rasterizes colliders; `ColliderManager.onChange` marks it dirty and it is rebuilt at the start of the next frame. `readGrid()` is a debug readback (conservation checks). `paintStroke(ax, ay, bx, by, brush)` queues a brush stamp swept along a segment (max `MAX_STAMPS` per frame); at the next stepping frame all stamps are uploaded and `PAINT_WGSL` rasterizes them on the GPU in one dispatch over their bounding box, before the sim steps.
+
+### Shaders (`src/engine/gpu/shaders.ts`)
+- `RENDER_WGSL`: full-screen triangle; maps each device pixel to a grid cell (`(pos - gridOrigin) / tilePx`, no stretching), air → background, else `colorTex[(type, variant)]`. Water haze is read per cell (blocky, matches the tiles); smoke and steam haze is sampled bilinearly between cell centers (`hazeSmooth`) so gas edges stay smooth on large tiles.
+- `PAINT_WGSL`: rasterizes brush stamps (circle = Euclidean, square = Chebyshev distance to the stamp's segment ≤ radius; per-cell density roll and random variant from a per-stamp seed; the last covering stamp wins), skips solid cells, marks the painted chunks.
+- `CHUNKS_WGSL`: per-chunk keep-alive countdown + awake list / indirect args (see Chunk sleeping).
+- `STATS_WGSL`: counts non-air tiles and movers for the HUD. A mover always lands in a cell whose previous content differs, so movers = occupied cells whose type or variant changed (the value byte is ignored). Counting vacated cells instead undercounts: stacks shift together and displaced water/smoke swap into the mover's old cell.
+- `COMPUTE_WGSL`: helpers `pack`, `passable` (in-bounds, air, not solid), `enterable(t, x, y)` (air, or a liquid/gas lighter than `t` in an awake chunk), `claim`, `commit` (write + mark), `mark`, `react`, `rand` (hash of x, y, step), `updateFall`; entry points `clearChunk`, `main` (solids: reactions, then any type with non-zero gravity runs `updateFall`, other types stay put; `settle` writes a staying solid), `mainLiquid`, `mainGas`. Entry points pick their tiles by the per-type `phase`, not by type id.
+- Uniform buffer (`UNIFORMS_WGSL`, shared by every module): 48-byte header (size, `tilePx` = tile edge in device px, wind, `gridOrigin` = device-px offset of grid cell (0, 0) in the canvas, `time` = wall-clock seconds, `frameSteps` = steps this frame, background; time and frameSteps are written every frame) + `types: array<TypeInfo, 256>` (gravity, phase, haze channel, reaction range `start | count << 16`, slide chance, density, rise speed, dissipation, cohesion, consumed flag + padding; 48 bytes each) + `reactions: array<Reaction, MAX_REACTIONS>` (other type, result, chance, consumes, radius + padding; 32 bytes each). All filled from the element registry in `writeUniforms`; unregistered types and air have haze `HAZE_NONE`.
+- `updateFall` is parameter-driven and spends the tile's whole fall budget per step: it loops (max 8 attempts) over stride-down / slope-aware diagonal slide (both diagonals open → always roll; one open → roll with `slideChance`; none → rest; `slideChance` 1 = no friction) and claims only the final cell, falling back to shallower stride cells, the other diagonal, then earlier waypoints. Being blocked sheds the leftover fall fraction; otherwise it carries over.
+- **Cohesion (wet sand, mud):** a type with `cohesion > 0` can hold still in `updateFall`. About to fall, it `clings` (with `cohesion` chance per step) to a cohesive tile beside it whose column is filled for `CLING_SCAN` cells (resting, not part of a falling stack); `fallChain` stops at a clinging tile, so the tiles above rest on it. About to roll off a slope, it stays (with `cohesion` chance) while touching a cohesive tile beside or below it, on top of the `slideChance` roll. Both are random holds, so they `mark()` and piles slump slowly to their final shape.
+- Color on the GPU depends on `(type, variant)` only, never on `value`.
+- **Stack fall (all falling tiles + liquids):** a falling tile looks down through the falling tiles (in awake chunks) stacked under it (`fallChain(x, y, t)`, up to `SETTINGS.FALL_CHAIN`) to the open air below and shifts down with the whole stack, so stacks do not unzip into stride-sized gaps (bands). The destination can then be a cell the stack tile below is vacating, so a resting falling tile must claim its own cell (`claim` retries the weak compare-exchange's spurious failures); one that loses it (its stack did not fall) moves up into a vacated stack cell (`fleeUp`) so it is not lost.
+- **Smoke (gas):** handled by `mainGas`, dispatched after `main` and `mainLiquid` in the same compute pass; `main` skips gases. Falling tiles and liquids are denser, so smoke is `enterable` for them and they claim its cell first; smoke may only write a cell it wins with `claim()` (its own cell included), so a displaced tile flees to a free neighbor or vanishes. `updateGas` (shared with steam) is advected by a flow field shared by all tiles (`SETTINGS.WIND` / `GpuSimulation.setWind(-1..1)` in the uniform header `wind : f32`, plus the curl of a smooth noise potential, which is divergence-free so it swirls without clumping or leaving voids) and buoyancy; tiles hold no velocity, speeds are move chances resolved with a shared per-step phase so whole patches move together (per-tile randomness or cohesion makes it look like water droplets); when blocked above it slides along the flow, and pockets (empty cells enclosed by `Smoke.POCKET_NEIGHBORS`+ smoke tiles) are closed by pulling in a less enclosed neighbor. `mainGas` also dissipates it by chance (rise speed and dissipation come from the per-type table: `Element.riseSpeed` / `dissipationChance`). Smoke tiles are not drawn individually: `HAZE_WGSL` (on frames that stepped, separable tent blur of `Smoke.HAZE_RADIUS` tiles into a haze buffer that is blended over time by `Smoke.HAZE_TEMPORAL` per sim step, compounded over the frame's `frameSteps`) feeds `RENDER_WGSL`, which draws a translucent haze modulated by drifting noise wisps (`wisps`, driven by the header's wall-clock `time` so they animate smoothly at any refresh rate), colored from the `Smoke.getColor` light-to-dark ramp by density, over whatever is behind it. Tuning statics live on `Smoke` and are injected as WGSL consts.
+- **Water (liquid):** same template, entry point `mainLiquid` dispatched after `main` and before `mainGas`; `main` skips liquids. Every liquid runs `updateLiquid(x, y, t)` with Water's tuning statics. Denser tiles sink through it (`enterable`: sand/dirt default density 1.5 > water 1 > gases), claiming first; displaced water flees up/sideways and is lost only if fully enclosed. `updateLiquid` falls (shifts down with its stack, see Stack fall above), slides diagonally, closes pockets (`pocketMove`, shared with smoke) and slides up to `Water.SPREAD_RANGE` cells per step toward the lowest surface along its row (`waterSlide`), else an occasional hop along a direction shared by row patches (`waterFlow`). Known: the incomplete top row of a pool keeps hopping (wander), so a pool's surface chunks never sleep and any pool on screen prevents idle. The haze pass is `vec4f` per cell (x smoke, y water, z steam); `RENDER_WGSL` draws water as a smooth body with a crisp `smoothstep` surface, colored by a global top-to-bottom gradient (`Water.SHALLOW_COLOR` to `Water.DEEP_COLOR` over the screen height). Tuning statics live on `Water`.
+- **Steam (gas):** runs in `mainGas` through `updateGas` like smoke (faster `Steam.RISE_SPEED`). Its value byte is a condensation timer: it counts up while at least `Steam.CONDENSE_NEIGHBORS` neighbors are steam and drains by `Steam.COOL_RATE` otherwise; at `Steam.CONDENSE_STEPS` the tile turns into water with `Steam.CONDENSE_CHANCE` per step. Drawn as its own haze channel from the `Steam` color ramp.
+
+### Elements (`src/elements/`, `src/engine/element.ts`)
+- **One class instance per element TYPE. Elements are display + tuning metadata only** (`type`, `name`, `displayName`, `defaultColor`, `getColor(value, variant)`, plus optional table fields: `phase` (`'solid'` default / `'liquid'` / `'gas'`), `gravityQuantum`, `slideChance`, `density` (default 1.5), `cohesion` (falling only, 0..1), `riseSpeed`, `dissipationChance`, `hazeChannel` (0 smoke-style, 1 water body, 2 steam-style; null = tiles), `reactions`). Per-tile behavior is WGSL in the compute shader, driven by these per-type tables.
+- **Reactions** (`Reaction { with, becomes, chance }`, at most `MAX_REACTIONS` in total, validated by the registry): one-sided; a tile touching (8 neighbors) a `with` tile turns into `becomes` with `chance` per step, and only the owning tile changes (conflict-free). Give the other element its own rule for a two-sided reaction. A non-consuming rule can set `radius` (Chebyshev distance, default 1 = the 8 neighbors, at most `MAX_REACTION_RADIUS` = 8 so a change in range always wakes the reacting chunk; `typeWithin`). With `consumes: true` the touched tile turns into air in the same step, exactly one per conversion (`reactConsuming`: each tile offers its rule to one touching `with` tile per step, picked by a per-step hash; the touched tile takes the first offer in neighbor scan order; both sides recompute the same offer from the read state, so no atomics are needed; both chunks must be awake). Types some rule consumes have `TypeInfo.consumed` set (only they scan for offers); the registry rejects two elements with consuming rules where one consumes the other. A reaction result of `AIR` makes the tile vanish (no write). Applied in all three dispatches; a touching rule that has not fired keeps the chunk awake. Sand → wet sand and dirt → mud consume the water they touch; both also soak without consuming within `SOAK_RADIUS` of water (`Sand` / `Dirt` statics), so sand or dirt dropped into a pool ends up mostly wet sand or mud.
+- Register every element in `src/elements/index.ts` (`createElementRegistry`); the header picker lists all registered elements automatically, and the color texture is built from `getColor(0, variant)` for variants 0–255.
+- Falling elements need no shader work: set `gravityQuantum` (and optionally `slideChance`, `density`) on the class. A new liquid or gas needs none either: set `phase` (+ `density`, `riseSpeed` / `dissipationChance` for gases, `hazeChannel` to draw it as haze); it then shares Water's flow tuning or the smoke flow field. Other moving behavior needs a new WGSL function dispatched from `main` (write through `commit`, and `mark()` any random move that has not fired). Static elements need none.
+- `gravity.ts`: `computeGravityQuantum(base, scale, offset)` → fixed-point quanta (256 = 1 cell/step). The fractional remainder accumulates in the tile's **value byte** (shader owns it for falling elements).
+- `colors.ts`: `buildVariantColors(base, count, variance)` precomputes deterministic per-variant channel shifts.
+
+### UI (`src/main.ts`, `src/ui/`)
+- 48px header (`ui/header.ts`), overlay layer (`ui/overlay.ts`) converts DOM rects to grid colliders; element picker (`ui/picker.ts`); brush picker (`ui/brush-picker.ts`). Both pickers mount into `#header .header-actions`.
+- Canvas has `pointer-events: none`; painting listens on `window` and skips header/overlay targets. Brush: circle or square, density-gated, calls `GpuSimulation.paintStroke` (rasterized on the GPU, collider cells skipped); Air is the eraser. Painting is unconditional overwrite (no occupancy check). It stamps once per sim step (not per frame), sweeping the brush along the pointer's path since the last stamp, so fast drags leave a continuous stroke; a press is stamped on the next step even if released before it.
+- **Tile size**: `SETTINGS.TILE_SIZE` CSS px (4; changed at runtime by the perf HUD's Tile Size dropdown via `GpuSimulation.setTileSize`, which rebuilds the world like a resize, so the grid clears), snapped to a whole number of device px (`tilePx = round(TILE_SIZE * dpr)`, so `GpuSimulation.tileSize` = `tilePx / dpr` can be fractional), grown if an axis would exceed `MAX_SIM_DIMENSION` (2048) cells. The grid is `ceil(canvas / tilePx)` cells, anchored to the canvas bottom (the floor row sits on the edge; the top row may be partly hidden; `originY` <= 0 is grid row 0's CSS y). Map CSS px to cells with `GpuSimulation.cellAt` (pointer) or `tileSize` + `originY` (`Overlay.measure`). Sim tuning is in tiles per step, so on-screen speeds scale with the tile size.
+- **Resize rebuilds the world**: grid state resets; colliders persist (they belong to overlay content). `Overlay.registerCollider(el)` keeps the element and re-measures it when it resizes (`ResizeObserver`) and after each window resize (`refreshColliders`); `unregisterCollider` removes it. The solid mask rebuilds automatically. Window resizes are coalesced to one rebuild per animation frame.
+- Perf HUD (`ui/perf-hud.ts`): third header button toggles a small readout under the header (fps/ms, tiles, moving vs resting, awake chunks + idle, GPU ms, steps/s, grid) and a Tile Size dropdown (1/2/4/8/16 px; the panel's clicks don't paint). The text is color-coded for low fps and for dropped sim steps (`perf.droppedStepsPerSecond`: backlog beyond `MAX_STEPS_PER_FRAME` discarded while the sim is awake, i.e. it ran slower than real time). `GpuSimulation.perf` holds the numbers; the tile counters (`STATS_WGSL`) only run while the HUD is visible. "moving" = tiles that changed cell last step (see `STATS_WGSL`).
+- If `navigator.gpu` is missing, device creation fails, or the device is lost mid-session (`GpuSimulation.onDeviceLost`), `ui/gpu-error-dialog.ts` shows a blocking popup ("Oh no! We need a GPU to run the simulation, and can't find one :(") with a Try Again button that reloads the page.
+
+### Colliders (`src/engine/collider.ts`)
+- Rect list in grid coordinates, rasterized into the GPU solid mask (`forEachRect`). Solid cells are not passable.
+
+## Conventions
+
+- **Strict TS**: `noUnusedLocals`/`noUnusedParameters` — prefix intentional unused params with `_`. JSDoc block comments on classes and exported functions explain *why*, matching existing files.
+- Global tunables live in `src/settings.ts`; per-element tuning lives as `static` fields on the element class (e.g. `GRAVITY_SCALE`, `SLIDE_CHANCE`, `*_VARIANT_COUNT`, `*_COLOR_VARIANCE`).
+- Adding an element: run `new-element.bat <name> <falling|static|bare>`, pick a color and tweak the statics, then add its WGSL behavior if it moves.
+- Add 1-3 line comments for any global or public API-like methods. Otherwise avoid code commenting unless the code is unconventional or rule-breaking. Code itself should be clean and readable so it is understood without comments.
+- WGSL gotchas: mixing `*` and `^` needs parentheses; unused bindings are dropped from `layout: 'auto'` (the compute pipeline uses an explicit layout); uniform arrays need 16-byte element stride (`TypeInfo` is 48 bytes, `Reaction` 32). The compute layout uses 7 of the default 8 storage buffers per stage.
+
+## Gotchas
+
+- Air must remain type 0; the registry rejects a non-zero type named `air`.
+- `SETTINGS.GRAVITY: 0` disables gravity for all falling elements.
+- WebGPU lacks `fillBuffer`/`fillTexture`; `getPreferredCanvasFormat` is on `navigator.gpu`. `src/engine/gpu/webgpu.d.ts` declares only what the bundled DOM lib is missing — verify any new declaration against a real browser.
+- A canvas locks to its first context type; GPU init acquires the device before `getContext('webgpu')`.
+- Never write `writeBuf` directly in the compute shader: use `commit()` (or `markCell` for a tile that vanishes), or the changed chunk may fall asleep with its two grid buffers out of sync (tiles reappear or vanish on the next swap).
+
+## File map
+
+```
+src/
+  main.ts            Bootstrap: GPU sim create, brush painting, input, resize
+  settings.ts        Global constants (SIM_HZ, GRAVITY, type IDs, flags)
+  engine/
+    gpu/
+      gpu-simulation.ts  Device, buffers, step loop, render, resize
+      shaders.ts         UNIFORMS_WGSL, RENDER_WGSL, HAZE_WGSL, COMPUTE_WGSL, PAINT_WGSL, CHUNKS_WGSL, STATS_WGSL
+      webgpu.d.ts        Ambient WebGPU declarations missing from the DOM lib
+    element.ts       Element metadata base class (phase, density, reactions, ...), ElementRegistry
+    gravity.ts       computeGravityQuantum (fixed-point fall rate)
+    colors.ts        Deterministic variant color shifting
+    collider.ts      Rect-list colliders
+  elements/
+    air.ts           Type 0
+    sand.ts          Type 1, falling particle (turns into wet sand touching or near water)
+    dirt.ts          Type 2, slow + sticky falling particle (slideChance 0.25; turns into mud touching or near water)
+    wood.ts          Type 3, static solid
+    smoke.ts         Type 4, gas drawn as haze (tuning statics for mainGas)
+    water.ts         Type 5, liquid drawn as a smooth body (tuning statics for mainLiquid)
+    steam.ts         Type 6, gas that condenses into water
+    wet-sand.ts      Type 7, cohesive falling particle (clumps, steep piles)
+    mud.ts           Type 8, cohesive slow falling particle (stickier than wet sand)
+    index.ts         createElementRegistry — register all elements here
+  ui/                header.ts, overlay.ts, picker.ts, brush-picker.ts, perf-hud.ts, gpu-error-dialog.ts
+  styles/main.css
+plans/               webgpu-compute-port.md (architecture history), fire.md (proposal)
+dev.bat, new-element.bat   Windows helper scripts (see Commands)
+```
