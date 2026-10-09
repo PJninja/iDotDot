@@ -1,5 +1,5 @@
 import { buildVariantColors } from '../engine/colors';
-import { Element } from '../engine/element';
+import { Element, type Reaction } from '../engine/element';
 import { computeGravityQuantum } from '../engine/gravity';
 import { SETTINGS } from '../settings';
 
@@ -8,6 +8,8 @@ import { SETTINGS } from '../settings';
  * cohesion lets grains cling to resting wet sand or mud beside them
  * (overhangs, clumps) and resist rolling off slopes, and its friction keeps
  * piles steep, so it holds sandcastle-like walls before slowly crumbling.
+ * Heat dries it back into sand: flames and embers within a couple of tiles, or a
+ * touching spark.
  */
 export class WetSand extends Element {
   readonly type = SETTINGS.WET_SAND_TYPE;
@@ -22,6 +24,18 @@ export class WetSand extends Element {
   readonly slideChance = WetSand.SLIDE_CHANCE;
   readonly cohesion = WetSand.COHESION;
   readonly density = WetSand.DENSITY;
+
+  /** Chance per step that a tile within HEAT_RADIUS of a flame or ember dries out. */
+  static DRY_CHANCE = 0.04;
+  /** Chance per step that a tile touching a spark dries out. */
+  static SPARK_DRY_CHANCE = 0.3;
+  /** Heat reach of flames and embers, in tiles (Chebyshev). */
+  static HEAT_RADIUS = 2;
+  readonly reactions: readonly Reaction[] = [
+    { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.SAND_TYPE, chance: WetSand.DRY_CHANCE, radius: WetSand.HEAT_RADIUS },
+    { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.SAND_TYPE, chance: WetSand.DRY_CHANCE, radius: WetSand.HEAT_RADIUS },
+    { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.SAND_TYPE, chance: WetSand.SPARK_DRY_CHANCE },
+  ];
 
   static WET_SAND_VARIANT_COUNT = 4;
   static WET_SAND_COLOR_VARIANCE = 12;

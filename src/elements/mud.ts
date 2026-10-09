@@ -1,5 +1,5 @@
 import { buildVariantColors } from '../engine/colors';
-import { Element } from '../engine/element';
+import { Element, type Reaction } from '../engine/element';
 import { computeGravityQuantum } from '../engine/gravity';
 import { SETTINGS } from '../settings';
 
@@ -7,6 +7,8 @@ import { SETTINGS } from '../settings';
  * Mud (type 8) — wet dirt. Falls like Dirt, but with more friction and a
  * stronger cohesion than wet sand: it clings to resting wet sand or mud beside
  * it and rarely rolls off a slope, so it lands in blobs and slumps slowly.
+ * Heat dries it back into dirt: flames and embers within a couple of tiles, or a
+ * touching spark.
  */
 export class Mud extends Element {
   readonly type = SETTINGS.MUD_TYPE;
@@ -21,6 +23,18 @@ export class Mud extends Element {
   readonly slideChance = Mud.SLIDE_CHANCE;
   readonly cohesion = Mud.COHESION;
   readonly density = Mud.DENSITY;
+
+  /** Chance per step that a tile within HEAT_RADIUS of a flame or ember dries out. */
+  static DRY_CHANCE = 0.03;
+  /** Chance per step that a tile touching a spark dries out. */
+  static SPARK_DRY_CHANCE = 0.3;
+  /** Heat reach of flames and embers, in tiles (Chebyshev). */
+  static HEAT_RADIUS = 2;
+  readonly reactions: readonly Reaction[] = [
+    { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.DRY_CHANCE, radius: Mud.HEAT_RADIUS },
+    { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.DRY_CHANCE, radius: Mud.HEAT_RADIUS },
+    { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.SPARK_DRY_CHANCE },
+  ];
 
   static MUD_VARIANT_COUNT = 4;
   static MUD_COLOR_VARIANCE = 10;
