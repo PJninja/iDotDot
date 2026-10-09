@@ -122,6 +122,16 @@ export abstract class Element {
    */
   readonly flammable: boolean = false;
 
+  /** Not listed in the element picker (internal elements such as the explosion). */
+  readonly hidden: boolean = false;
+
+  /**
+   * 0..1: how well a tile holds against an adjacent explosion. It is the chance per
+   * step the tile survives, and scales how much of the blast's reach the tile soaks
+   * up when the blast eats through it. Below 1 for everything, so no tile is immune.
+   */
+  readonly blastResistance: number = 0;
+
   /** One-sided reactions this element undergoes (see Reaction). */
   readonly reactions: readonly Reaction[] = [];
 }
@@ -150,6 +160,9 @@ export class ElementRegistry {
     }
     if (!Number.isInteger(element.agedInto) || element.agedInto < 0 || element.agedInto > 255) {
       throw new Error(`agedInto of "${element.name}" is an invalid type ${element.agedInto}`);
+    }
+    if (!(element.blastResistance >= 0 && element.blastResistance < 1)) {
+      throw new Error(`Blast resistance of "${element.name}" must be in [0, 1), got ${element.blastResistance}`);
     }
     for (const r of element.reactions) {
       for (const t of [r.with, r.becomes]) {

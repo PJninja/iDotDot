@@ -25,6 +25,7 @@ export class Wood extends Element {
   /** Chance per step that wood touching a spark catches (sparks stick to wood, so this is a steady chance until they fade). */
   static SPARK_IGNITE_CHANCE = 0.1;
   readonly flammable = true;
+  readonly blastResistance = 0.3;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.FLAME_IGNITE_CHANCE },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.EMBER_IGNITE_CHANCE },

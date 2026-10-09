@@ -27,6 +27,8 @@ export const SETTINGS = {
   EMBER_TYPE: 9,
   FLAME_TYPE: 10,
   SPARK_TYPE: 11,
+  EXPLOSION_TYPE: 12,
+  BOMB_TYPE: 13,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

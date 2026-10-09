@@ -23,6 +23,7 @@ export class Dirt extends Element {
   /** Tiles within this many tiles of water soak through (without using it up) with SOAK_CHANCE per step. */
   static SOAK_RADIUS = 4;
   static SOAK_CHANCE = 0.08;
+  readonly blastResistance = 0.35;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.MUD_TYPE, chance: Dirt.WETTING_CHANCE, consumes: true },
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.MUD_TYPE, chance: Dirt.SOAK_CHANCE, radius: Dirt.SOAK_RADIUS },

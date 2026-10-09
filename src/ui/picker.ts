@@ -42,7 +42,7 @@ export class ElementPicker {
     this.dropdown.className = 'picker-dropdown';
     this.dropdown.setAttribute('role', 'listbox');
     this.dropdown.hidden = true;
-    for (const element of registry.list()) {
+    for (const element of registry.list().filter((e) => !e.hidden)) {
       this.dropdown.appendChild(this.createOption(element));
     }
 

@@ -37,6 +37,7 @@ export class Ember extends Element {
   readonly cohesion = Ember.COHESION;
   readonly ageRate = Ember.AGE_RATE;
   readonly holdsOnFlammable = true;
+  readonly blastResistance = 0.3;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.AIR_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Ember.FLAME_CHANCE },
     { with: SETTINGS.AIR_TYPE, becomes: SETTINGS.SPARK_TYPE, chance: Ember.SPARK_CHANCE },
