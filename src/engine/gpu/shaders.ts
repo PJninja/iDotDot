@@ -8,6 +8,7 @@
  */
 
 import { MAX_REACTIONS } from '../element';
+import { Ember } from '../../elements/ember';
 import { Flame } from '../../elements/flame';
 import { Smoke } from '../../elements/smoke';
 import { Spark } from '../../elements/spark';
@@ -27,10 +28,11 @@ export const REACTION_BYTES = 32;
 /** Phase codes in TypeInfo.phase (see ElementPhase). */
 export const PHASE_CODES = { solid: 0, liquid: 1, gas: 2 } as const;
 
-/** TypeInfo.flags bits: some reaction consumes this type; fire sticks to this type; a falling type holds still next to flammable tiles. */
+/** TypeInfo.flags bits: some reaction consumes this type; fire sticks to this type; a falling type holds still next to flammable tiles; the type ages slower next to fuel. */
 export const FLAG_CONSUMED = 1;
 export const FLAG_FLAMMABLE = 2;
 export const FLAG_HOLDS_ON_FLAMMABLE = 4;
+export const FLAG_FUEL_FED = 8;
 
 /** TypeInfo.haze value for elements drawn as tiles. */
 export const HAZE_NONE = 255;
@@ -50,6 +52,7 @@ const HAZE_NONE : u32 = ${HAZE_NONE}u;
 const FLAG_CONSUMED : u32 = ${FLAG_CONSUMED}u;
 const FLAG_FLAMMABLE : u32 = ${FLAG_FLAMMABLE}u;
 const FLAG_HOLDS_ON_FLAMMABLE : u32 = ${FLAG_HOLDS_ON_FLAMMABLE}u;
+const FLAG_FUEL_FED : u32 = ${FLAG_FUEL_FED}u;
 const SPARK_STUCK : u32 = 0xFFu;
 
 struct TypeInfo {
@@ -317,6 +320,9 @@ const WATER_RETURN_TRIES : u32 = 24u;
 const WATER_RETURN_REACH : i32 = 128;
 const STEAM_COOL : u32 = ${Steam.COOL_RATE}u;
 const FLAME : u32 = ${SETTINGS.FLAME_TYPE}u;
+const EMBER : u32 = ${SETTINGS.EMBER_TYPE}u;
+const FLAME_FUEL_AGE_FACTOR : f32 = ${Flame.FUEL_AGE_FACTOR};
+const EMBER_EMIT_CHANCE : f32 = ${Ember.EMIT_CHANCE};
 const SPARK : u32 = ${SETTINGS.SPARK_TYPE}u;
 const FLAME_FLICKER : f32 = ${Flame.FLICKER};
 const FLAME_WIND_FLICKER : f32 = ${Flame.WIND_FLICKER};
@@ -694,14 +700,18 @@ fn react(x : i32, y : i32, t : u32) -> u32 {
 
 // Aging: the (type, age) a tile of type t has after this step. It gains the whole
 // part of its ageRate plus the fraction by chance; past 255 it becomes agedInto
-// (AIR = it vanishes) with a fresh age. A type with an ageRate has a random change
-// pending every step, so it keeps its chunk awake.
+// (AIR = it vanishes) with a fresh age. A fuel-fed type ages slower next to fuel. A
+// type with an ageRate has a random change pending every step, so it keeps its chunk
+// awake.
 fn ageTile(x : i32, y : i32, t : u32, age : u32) -> vec2u {
-  let rate = u.types[t].ageRate;
+  var rate = u.types[t].ageRate;
   if (rate <= 0.0) {
     return vec2u(t, age);
   }
   mark(x, y);
+  if ((u.types[t].flags & FLAG_FUEL_FED) != 0u && fuelAround(x, y)) {
+    rate *= FLAME_FUEL_AGE_FACTOR;
+  }
   let whole = floor(rate);
   let gain = u32(whole) + select(0u, 1u, rand(u32(x), u32(y), stepU.step ^ 0xA136AAADu) < rate - whole);
   if (age + gain > 255u) {
@@ -920,6 +930,25 @@ fn flammableAround(x : i32, y : i32) -> bool {
     }
   }
   return false;
+}
+
+// Fuel feeds fire: a flammable tile or an ember.
+fn fuelAround(x : i32, y : i32) -> bool {
+  return flammableAround(x, y) || typeAround(x, y, EMBER) > 0u;
+}
+
+// An empty cell beside or above embers pulls a flame into itself with a chance per
+// ember, so burning wood keeps producing flames without being consumed (the cell
+// only writes itself, so no thread ever writes a second cell).
+fn emitFlame(i : u32, x : i32, y : i32, p : u32) {
+  let embers = typeAt(x - 1, y + 1, EMBER) + typeAt(x, y + 1, EMBER) + typeAt(x + 1, y + 1, EMBER)
+    + typeAt(x - 1, y, EMBER) + typeAt(x + 1, y, EMBER);
+  if (embers == 0u || solidBuf[i] != 0u) {
+    return;
+  }
+  if (rand(u32(x), u32(y), stepU.step ^ 0xD1B54A32u) < EMBER_EMIT_CHANCE * f32(embers) && claim(x, y)) {
+    commit(i, i, pack(FLAME, 0u, 0u, 0u), p);
+  }
 }
 
 // Pocket closing: the neighboring empty cell enclosed by the most tiles of
@@ -1358,8 +1387,9 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
   }
 }
 
-// Third dispatch of every step: gases. It runs after main and mainLiquid so falling
-// tiles and liquids have already claimed the cells they displace. A gas tile always
+// Third dispatch of every step: gases (and empty cells, which may emit a flame, see
+// emitFlame). It runs after main and mainLiquid so falling tiles and liquids have
+// already claimed the cells they displace. A gas tile always
 // keeps its chunk awake (it drifts and dissipates by chance every step).
 // Steam keeps a condensation timer in its value byte: it counts up while the tile is
 // packed among other steam, drains otherwise, and a full timer turns the tile into water.
@@ -1372,6 +1402,10 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   let i = g.y * u.width + g.x;
   let p = readBuf[i];
   let t = p & 0xFFu;
+  if (t == AIR) {
+    emitFlame(i, i32(g.x), i32(g.y), p);
+    return;
+  }
   if (u.types[t].phase != PHASE_GAS) {
     return;
   }

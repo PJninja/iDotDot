@@ -25,11 +25,14 @@ export class Flame extends Element {
   static WIND_FLICKER = 0.4;
   /** Age steps per sim step (about 0.5 s of life at 8). */
   static AGE_RATE = 8;
+  /** Multiplier on the age rate while touching fuel (flammable tile or ember): flames burn longer where they are fed. */
+  static FUEL_AGE_FACTOR = 0.35;
   /** Chance per step that a flame touching water goes out. */
   static QUENCH_CHANCE = 0.8;
 
   readonly riseSpeed = Flame.RISE_SPEED;
   readonly ageRate = Flame.AGE_RATE;
+  readonly fuelFed = true;
   readonly agedInto = SETTINGS.SMOKE_TYPE;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.AIR_TYPE, chance: Flame.QUENCH_CHANCE },

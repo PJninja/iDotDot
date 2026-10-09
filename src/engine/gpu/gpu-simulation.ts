@@ -17,6 +17,7 @@ import {
   FLAG_CONSUMED,
   FLAG_FLAMMABLE,
   FLAG_HOLDS_ON_FLAMMABLE,
+  FLAG_FUEL_FED,
 } from './shaders';
 
 const UNIFORM_HEADER_BYTES = 48;
@@ -940,7 +941,8 @@ export class GpuSimulation {
       f32[o + 7] = element.dissipationChance;
       f32[o + 8] = element.cohesion;
       u32[o + 9] = (consumedTypes.has(element.type) ? FLAG_CONSUMED : 0) | (element.flammable ? FLAG_FLAMMABLE : 0)
-        | (element.holdsOnFlammable ? FLAG_HOLDS_ON_FLAMMABLE : 0);
+        | (element.holdsOnFlammable ? FLAG_HOLDS_ON_FLAMMABLE : 0)
+        | (element.fuelFed ? FLAG_FUEL_FED : 0);
       f32[o + 10] = element.ageRate;
       u32[o + 11] = element.agedInto;
       for (const reaction of element.reactions) {
