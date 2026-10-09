@@ -9,6 +9,7 @@
 
 import { MAX_REACTIONS } from '../element';
 import { Ember } from '../../elements/ember';
+import { Explosion } from '../../elements/explosion';
 import { Flame } from '../../elements/flame';
 import { Smoke } from '../../elements/smoke';
 import { Spark } from '../../elements/spark';
@@ -33,6 +34,8 @@ export const FLAG_CONSUMED = 1;
 export const FLAG_FLAMMABLE = 2;
 export const FLAG_HOLDS_ON_FLAMMABLE = 4;
 export const FLAG_FUEL_FED = 8;
+/** TypeInfo.flags bits 8-15 hold the type's blastResistance as round(resistance * 255). */
+export const BLAST_RESIST_SHIFT = 8;
 
 /** TypeInfo.haze value for elements drawn as tiles. */
 export const HAZE_NONE = 255;
@@ -53,6 +56,7 @@ const FLAG_CONSUMED : u32 = ${FLAG_CONSUMED}u;
 const FLAG_FLAMMABLE : u32 = ${FLAG_FLAMMABLE}u;
 const FLAG_HOLDS_ON_FLAMMABLE : u32 = ${FLAG_HOLDS_ON_FLAMMABLE}u;
 const FLAG_FUEL_FED : u32 = ${FLAG_FUEL_FED}u;
+const BLAST_RESIST_SHIFT : u32 = ${BLAST_RESIST_SHIFT}u;
 const SPARK_STUCK : u32 = 0xFFu;
 
 struct TypeInfo {
@@ -323,6 +327,12 @@ const FLAME : u32 = ${SETTINGS.FLAME_TYPE}u;
 const EMBER : u32 = ${SETTINGS.EMBER_TYPE}u;
 const FLAME_FUEL_AGE_FACTOR : f32 = ${Flame.FUEL_AGE_FACTOR};
 const EMBER_EMIT_CHANCE : f32 = ${Ember.EMIT_CHANCE};
+const EXPLOSION : u32 = ${SETTINGS.EXPLOSION_TYPE}u;
+const BLAST_HOP_COST : u32 = ${Explosion.HOP_COST}u;
+const BLAST_DIAGONAL_COST : u32 = ${Explosion.DIAGONAL_COST}u;
+const BLAST_REACH : u32 = ${Explosion.REACH}u;
+const BLAST_SPREAD_MAX_AGE : u32 = ${Explosion.SPREAD_MAX_AGE}u;
+const BLAST_ABSORB : f32 = ${Explosion.ABSORB}.0;
 const SPARK : u32 = ${SETTINGS.SPARK_TYPE}u;
 const FLAME_FLICKER : f32 = ${Flame.FLICKER};
 const FLAME_WIND_FLICKER : f32 = ${Flame.WIND_FLICKER};
@@ -951,6 +961,59 @@ fn emitFlame(i : u32, x : i32, y : i32, p : u32) {
   }
 }
 
+// The reach an explosion has spent when it spreads into (x, y): the cheapest
+// neighboring blast tile that may still spread (younger than BLAST_SPREAD_MAX_AGE),
+// its spent reach plus the hop cost (diagonals cost more, which keeps the blast
+// round) plus absorb, the extra cost of eating through the tile there. Above
+// BLAST_REACH means no blast reaches the cell.
+fn blastSpent(x : i32, y : i32, absorb : u32) -> u32 {
+  var best = BLAST_REACH + 1u;
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      if ((dx != 0 || dy != 0) && inBounds(x + dx, y + dy)) {
+        let n = readBuf[u32(y + dy) * u.width + u32(x + dx)];
+        if ((n & 0xFFu) == EXPLOSION && (n >> 24u) < BLAST_SPREAD_MAX_AGE) {
+          let hop = select(BLAST_HOP_COST, BLAST_DIAGONAL_COST, dx != 0 && dy != 0);
+          best = min(best, ((n >> 8u) & 0xFFu) + hop + absorb);
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// The explosion tile the non-air tile t at (x, y) turns into this step (packed, with
+// the reach spent so far in its value byte), or 0 if it survives. A tile holds against
+// the blast with its blastResistance per step; a blast next to it is a random roll
+// pending, so it keeps the chunk awake.
+fn blastHit(x : i32, y : i32, t : u32) -> u32 {
+  if (t == EXPLOSION) {
+    return 0u;
+  }
+  let resist = f32((u.types[t].flags >> BLAST_RESIST_SHIFT) & 0xFFu) / 255.0;
+  let spent = blastSpent(x, y, u32(resist * BLAST_ABSORB));
+  if (spent > BLAST_REACH) {
+    return 0u;
+  }
+  mark(x, y);
+  if (rand(u32(x), u32(y), stepU.step ^ 0x4B1D0F57u) < resist) {
+    return 0u;
+  }
+  return pack(EXPLOSION, spent, 0u, 0u);
+}
+
+// An empty cell next to a spreading blast pulls it in (like emitFlame, it only writes
+// itself, and loses to any mover that already claimed it this step).
+fn blastFill(i : u32, x : i32, y : i32, p : u32) {
+  if (solidBuf[i] != 0u) {
+    return;
+  }
+  let spent = blastSpent(x, y, 0u);
+  if (spent <= BLAST_REACH && claim(x, y)) {
+    commit(i, i, pack(EXPLOSION, spent, 0u, 0u), p);
+  }
+}
+
 // Pocket closing: the neighboring empty cell enclosed by the most tiles of
 // type t (at least minCount), if moving there leaves this tile better enclosed
 // than it is now. Returns the offset to it, or (0, 0) if there is none.
@@ -1358,6 +1421,13 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
     return;
   }
 
+  // An explosion next to the tile destroys it in place, unless it holds.
+  let blast = blastHit(x, y, t);
+  if (blast != 0u) {
+    settle(i, x, y, t, blast, p);
+    return;
+  }
+
   // A tile that ages out turns into agedInto in place, like a reaction result.
   let aged = ageTile(x, y, t, p >> 24u);
   if (aged.x == AIR) {
@@ -1403,6 +1473,7 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   let p = readBuf[i];
   let t = p & 0xFFu;
   if (t == AIR) {
+    blastFill(i, i32(g.x), i32(g.y), p);
     emitFlame(i, i32(g.x), i32(g.y), p);
     return;
   }
@@ -1423,6 +1494,11 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   }
   if (reacted != t && claim(x, y)) {
     commit(i, i, pack(reacted, 0u, variant, 0u), p);
+    return;
+  }
+  let blast = blastHit(x, y, t);
+  if (blast != 0u && claim(x, y)) {
+    commit(i, i, blast, p);
     return;
   }
 
@@ -1499,6 +1575,11 @@ fn mainLiquid(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) 
   }
   if (reacted != t && claim(x, y)) {
     commit(i, i, pack(reacted, 0u, variant, 0u), p);
+    return;
+  }
+  let blast = blastHit(x, y, t);
+  if (blast != 0u && claim(x, y)) {
+    commit(i, i, blast, p);
     return;
   }
 

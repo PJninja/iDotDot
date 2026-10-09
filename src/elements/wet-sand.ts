@@ -31,6 +31,7 @@ export class WetSand extends Element {
   static SPARK_DRY_CHANCE = 0.3;
   /** Heat reach of flames and embers, in tiles (Chebyshev). */
   static HEAT_RADIUS = 2;
+  readonly blastResistance = 0.5;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.SAND_TYPE, chance: WetSand.DRY_CHANCE, radius: WetSand.HEAT_RADIUS },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.SAND_TYPE, chance: WetSand.DRY_CHANCE, radius: WetSand.HEAT_RADIUS },

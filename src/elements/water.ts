@@ -53,6 +53,7 @@ export class Water extends Element {
 
   /** Chance per step that water touching an ember boils off into steam. */
   static BOIL_CHANCE = 0.1;
+  readonly blastResistance = 0.75;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.STEAM_TYPE, chance: Water.BOIL_CHANCE },
   ];

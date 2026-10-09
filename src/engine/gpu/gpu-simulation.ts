@@ -14,6 +14,7 @@ import {
   STAMP_BYTES,
   STATS_WGSL,
   TYPE_INFO_BYTES,
+  BLAST_RESIST_SHIFT,
   FLAG_CONSUMED,
   FLAG_FLAMMABLE,
   FLAG_HOLDS_ON_FLAMMABLE,
@@ -942,7 +943,8 @@ export class GpuSimulation {
       f32[o + 8] = element.cohesion;
       u32[o + 9] = (consumedTypes.has(element.type) ? FLAG_CONSUMED : 0) | (element.flammable ? FLAG_FLAMMABLE : 0)
         | (element.holdsOnFlammable ? FLAG_HOLDS_ON_FLAMMABLE : 0)
-        | (element.fuelFed ? FLAG_FUEL_FED : 0);
+        | (element.fuelFed ? FLAG_FUEL_FED : 0)
+        | (Math.round(element.blastResistance * 255) << BLAST_RESIST_SHIFT);
       f32[o + 10] = element.ageRate;
       u32[o + 11] = element.agedInto;
       for (const reaction of element.reactions) {

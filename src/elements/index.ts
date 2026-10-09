@@ -1,7 +1,9 @@
 import { ElementRegistry } from '../engine/element';
 import { Air } from './air';
+import { Bomb } from './bomb';
 import { Dirt } from './dirt';
 import { Ember } from './ember';
+import { Explosion } from './explosion';
 import { Flame } from './flame';
 import { Mud } from './mud';
 import { Sand } from './sand';
@@ -30,5 +32,7 @@ export function createElementRegistry(): ElementRegistry {
   registry.register(new Ember());
   registry.register(new Flame());
   registry.register(new Spark());
+  registry.register(new Explosion());
+  registry.register(new Bomb());
   return registry;
 }

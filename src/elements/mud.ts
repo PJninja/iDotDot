@@ -30,6 +30,7 @@ export class Mud extends Element {
   static SPARK_DRY_CHANCE = 0.3;
   /** Heat reach of flames and embers, in tiles (Chebyshev). */
   static HEAT_RADIUS = 2;
+  readonly blastResistance = 0.5;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.DRY_CHANCE, radius: Mud.HEAT_RADIUS },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.DRY_CHANCE, radius: Mud.HEAT_RADIUS },
