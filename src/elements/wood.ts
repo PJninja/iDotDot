@@ -19,7 +19,7 @@ export class Wood extends Element {
   static WOOD_COLOR_VARIANCE = 15;
 
   /** Chance per step that wood touching a flame catches and turns into an ember. */
-  static FLAME_IGNITE_CHANCE = 0.015;
+  static FLAME_IGNITE_CHANCE = 0.012;
   /** Chance per step that wood touching an ember catches (fire creeps slowly through a log). */
   static EMBER_IGNITE_CHANCE = 0.0025;
   /** Chance per step that wood touching a spark catches (sparks stick to wood, so this is a steady chance until they fade). */

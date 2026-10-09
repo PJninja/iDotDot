@@ -24,6 +24,8 @@ export class Ember extends Element {
   static COHESION = 0.8;
   /** Age steps per sim step (mean lifetime about 256 / rate steps, 0.4 = about 10 s). */
   static AGE_RATE = 0.4;
+  /** Chance per step, per ember beside or below it, that an empty cell turns into a flame (the ember is not used up). */
+  static EMIT_CHANCE = 0.006;
   /** Chance per step that an ember touching air turns into a flame. */
   static FLAME_CHANCE = 0.01;
   /** Chance per step that an ember touching air turns into a spark. */

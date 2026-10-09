@@ -111,6 +111,12 @@ export abstract class Element {
   readonly holdsOnFlammable: boolean = false;
 
   /**
+   * Ages more slowly (by the fuel factor in the shader) while touching fuel: a
+   * flammable tile or an ember. Flames use it to burn longer next to what feeds them.
+   */
+  readonly fuelFed: boolean = false;
+
+  /**
    * Fire sticks to this element: a flame rising into it holds still beneath it and a
    * spark that hits it stays stuck to it (see updateFlame / updateSpark).
    */
