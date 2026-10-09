@@ -1,6 +1,6 @@
 # Fire: Flames, Embers, Sparks
 
-Status: plan, not started.
+Status: implemented (all four phases). Deviations: the shader uses `ageTile` instead of `age` (a local named `age` would shadow it), `SparkResult.step` instead of `move` (reserved WGSL keyword), `Spark.GRAVITY` is 0.4 after tuning (0.25 threw sparks about 55 tiles high), and flames get `Flame.WIND_FLICKER` extra flicker chance in wind.
 Scope: 3 new elements, reaction rules on Wood and Water, one generic **aging** mechanism (a new per-tile **age byte**, bits 24–31 of the packed tile, + per-type table fields), and two small movement functions (`updateFlame`, `updateSpark`). No new buffers, no `TypeInfo` size change, no haze changes; the render shader changes by one line.
 
 ## Goals

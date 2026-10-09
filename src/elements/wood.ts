@@ -1,11 +1,12 @@
 import { buildVariantColors } from '../engine/colors';
-import { Element } from '../engine/element';
+import { Element, type Reaction } from '../engine/element';
 import { SETTINGS } from '../settings';
 
 /**
  * Variants 0–3 shift the base color by up to ±WOOD_COLOR_VARIANCE per
  * channel; the shifted colors are precomputed at construction
  * (see engine/colors.ts). Painted wood cycles through them for texture.
+ * Touching a flame or ember it can catch fire and turn into an ember.
  */
 export class Wood extends Element {
   readonly type = SETTINGS.WOOD_TYPE;
@@ -15,6 +16,15 @@ export class Wood extends Element {
 
   static WOOD_VARIANT_COUNT = 4;
   static WOOD_COLOR_VARIANCE = 15;
+
+  /** Chance per step that wood touching a flame catches and turns into an ember. */
+  static FLAME_IGNITE_CHANCE = 0.03;
+  /** Chance per step that wood touching an ember catches (fire creeps slowly through a log). */
+  static EMBER_IGNITE_CHANCE = 0.005;
+  readonly reactions: readonly Reaction[] = [
+    { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.FLAME_IGNITE_CHANCE },
+    { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.EMBER_IGNITE_CHANCE },
+  ];
 
   private readonly variantColors: [number, number, number][];
 

@@ -24,6 +24,9 @@ export const SETTINGS = {
   STEAM_TYPE: 6,
   WET_SAND_TYPE: 7,
   MUD_TYPE: 8,
+  EMBER_TYPE: 9,
+  FLAME_TYPE: 10,
+  SPARK_TYPE: 11,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

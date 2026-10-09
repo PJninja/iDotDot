@@ -93,6 +93,17 @@ export abstract class Element {
    */
   readonly hazeChannel: number | null = null;
 
+  /**
+   * Age steps a tile gains per sim step (fractions roll by chance per tile), so the
+   * mean lifetime is about 256 / ageRate steps. 0 = does not age. The age lives in
+   * the tile's age byte; for an aging type getColor's second argument is the age
+   * (0..255) instead of the variant, so the color can follow a ramp over its life.
+   */
+  readonly ageRate: number = 0;
+
+  /** What an aging tile turns into once its age passes 255 (AIR = it vanishes). */
+  readonly agedInto: number = SETTINGS.AIR_TYPE;
+
   /** One-sided reactions this element undergoes (see Reaction). */
   readonly reactions: readonly Reaction[] = [];
 }
@@ -115,6 +126,12 @@ export class ElementRegistry {
     const existing = this.elements[type];
     if (existing !== null) {
       throw new Error(`Element type ${type} already registered as "${existing.name}"`);
+    }
+    if (!Number.isFinite(element.ageRate) || element.ageRate < 0 || element.ageRate > 255) {
+      throw new Error(`Age rate of "${element.name}" must be in [0, 255], got ${element.ageRate}`);
+    }
+    if (!Number.isInteger(element.agedInto) || element.agedInto < 0 || element.agedInto > 255) {
+      throw new Error(`agedInto of "${element.name}" is an invalid type ${element.agedInto}`);
     }
     for (const r of element.reactions) {
       for (const t of [r.with, r.becomes]) {

@@ -1,9 +1,12 @@
 import { ElementRegistry } from '../engine/element';
 import { Air } from './air';
 import { Dirt } from './dirt';
+import { Ember } from './ember';
+import { Flame } from './flame';
 import { Mud } from './mud';
 import { Sand } from './sand';
 import { Smoke } from './smoke';
+import { Spark } from './spark';
 import { Steam } from './steam';
 import { Water } from './water';
 import { WetSand } from './wet-sand';
@@ -24,5 +27,8 @@ export function createElementRegistry(): ElementRegistry {
   registry.register(new Wood());
   registry.register(new WetSand());
   registry.register(new Mud());
+  registry.register(new Ember());
+  registry.register(new Flame());
+  registry.register(new Spark());
   return registry;
 }
