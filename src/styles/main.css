@@ -1,0 +1,317 @@
+/* Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1a2e;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #e8e8f0;
+}
+
+/* 48px header bar, above all other layers */
+#header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: rgba(26, 26, 46, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#header nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+#header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#header .site-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* Element picker (library button + dropdown) */
+.element-picker {
+  position: relative;
+}
+
+.picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: transparent;
+  color: #e8e8f0;
+  cursor: pointer;
+}
+
+.picker-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.picker-button[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.picker-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 170px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: rgba(20, 20, 36, 0.97);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.picker-dropdown[hidden] {
+  display: none;
+}
+
+.picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.picker-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.picker-option[aria-selected='true'] {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.picker-swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* Brush picker panel (shape + radius + density) */
+.brush-dropdown {
+  min-width: 200px;
+  padding: 10px;
+}
+
+.brush-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.brush-section + .brush-section {
+  margin-top: 12px;
+}
+
+.brush-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(232, 232, 240, 0.6);
+}
+
+.brush-radius-value {
+  font-variant-numeric: tabular-nums;
+  color: #e8e8f0;
+}
+
+.brush-shape-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.brush-shape-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.brush-shape-option[aria-selected='true'] {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.brush-shape-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: rgba(232, 232, 240, 0.8);
+}
+
+.brush-radius-input {
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  accent-color: #e8e8f0;
+  cursor: pointer;
+}
+
+/* HTML overlay layer: between header (100) and canvas (auto/0) */
+#overlay {
+  position: fixed;
+  top: 48px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+#overlay > * {
+  pointer-events: auto;
+}
+
+/* Simulation canvas: fills the viewport below the header.
+   Width/height are set dynamically from JS. Background color is set
+   from SETTINGS.CANVAS_BACKGROUND by the renderer. */
+#sandbox {
+  position: fixed;
+  top: 48px;
+  left: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* Performance readout toggled by the header gauge button. */
+.perf-hud {
+  position: fixed;
+  top: 56px;
+  right: 12px;
+  z-index: 60;
+  padding: 6px 8px;
+  white-space: pre;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #9fe8a8;
+  background: rgba(10, 10, 20, 0.55);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.perf-hud[hidden] {
+  display: none;
+}
+
+.perf-hud[data-health='warn'] {
+  color: #f0d264;
+}
+
+.perf-hud[data-health='bad'] {
+  color: #ff6b6b;
+}
+
+.perf-hud-control {
+  display: block;
+  margin-top: 4px;
+  pointer-events: auto;
+}
+
+.perf-hud-control select {
+  font: inherit;
+  color: inherit;
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+/* Blocking popup shown when WebGPU is unavailable or the device is lost. */
+.gpu-error-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 10, 20, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.gpu-error-dialog {
+  max-width: 360px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(20, 20, 36, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color: #e8e8f0;
+}
+
+.gpu-error-message {
+  margin: 0 0 18px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.gpu-error-retry {
+  padding: 8px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: #e8e8f0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.gpu-error-retry:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
