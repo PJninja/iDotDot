@@ -92,6 +92,9 @@ export interface PerfStats {
  * settled it stops submitting frames entirely (the canvas keeps its last
  * frame) until painting, wind, collider or size changes wake it.
  *
+ * A packed tile is a u32: type bits 0-7, value 8-15, variant 16-23, age 24-31
+ * (see Element.ageRate; painted tiles and reaction results start at age 0).
+ *
  * The grid lives in storage buffers rather than `r32uint` textures:
  * WebGPU has no `fillTexture`/`fillBuffer` (only `clearBuffer`), and
  * buffers also make painting a plain compute scatter.
@@ -934,6 +937,8 @@ export class GpuSimulation {
       f32[o + 7] = element.dissipationChance;
       f32[o + 8] = element.cohesion;
       u32[o + 9] = consumedTypes.has(element.type) ? 1 : 0;
+      f32[o + 10] = element.ageRate;
+      u32[o + 11] = element.agedInto;
       for (const reaction of element.reactions) {
         const r = (REACTIONS_OFFSET_BYTES + rule * REACTION_BYTES) / 4;
         u32[r] = reaction.with;
@@ -950,7 +955,8 @@ export class GpuSimulation {
   /**
    * 256x256 rgba8unorm table indexed by (x = type, y = variant), built from
    * each element's getColor. Color on the GPU therefore depends on
-   * (type, variant) only, never on the value byte.
+   * (type, variant) only, never on the value byte; for aging types (ageRate > 0)
+   * the row is the tile's age instead of its variant.
    */
   private buildColorTexture(): GPUTexture {
     const pixels = new Uint8Array(COLOR_TEX_SIZE * COLOR_TEX_SIZE * 4);

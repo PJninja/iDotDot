@@ -2,11 +2,15 @@
  * WGSL sources for the GPU backend.
  *
  * The grid is a storage buffer of packed tiles (one u32 each, flat index
- * `y * width + x`): type bits 0-7, value bits 8-15, variant bits 16-23.
+ * `y * width + x`): type bits 0-7, value bits 8-15, variant bits 16-23, age
+ * bits 24-31 (only types with an ageRate advance it; it picks the color row of
+ * an aging type instead of the variant).
  */
 
 import { MAX_REACTIONS } from '../element';
+import { Flame } from '../../elements/flame';
 import { Smoke } from '../../elements/smoke';
+import { Spark } from '../../elements/spark';
 import { Steam } from '../../elements/steam';
 import { Water } from '../../elements/water';
 import { SETTINGS } from '../../settings';
@@ -50,8 +54,8 @@ struct TypeInfo {
   dissipation : f32,
   cohesion : f32,
   consumed : u32,
-  _pad1 : f32,
-  _pad2 : f32,
+  ageRate : f32,
+  agedInto : u32,
 }
 
 struct Reaction {
@@ -81,7 +85,7 @@ struct Uniforms {
 
 /**
  * Full-screen triangle that maps each device pixel to its grid cell and
- * colors it from the (type, variant) color table. Air shows the background;
+ * colors it from the (type, variant) color table (the row is the age for aging types). Air shows the background;
  * elements with a haze channel are drawn from the haze buffer instead.
  */
 export const RENDER_WGSL = /* wgsl */ `
@@ -162,7 +166,8 @@ fn fs(@builtin(position) pos : vec4f) -> @location(0) vec4f {
   let t = p & 0xFFu;
   var color = u.background;
   if (t != 0u && u.types[t].haze == HAZE_NONE) {
-    color = textureLoad(colorTex, vec2u(t, (p >> 16u) & 0xFFu), 0);
+    let row = select((p >> 16u) & 0xFFu, p >> 24u, u.types[t].ageRate > 0.0);
+    color = textureLoad(colorTex, vec2u(t, row), 0);
   }
 
   let water = haze[i].y;
@@ -302,6 +307,12 @@ const STEAM_CONDENSE_CHANCE : f32 = ${Steam.CONDENSE_CHANCE};
 const WATER_RETURN_TRIES : u32 = 24u;
 const WATER_RETURN_REACH : i32 = 128;
 const STEAM_COOL : u32 = ${Steam.COOL_RATE}u;
+const FLAME : u32 = ${SETTINGS.FLAME_TYPE}u;
+const SPARK : u32 = ${SETTINGS.SPARK_TYPE}u;
+const FLAME_FLICKER : f32 = ${Flame.FLICKER};
+const FLAME_WIND_FLICKER : f32 = ${Flame.WIND_FLICKER};
+const SPARK_GRAVITY : f32 = ${Spark.GRAVITY};
+const SPARK_DRAG : f32 = ${Spark.DRAG};
 // new-element:types
 
 struct StepUniform {
@@ -318,8 +329,8 @@ struct StepUniform {
 @group(0) @binding(7) var<storage, read_write> marks : array<atomic<u32>>;
 @group(0) @binding(8) var<storage, read> activeChunks : array<u32>;
 
-fn pack(t : u32, value : u32, variant : u32) -> u32 {
-  return t | (value << 8u) | (variant << 16u);
+fn pack(t : u32, value : u32, variant : u32, age : u32) -> u32 {
+  return t | (value << 8u) | (variant << 16u) | (age << 24u);
 }
 
 fn inBounds(x : i32, y : i32) -> bool {
@@ -668,6 +679,24 @@ fn react(x : i32, y : i32, t : u32) -> u32 {
   return t;
 }
 
+// Aging: the (type, age) a tile of type t has after this step. It gains the whole
+// part of its ageRate plus the fraction by chance; past 255 it becomes agedInto
+// (AIR = it vanishes) with a fresh age. A type with an ageRate has a random change
+// pending every step, so it keeps its chunk awake.
+fn ageTile(x : i32, y : i32, t : u32, age : u32) -> vec2u {
+  let rate = u.types[t].ageRate;
+  if (rate <= 0.0) {
+    return vec2u(t, age);
+  }
+  mark(x, y);
+  let whole = floor(rate);
+  let gain = u32(whole) + select(0u, 1u, rand(u32(x), u32(y), stepU.step ^ 0xA136AAADu) < rate - whole);
+  if (age + gain > 255u) {
+    return vec2u(u.types[t].agedInto, 0u);
+  }
+  return vec2u(t, age + gain);
+}
+
 const MAX_FALL_ATTEMPTS = 8;
 
 // Falling element: spends the tile's whole fall budget this step. Each attempt
@@ -922,6 +951,84 @@ fn updateGas(x : i32, y : i32, t : u32, value : u32, rise : f32) -> Move {
   return tileGone();
 }
 
+// Flame: rises with its type's riseSpeed and flickers sideways with FLICKER, both
+// rolled per tile (unlike updateGas's shared phase) so neighbors move independently.
+// Wind biases the sideways direction and makes flickers more likely. It tries
+// (dx, dy), (0, dy), (dx, 0) like updateGas's first candidates, then keeps its cell,
+// and vanishes if a falling tile took that.
+fn updateFlame(x : i32, y : i32, t : u32) -> Move {
+  let rise = rand(u32(x), u32(y), stepU.step ^ 0x68E31DA4u) < u.types[t].rise;
+  let flicker = rand(u32(x), u32(y), stepU.step ^ 0xB5297A4Du) < FLAME_FLICKER + FLAME_WIND_FLICKER * abs(u.wind);
+  let right = rand(u32(x), u32(y), stepU.step ^ 0x1B56C4E9u) < 0.5 + 0.5 * u.wind;
+  let dx = select(0, select(-1, 1, right), flicker);
+  let dy = select(0, -1, rise);
+  var cand = array<vec2i, 3>(vec2i(dx, dy), vec2i(0, dy), vec2i(dx, 0));
+  for (var k = 0; k < 3; k++) {
+    let c = cand[k];
+    if ((c.x != 0 || c.y != 0) && passable(x + c.x, y + c.y) && claim(x + c.x, y + c.y)) {
+      return moveTo(x + c.x, y + c.y, 0u);
+    }
+  }
+  if (claim(x, y)) {
+    return stay(0u);
+  }
+  return tileGone();
+}
+
+// A spark's step: its move, and whether it landed (was blocked, so it turns into a flame).
+struct SparkResult {
+  step : Move,
+  landed : bool,
+}
+
+// Spark: a ballistic tile. Its velocity (cells per step) lives in the value byte,
+// vx in bits 0-3 and vy in bits 4-7, each stored +8 so 0 means "not launched yet":
+// a fresh spark picks a random upward-cone velocity. Each step gravity pulls vy
+// down and drag decays vx; it then traces the cells toward (x + vx, y + vy) through
+// enterable cells (it passes through lighter gas) and claims the furthest one it
+// can, falling back to earlier path cells. If the path was blocked it lands, which
+// turns it into a flame in the cell it reached.
+fn updateSpark(x : i32, y : i32, t : u32, value : u32) -> SparkResult {
+  var vx = i32(value & 15u) - 8;
+  var vy = i32((value >> 4u) & 15u) - 8;
+  if (value == 0u) {
+    vx = min(i32(rand(u32(x), u32(y), stepU.step ^ 0x2F6A5D13u) * 7.0), 6) - 3;
+    vy = min(i32(rand(u32(x), u32(y), stepU.step ^ 0x7ED55D16u) * 4.0), 3) - 5;
+  } else {
+    if (rand(u32(x), u32(y), stepU.step ^ 0xC761C23Cu) < SPARK_GRAVITY) {
+      vy = min(vy + 1, 7);
+    }
+    if (rand(u32(x), u32(y), stepU.step ^ 0x165667B1u) < SPARK_DRAG) {
+      vx -= sign(vx);
+    }
+  }
+  let packed = u32(vx + 8) | (u32(vy + 8) << 4u);
+
+  let n = max(abs(vx), abs(vy));
+  var path : array<vec2i, 7>;
+  var reach = 0;
+  var blocked = false;
+  for (var k = 1; k <= n; k++) {
+    let f = f32(k) / f32(n);
+    let c = vec2i(x + i32(round(f32(vx) * f)), y + i32(round(f32(vy) * f)));
+    if (!enterable(t, c.x, c.y)) {
+      blocked = true;
+      break;
+    }
+    path[k - 1] = c;
+    reach = k;
+  }
+  for (var k = reach; k > 0; k--) {
+    if (claim(path[k - 1].x, path[k - 1].y)) {
+      return SparkResult(moveTo(path[k - 1].x, path[k - 1].y, packed), blocked && k == reach);
+    }
+  }
+  if (claim(x, y)) {
+    return SparkResult(stay(packed), blocked && reach == 0);
+  }
+  return SparkResult(tileGone(), false);
+}
+
 // Sideways spread direction, shared by a patch of WATER_FLOW_SCALE tiles per row
 // band and re-rolled every WATER_FLOW_PERIOD steps.
 fn waterFlow(x : i32, y : i32) -> i32 {
@@ -1169,7 +1276,18 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
     return;
   }
   if (reacted != t) {
-    settle(i, x, y, t, pack(reacted, 0u, variant), p);
+    settle(i, x, y, t, pack(reacted, 0u, variant, 0u), p);
+    return;
+  }
+
+  // A tile that ages out turns into agedInto in place, like a reaction result.
+  let aged = ageTile(x, y, t, p >> 24u);
+  if (aged.x == AIR) {
+    markCell(i);
+    return;
+  }
+  if (aged.x != t) {
+    settle(i, x, y, t, pack(aged.x, 0u, variant, 0u), p);
     return;
   }
 
@@ -1185,9 +1303,9 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
 
   if (result.moved) {
     // The destination was claimed by this thread (claim() in the behavior).
-    commit(i, u32(result.dest.y) * u.width + u32(result.dest.x), pack(t, result.newValue, variant), p);
+    commit(i, u32(result.dest.y) * u.width + u32(result.dest.x), pack(t, result.newValue, variant, aged.y), p);
   } else {
-    settle(i, x, y, t, pack(t, result.newValue, variant), p);
+    settle(i, x, y, t, pack(t, result.newValue, variant, aged.y), p);
   }
 }
 
@@ -1221,12 +1339,22 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
     return;
   }
   if (reacted != t && claim(x, y)) {
-    commit(i, i, pack(reacted, 0u, variant), p);
+    commit(i, i, pack(reacted, 0u, variant, 0u), p);
+    return;
+  }
+
+  let aged = ageTile(x, y, t, p >> 24u);
+  if (aged.x != t) {
+    if (aged.x != AIR && claim(x, y)) {
+      commit(i, i, pack(aged.x, 0u, variant, 0u), p);
+    }
     return;
   }
 
   var value = 0u;
-  if (t == STEAM) {
+  if (t == SPARK) {
+    value = (p >> 8u) & 0xFFu;
+  } else if (t == STEAM) {
     value = (p >> 8u) & 0xFFu;
     if (typeAround(x, y, STEAM) >= STEAM_COMPACT) {
       value = min(value + 1u, 255u);
@@ -1234,12 +1362,22 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
       value = select(value - STEAM_COOL, 0u, value < STEAM_COOL);
     }
     if (value >= STEAM_CONDENSE_STEPS && rand(g.x, g.y, stepU.step ^ 0x7F4A7C15u) < STEAM_CONDENSE_CHANCE && claim(x, y)) {
-      commit(i, i, pack(WATER, 0u, 0u), p);
+      commit(i, i, pack(WATER, 0u, 0u, 0u), p);
       return;
     }
   }
 
-  let result = updateGas(x, y, t, value, u.types[t].rise);
+  var result : Move;
+  var landed = false;
+  if (t == FLAME) {
+    result = updateFlame(x, y, t);
+  } else if (t == SPARK) {
+    let spark = updateSpark(x, y, t, value);
+    result = spark.step;
+    landed = spark.landed;
+  } else {
+    result = updateGas(x, y, t, value, u.types[t].rise);
+  }
   if (result.moved && result.dest.x < 0) {
     return;
   }
@@ -1247,7 +1385,11 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   if (result.moved) {
     dest = u32(result.dest.y) * u.width + u32(result.dest.x);
   }
-  commit(i, dest, pack(t, result.newValue, variant), p);
+  if (landed) {
+    commit(i, dest, pack(FLAME, 0u, variant, 0u), p);
+  } else {
+    commit(i, dest, pack(t, result.newValue, variant, aged.y), p);
+  }
 }
 
 // Second dispatch of every step: liquids. It runs after main so sinking
@@ -1273,7 +1415,7 @@ fn mainLiquid(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) 
     return;
   }
   if (reacted != t && claim(x, y)) {
-    commit(i, i, pack(reacted, 0u, variant), p);
+    commit(i, i, pack(reacted, 0u, variant, 0u), p);
     return;
   }
 
@@ -1286,7 +1428,7 @@ fn mainLiquid(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) 
   if (result.moved) {
     dest = u32(result.dest.y) * u.width + u32(result.dest.x);
   }
-  commit(i, dest, pack(t, result.newValue, variant), p);
+  commit(i, dest, pack(t, result.newValue, variant, p >> 24u), p);
 }
 `;
 
