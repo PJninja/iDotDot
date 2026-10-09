@@ -105,6 +105,12 @@ export abstract class Element {
   readonly agedInto: number = SETTINGS.AIR_TYPE;
 
   /**
+   * Falling elements only: a tile holds still while any of its 8 neighbors is
+   * flammable, so burning wood stays where it burns instead of dropping away.
+   */
+  readonly holdsOnFlammable: boolean = false;
+
+  /**
    * Fire sticks to this element: a flame rising into it holds still beneath it and a
    * spark that hits it stays stuck to it (see updateFlame / updateSpark).
    */
