@@ -12,7 +12,7 @@ This file is intent. `AGENTS.md` and the code are the current state. The plan it
 | Physics | A chip's interior is a collider, so sand, water and fire respect it. |
 | Borders | Each chip is surrounded by a ring of static element tiles (sand rests on it, wood burns, acid dissolves steel, ice melts). Material is chosen per project. |
 | Damage | Cosmetic. Lasts until the world rebuilds (reload or resize). |
-| Expanding | Two stages: click a chip to open a centered preview window above the sim, then open the detail view. The preview is a dimmed overlay and does not affect the sim. The chip itself never moves or grows. |
+| Expanding | Two stages: click a chip to open a centered preview window above the sim, then expand that same window into the detail view. The preview is a dimmed overlay and does not affect the sim. The chip itself never moves or grows. |
 | Content | One typed TS module per project. A chip shows an icon, title, description and three tags. |
 | Extras | Plain-HTML view, name and contact made of tiles, tag filter using the elements, portfolio and play modes, structured case studies with video. |
 
@@ -107,7 +107,8 @@ Stamping last puts the rings on top of whatever the default world contains.
 
 **Stage 2: detail panel**
 - Shows the sections, gallery and links.
-- Open question 9: whether the detail panel is a second overlay like the preview (replacing it on the same scrim) or something different.
+- It is the preview window expanded in place on the same scrim, with the same dialog semantics, focus trap and close handling. It grows without a CSS transition and still never touches the grid.
+- Closing returns to the board, not back to the preview.
 - Deep link: the hash `#/<id>` opens it. Back or `hashchange` closes it. Loading a URL with a hash opens that project after the first rebuild.
 
 ## Case-study content
@@ -170,7 +171,7 @@ Every project has the same shape so the detail view renders it the same way: a f
 
 ## Edge cases
 
-- Window resize: layout is recomputed once per animation frame, as today. Narrow viewports use fewer columns and the detail panel fills the viewport.
+- Window resize: layout is recomputed once per animation frame, as today. Narrow viewports use fewer columns and the window fills the viewport.
 - Tile size change from the perf HUD goes through `rebuildWorld()`.
 - The board lives in `#overlay`, below the 48 px header.
 - Under `prefers-reduced-motion` there are no transitions and video shows its poster.
@@ -188,7 +189,7 @@ Every project has the same shape so the detail view renders it the same way: a f
 7. ~~**Video.**~~ Resolved: short silent clips of a few MB each, `.webm` plus `.mp4`.
 8. ~~**Icons.**~~ Resolved: inline SVG strings in each project module, pixelated with CSS.
 
-9. **Detail view.** Is the detail view another overlay on the same scrim, or something different? Pending.
+9. ~~**Detail view.**~~ Resolved: the same window, expanded in place on the same scrim.
 
 ## Build order
 
@@ -197,7 +198,7 @@ Every project has the same shape so the detail view renders it the same way: a f
 3. `stampFrame` / `clearFrame` and the `rebuildWorld()` refactor in `main.ts`. Wait for the default-worlds work, since both touch `main.ts` and the rebuild path.
 4. Board with chips, colliders, rings and keyboard support.
 5. Preview window above the sim: scrim, focus trap, close handling.
-6. Detail panel with gallery, deep link and video.
+6. Expand the window into the detail view with gallery, deep link and video.
 7. Tag filter.
 8. Name and contact line.
 9. Mode toggle, Reset world and first-visit hint.
