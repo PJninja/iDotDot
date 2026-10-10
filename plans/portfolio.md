@@ -11,6 +11,7 @@ Decisions already made:
 - **Two-stage expand.** Chip -> grown preview -> full detail panel.
 - **Visual style: blocky and tile-aligned.** Edges snap to the tile grid, colors come from the element palettes, thumbnails are pixelated.
 - **Content:** one typed TS module per project.
+- **Five additions** (each has its own section below): a plain-HTML view built from the same project data, an identity hero plus contact dock made of tiles, tag filtering that uses the elements, a portfolio mode vs play mode, and structured case-study content with video.
 
 ## Chip contents
 
@@ -18,7 +19,7 @@ Each chip shows, at a glance: an icon, the title, a short description (2 lines m
 
 ## Data (`src/projects/`)
 
-- `src/projects/project.ts`: `Project` type: `id` (kebab-case, also the URL hash), `title`, `summary` (chip description), `tags` (tuple of 3), `icon` (an inline SVG string or an imported asset URL), `border` (a registry element name or type constant), `blurb` (preview text), `sections` (`{ heading, body }[]` for the detail view), `screenshots` (`{ src, alt, caption? }[]`, imported with Vite `?url`), `links` (`{ label, href }[]`), `order`.
+- `src/projects/project.ts`: `Project` type: `id` (kebab-case, also the URL hash), `title`, `summary` (chip description), `tags` (tuple of 3), `icon` (an inline SVG string or an imported asset URL), `border` (a registry element name or type constant), `blurb` (preview text), `sections` (`{ heading, body }[]` for the detail view), `screenshots` (`{ src, alt, caption? }[]`, imported with Vite `?url`), `links` (`{ label, href }[]`), `order`. Case-study fields (see Case-study content): `role`, `timeline`, `stack` (string[]), `outcome`, optional `video`.
 - One file per project: `src/projects/<id>.ts` exports a default `Project`. `src/projects/index.ts` collects them with `import.meta.glob(..., { eager: true })` (same pattern as `src/worlds/`), validates (unique ids, exactly 3 tags, known border material) and sorts by `order`.
 - Images live next to the module (`src/projects/<id>/…`) so Vite hashes and bundles them. Zero runtime dependencies stays true.
 
@@ -54,10 +55,47 @@ Resize, `setTileSize` and `loadWorld` clear or replace the grid, which erases ev
 - Deep link: hash `#/<id>`. Opening writes the hash; `hashchange` / Back closes it. Loading a URL with a hash opens that project's detail directly after the first rebuild.
 - Closing restores the preview or collapsed chip.
 
+## Case-study content
+
+Screenshots alone do not say what was done, so every project has the same shape and the detail view renders it the same way:
+
+- A facts row: `role`, `timeline`, `stack`, `outcome` (one sentence), all required, validated by the loader.
+- `sections` for the write-up, then the gallery, then `links`.
+- Optional `video`: a short muted looping clip (`<video muted loop playsinline preload="none">`, poster = first screenshot, `.webm` and `.mp4` sources) shown at the top of the gallery. It loads only when the detail view opens, never from the chips. Paused when the tab is hidden and under `prefers-reduced-motion` (poster only).
+- Keep clips small (bundled by Vite, so they count toward the deploy size); guidance of a few MB each, decided when real content arrives.
+
 ## Screenshots
 
 - Chips and preview use pixelated thumbnails (downscale to roughly the tile resolution, `image-rendering: pixelated`) so they look like they belong in the grid.
 - The detail panel shows full-quality images (`<img loading="lazy" decoding="async">`, explicit `width`/`height`, `alt` required).
+
+## Tag filter (elements as feedback)
+
+- With 10-20 chips, visitors need to find the relevant ones. A tag bar (all tags used across projects, as buttons with `aria-pressed`) sits in a free area of the board; clicking tags is a multi-select, any-match filter.
+- Matching chips get a lit ring (a torch or ember tile stamped on or next to the ring); non-matching chips get an ice ring and their DOM content is dimmed. Clearing the filter restores each chip's own material. Both effects use the same `stampFrame` / `clearFrame` path as expand.
+- Filtering overwrites border damage on the affected chips and stamping restores their rings. Accepted: it is a deliberate user action, and "permanent until reload" still holds when no filter is used.
+- Non-matching chips stay focusable and clickable (filtering never removes content), only dimmed.
+- Filter state is mirrored in the URL (`?tag=webgpu`) so it can be shared, and read back on load after the first rebuild.
+
+## Identity hero and contact dock
+
+- **Hero:** the name and a one-line tagline are part of the default world, stamped in tiles (stone, or wood to be burnable) near the top of the board, authored with the Save / Load tooling like the other default worlds. Because worlds resample by tile size, the hero is authored at 4 px tiles; an HTML `<h1>` and tagline stay in the page (visually hidden or under the tile text) so the identity is always accessible and indexed.
+- **Contact dock:** a small fixed group of chips for email (click copies to the clipboard and confirms), GitHub, resume and other links. Each is a real `<a>`/`<button>` and a collider, with a ring of its own. The primary contact chip's ring is a permanent torch so it stays the one lit thing on the board.
+- Dock position is part of the board layout (a corner or the bottom edge), reserved so it is never covered by a grown preview.
+
+## Portfolio mode and play mode
+
+- **Portfolio mode (default):** chips, hero and contact dock, with a minimal header (title, mode toggle, plain-view link). The brush picker, element picker, perf button and world menu are hidden.
+- **Play mode:** the full existing toolbox is revealed, and the chips and dock stay (they are solid and part of the world). A Reset world button reloads this visit's default world and re-stamps the rings; it is available in both modes.
+- The mode toggle is a header button; the choice is remembered in `idotdot.preferences` (`loadPreferences` validates the new field and falls back to portfolio mode).
+- A one-time hint, such as "drag to pour sand", shows on the first visit and is dismissed by the first paint or any click; whether it was seen is stored in preferences. Painting outside UI is allowed in both modes, only the toolbox visibility differs.
+
+## Plain view and SEO
+
+- A plain page rendered from the same `Project` modules: header, identity, one article per project (facts, write-up, screenshots, video, links) and the contact links. No canvas, no WebGPU, normal scrolling and semantics.
+- **When it shows:** automatically if `navigator.gpu` is missing or device creation fails (replacing the blocking GPU error dialog for this case), and on request via a "Plain view" link and `?view=plain`. Device loss mid-session keeps the current dialog behavior, with a link to the plain view added.
+- **Build:** render it at build time with Vite (a small plugin or a post-build step that writes the static HTML into the `<noscript>`/fallback region of `index.html`) so crawlers and no-JS visitors see real content with zero runtime dependencies. Generated output must come from the same project modules, never a second copy of the content.
+- **Share previews:** `og:title`, `og:description`, `og:image` (a screenshot of the world with the board), `twitter:card`, canonical URL, and a `<meta name="description">`. Per-project deep links (`#/<id>`) share the site-level preview; per-project previews would need separate pages and are out of scope.
 
 ## Edge cases
 
@@ -75,6 +113,11 @@ Resize, `setTileSize` and `loadWorld` clear or replace the grid, which erases ev
 3. Exact layout rule for where a grown preview goes when neighbors are adjacent.
 4. Icon format: inline SVG strings vs imported assets (affects pixelation).
 5. Fractional `tileSize` at 125% / 150% DPR: confirm chip edges and ring alignment at several tile sizes.
+6. Plain view build: a Vite plugin vs a post-build script, and how the fallback HTML and the live app share the same markup (or deliberately do not).
+7. Hero: whether the name is wood (burnable, visitors can wreck it) or stone; hidden `<h1>` vs visible text beneath the tiles.
+8. Which contact links and which one gets the permanent torch.
+9. Tag filter: which chips lose border damage and whether non-matching ones should also be ice or just dimmed (ice melts near the lit rings next to it).
+10. Video size budget and formats, and whether `preload="none"` is enough on slow connections.
 
 ## Build order
 
@@ -82,7 +125,13 @@ Resize, `setTileSize` and `loadWorld` clear or replace the grid, which erases ev
 2. `stampFrame` / `clearFrame` in the engine + `rebuildWorld()` refactor in `main.ts`.
 3. Board + chips (static layout, colliders, rings, keyboard/ARIA).
 4. Preview expand/collapse.
-5. Detail panel, gallery, deep link.
-6. Real content, real icons and screenshots; tune ring materials and spacing.
+5. Detail panel, gallery, deep link, case-study fields and video.
+6. Tag bar and filter (lit and ice rings, URL state).
+7. Hero default-world content and contact dock.
+8. Portfolio / play mode toggle, Reset world, first-visit hint, preferences.
+9. Plain view (generated from project modules), GPU-failure fallback, Open Graph tags.
+10. Real content, real icons and screenshots; tune ring materials and spacing.
+
+Steps 1, 9 and the data parts of 5 do not touch the engine and can start before the default-worlds work lands.
 
 Wait for the default-worlds work to land before step 2, since both touch `main.ts` and the world-rebuild path.
