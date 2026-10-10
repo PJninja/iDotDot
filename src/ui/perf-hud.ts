@@ -1,5 +1,5 @@
 import type { GpuSimulation, PerfStats } from '../engine/gpu/gpu-simulation';
-import { SETTINGS } from '../settings';
+import { TILE_SIZES } from './preferences';
 
 /** Gauge icon for the performance button. */
 const ICON_SVG =
@@ -10,9 +10,6 @@ const ICON_SVG =
   '</svg>';
 
 const REFRESH_MS = 250;
-/** Tile edges (CSS px) offered by the tile size dropdown. */
-const TILE_SIZES = [1, 2, 4, 8, 16];
-
 /** Smoothed fps below which the readout turns yellow / red. Dropped steps (the sim running slower than real time) also turn it red. */
 const WARN_FPS = 50;
 const BAD_FPS = 30;
@@ -46,7 +43,7 @@ export class PerfHud {
   /** Called with the new tile edge (CSS px) when the tile size dropdown changes. */
   onTileSizeChange: ((cssPx: number) => void) | null = null;
 
-  constructor(private readonly sim: GpuSimulation) {
+  constructor(private readonly sim: GpuSimulation, initialTileSize: number) {
     this.button = document.createElement('button');
     this.button.type = 'button';
     this.button.className = 'picker-button';
@@ -60,7 +57,7 @@ export class PerfHud {
     this.panel.hidden = true;
     this.stats = document.createElement('div');
     this.panel.appendChild(this.stats);
-    this.panel.appendChild(this.createTileSizeSelect());
+    this.panel.appendChild(this.createTileSizeSelect(initialTileSize));
     document.body.appendChild(this.panel);
 
     const actions = document.querySelector('#header .header-actions');
@@ -68,7 +65,7 @@ export class PerfHud {
     actions.appendChild(this.button);
   }
 
-  private createTileSizeSelect(): HTMLLabelElement {
+  private createTileSizeSelect(initialTileSize: number): HTMLLabelElement {
     const label = document.createElement('label');
     label.className = 'perf-hud-control';
     label.textContent = 'Tile Size ';
@@ -79,7 +76,7 @@ export class PerfHud {
       option.textContent = `${size}px`;
       select.appendChild(option);
     }
-    select.value = String(SETTINGS.TILE_SIZE);
+    select.value = String(initialTileSize);
     select.addEventListener('change', () => {
       this.onTileSizeChange?.(Number(select.value));
       this.render();
