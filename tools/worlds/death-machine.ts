@@ -27,7 +27,7 @@ const SKULL_ART = [
 /** Guard tower with a searchlight torch, a coal heap, the loader funnel over the coal chute, a stubborn weed. */
 function fuelYard(g: Grid): void {
   g.bricks(6, S - 36, 10, 36, T.STONE, 5, 3);
-  g.rect(4, S - 40, 14, 4, T.STEEL);
+  g.rect(4, S - 40, 14, 4, T.STONE);
   g.rect(8, S - 42, 2, 2, T.TORCH);
   g.rect(12, S - 42, 2, 2, T.TORCH);
   g.poly([[24, S], [62, S], [56, S - 12], [46, S - 18], [38, S - 18], [30, S - 12]], T.CHARCOAL);
@@ -119,7 +119,8 @@ function acidTower(g: Grid): void {
   g.rect(x0 - 2, 144, x1 - x0 + 6, 3, T.STEEL);
   g.vessel(x0 + 4, 78, 26, 30, 2, T.ICE, T.ACID, 20);
   g.vessel(x0 + 16, 114, 24, 30, 2, T.ICE, T.ACID, 20);
-  g.rect(x0 + 21, 66, 2, 12, T.STEEL);
+  g.rect(x0 + 21, 70, 2, 8, T.STEEL);
+  g.rect(x0 + 19, 66, 6, 4, T.STONE);
   g.rect(x0 + 20, 64, 4, 2, T.TORCH);
   g.vessel(x0, S - 10, 48, 10, 2, T.STONE, T.MUD, 6);
 }
@@ -164,7 +165,7 @@ function rightYard(g: Grid): void {
   g.vessel(616, S - 12, 9, 12, 1, T.STEEL, T.ACID, 8);
   g.set(616, S - 3, T.AIR);
   g.bricks(626, S - 36, 12, 36, T.STONE, 6, 3);
-  g.rect(622, S - 40, 20, 4, T.STEEL);
+  g.rect(622, S - 40, 20, 4, T.STONE);
   g.rect(628, S - 42, 2, 2, T.TORCH);
   g.rect(634, S - 42, 2, 2, T.TORCH);
   g.rect(588, S - 40, 2, 40, T.STEEL);
