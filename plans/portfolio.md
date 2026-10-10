@@ -1,6 +1,6 @@
 # Portfolio content
 
-Goal: list 10-20 projects as cards that live inside the falling-sands world instead of on top of it. A card opens a centered preview and then a detail view with text and screenshots.
+Goal: list 10-20 projects as cards that live inside the falling-sands world instead of on top of it. A card opens a centered preview window above the sim and then a detail view with text and screenshots.
 
 This file is intent. `AGENTS.md` and the code are the current state. The plan itself is written to be easy to scan; the guidelines below apply to what the plan builds (site UI and copy), not to how the plan is written.
 
@@ -12,7 +12,7 @@ This file is intent. `AGENTS.md` and the code are the current state. The plan it
 | Physics | A chip's interior is a collider, so sand, water and fire respect it. |
 | Borders | Each chip is surrounded by a ring of static element tiles (sand rests on it, wood burns, acid dissolves steel, ice melts). Material is chosen per project. |
 | Damage | Cosmetic. Lasts until the world rebuilds (reload or resize). |
-| Expanding | Two stages: click a chip to open a centered preview panel, then open the detail panel. The chip itself never moves or grows. |
+| Expanding | Two stages: click a chip to open a centered preview window above the sim, then open the detail view. The preview is a dimmed overlay and does not affect the sim. The chip itself never moves or grows. |
 | Content | One typed TS module per project. A chip shows an icon, title, description and three tags. |
 | Extras | Plain-HTML view, name and contact made of tiles, tag filter using the elements, portfolio and play modes, structured case studies with video. |
 
@@ -97,14 +97,17 @@ Stamping last puts the rings on top of whatever the default world contains.
 ## Expanding
 
 **Stage 1: preview**
-- A click opens a preview panel centered in the viewport. The chip itself does not change, so its collider and ring stay put and neighbors are never displaced.
-- The preview shows the `blurb`, the first screenshot and two controls (open detail, close). It is its own collider with its own ring in the project's material, stamped when it opens and cleared when it closes.
-- It opens in one frame with no CSS transition, so the collider and ring are correct from the first frame. Sand under its footprint is deleted.
-- Only one preview is open at a time. Opening another replaces it. Escape or the close control removes it.
+- A click opens a preview window centered in the viewport, on top of the sim. It is a plain DOM layer: it is not a collider, has no tile ring and does not touch the grid, so the sim underneath is unaffected and keeps running.
+- A flat dark scrim covers the sim and board behind the window, so it is clear the window sits above the world. Plain dimming only: no blur and no frosted effect.
+- The scrim takes pointer events, so clicks and drags on it never paint. Clicking the scrim, pressing Escape or using the close control closes the preview.
+- The window shows the `blurb`, the first screenshot and two controls (open detail, close). Square corners, no shadow, no CSS border. Its edge uses a tile-stepped treatment of its own (for example a chunky stepped outline drawn with tile-sized blocks in the project's material colors) instead of a stock card look.
+- Accessibility: `role="dialog"` with `aria-modal="true"`, focus moves into the window on open and is trapped there, and focus returns to the chip on close.
+- Only one preview is open at a time. Opening happens in one frame with no CSS transition. Under `prefers-reduced-motion` nothing changes, since there is no animation.
+- Opening and closing never stamp, clear or delete anything in the grid, so a chip's ring and collider are untouched.
 
 **Stage 2: detail panel**
 - Shows the sections, gallery and links.
-- The panel uses the same collider and ring treatment as the preview, sized larger and replacing it. Square corners, no shadow, no blur, no dimming layer. The board and world stay visible and running around it. The fill is a flat palette color.
+- Open question 9: whether the detail panel is a second overlay like the preview (replacing it on the same scrim) or something different.
 - Deep link: the hash `#/<id>` opens it. Back or `hashchange` closes it. Loading a URL with a hash opens that project after the first rebuild.
 
 ## Case-study content
@@ -137,7 +140,6 @@ Every project has the same shape so the detail view renders it the same way: a f
 - This is part of the world and not a hero section: it takes only the space the lettering needs, with no background, call to action or illustration.
 - Contact is one line of plain text links under the name: email, GitHub and resume. Each is underlined text with no ring of its own.
 - Email copies the address on click and the link text changes to "Copied".
-- The line sits outside the centered preview region, so an open preview never covers it.
 
 ## Portfolio mode and play mode
 
@@ -178,7 +180,7 @@ Every project has the same shape so the detail view renders it the same way: a f
 ## Open questions
 
 1. ~~**Grid vs the guidelines.**~~ Resolved: keep the chip grid as decided. The chips' tile rings, per-project materials and physical interaction with the sim are what separate it from a stock feature grid.
-2. ~~**Growing a preview.**~~ Resolved: the preview opens centered and the chip does not move. Sand under the preview footprint is deleted (shoving it outward can come later). Verify first that `rebuildSolidMask` plus `wakeAllPending` handle tiles inside newly solid cells (the shaders skip solid cells, but existing tiles there must not linger).
+2. ~~**Growing a preview.**~~ Superseded: the preview is a dimmed overlay above the sim and does not touch it, so there is nothing to grow or delete. The shader check for tiles inside newly solid cells only matters if a detail view or anything else changes colliders at runtime.
 3. **Alignment (verification, not a decision).** At 125% and 150% device pixel ratios `tileSize` is fractional. Check chip edges and ring alignment at several tile sizes when the board is built.
 4. ~~**Name and contact.**~~ Resolved: the name is layered strokes (stone core, steel edges, wood accents). Contact links are email, GitHub and resume. No torch on the contact line.
 5. ~~**Filter details.**~~ Resolved: matching chips get a lit ring and nothing else changes.
@@ -186,13 +188,15 @@ Every project has the same shape so the detail view renders it the same way: a f
 7. ~~**Video.**~~ Resolved: short silent clips of a few MB each, `.webm` plus `.mp4`.
 8. ~~**Icons.**~~ Resolved: inline SVG strings in each project module, pixelated with CSS.
 
+9. **Detail view.** Is the detail view another overlay on the same scrim, or something different? Pending.
+
 ## Build order
 
 1. `Project` type, loader with validation, three placeholder projects.
 2. Plain view and case-study fields (depend only on the data, so they can start before the default-worlds work lands).
 3. `stampFrame` / `clearFrame` and the `rebuildWorld()` refactor in `main.ts`. Wait for the default-worlds work, since both touch `main.ts` and the rebuild path.
 4. Board with chips, colliders, rings and keyboard support.
-5. Centered preview panel open and close.
+5. Preview window above the sim: scrim, focus trap, close handling.
 6. Detail panel with gallery, deep link and video.
 7. Tag filter.
 8. Name and contact line.
