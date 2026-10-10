@@ -28,12 +28,16 @@ export class Bomb extends Element {
   /** Chance per step that a bomb touching a spark explodes (sparks stick, so this repeats until they fade). */
   static SPARK_CHANCE = 0.3;
 
+  /** Chance per step that a bomb touching hot steel explodes. */
+  static HOT_STEEL_CHANCE = 0.02;
+
   readonly flammable = true;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.EXPLOSION_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: 1 },
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.FLAME_CHANCE },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.EMBER_CHANCE },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.SPARK_CHANCE },
+    { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.HOT_STEEL_CHANCE },
   ];
 
   private readonly variantColors: [number, number, number][];

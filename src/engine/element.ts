@@ -104,6 +104,9 @@ export abstract class Element {
   /** What an aging tile turns into once its age passes 255 (AIR = it vanishes). */
   readonly agedInto: number = SETTINGS.AIR_TYPE;
 
+  /** Chance (0..1) that an aged-out tile turns into agedInto; otherwise it vanishes. */
+  readonly agedIntoChance: number = 1;
+
   /**
    * Falling elements only: a tile holds still while any of its 8 neighbors is
    * flammable, so burning wood stays where it burns instead of dropping away.
@@ -160,6 +163,9 @@ export class ElementRegistry {
     }
     if (!Number.isInteger(element.agedInto) || element.agedInto < 0 || element.agedInto > 255) {
       throw new Error(`agedInto of "${element.name}" is an invalid type ${element.agedInto}`);
+    }
+    if (!(element.agedIntoChance >= 0 && element.agedIntoChance <= 1)) {
+      throw new Error(`agedIntoChance of "${element.name}" must be in [0, 1], got ${element.agedIntoChance}`);
     }
     if (!(element.blastResistance >= 0 && element.blastResistance < 1)) {
       throw new Error(`Blast resistance of "${element.name}" must be in [0, 1), got ${element.blastResistance}`);
