@@ -11,6 +11,7 @@ import { MAX_REACTIONS } from '../element';
 import { Ember } from '../../elements/ember';
 import { Explosion } from '../../elements/explosion';
 import { Flame } from '../../elements/flame';
+import { Methane } from '../../elements/methane';
 import { Smoke } from '../../elements/smoke';
 import { Spark } from '../../elements/spark';
 import { Steam } from '../../elements/steam';
@@ -126,6 +127,10 @@ const STEAM : u32 = ${SETTINGS.STEAM_TYPE}u;
 const STEAM_LEVELS : u32 = ${Steam.DENSITY_LEVELS}u;
 const STEAM_FULL : f32 = ${Steam.HAZE_FULL};
 const STEAM_OPACITY : f32 = ${Steam.HAZE_OPACITY};
+const METHANE : u32 = ${SETTINGS.METHANE_TYPE}u;
+const METHANE_LEVELS : u32 = ${Methane.DENSITY_LEVELS}u;
+const METHANE_FULL : f32 = ${Methane.HAZE_FULL};
+const METHANE_OPACITY : f32 = ${Methane.HAZE_OPACITY};
 const HAZE_LEVELS : u32 = ${Smoke.SMOKE_DENSITY_LEVELS}u;
 const HAZE_FULL : f32 = ${Smoke.HAZE_FULL};
 const HAZE_OPACITY : f32 = ${Smoke.HAZE_OPACITY};
@@ -207,13 +212,19 @@ fn fs(@builtin(position) pos : vec4f) -> @location(0) vec4f {
     let shade = textureLoad(colorTex, vec2u(STEAM, u32(round(s * f32(STEAM_LEVELS - 1u)))), 0);
     color = mix(color, shade, STEAM_OPACITY * s);
   }
+  if (hz.w > 0.0) {
+    let wisp = 1.0 - WISP_AMOUNT + 2.0 * WISP_AMOUNT * wisps(g + vec2f(73.0, 29.0));
+    let s = clamp(hz.w / METHANE_FULL * wisp, 0.0, 1.0);
+    let shade = textureLoad(colorTex, vec2u(METHANE, u32(round(s * f32(METHANE_LEVELS - 1u)))), 0);
+    color = mix(color, shade, METHANE_OPACITY * s);
+  }
   return color;
 }
 `;
 
 /**
  * Haze pre-pass, run on frames that stepped the sim: occupancy of each haze channel
- * (per-type TypeInfo.haze: x smoke-style, y water body, z steam-style) blurred
+ * (per-type TypeInfo.haze: x smoke-style, y water body, z steam-style, w methane-style) blurred
  * with a separable tent kernel of HAZE_RADIUS cells per side (radius
  * 1 = 1 2 1 / 4). blurH reads the grid into hazeA, blurV reads hazeA into hazeB, which
  * the render shader samples with a single read per pixel. Cells outside the grid count
@@ -225,7 +236,7 @@ export const HAZE_WGSL = /* wgsl */ `
 ${UNIFORMS_WGSL}
 
 const RADIUS : i32 = ${Smoke.HAZE_RADIUS};
-const TEMPORAL : vec4f = vec4f(${Smoke.HAZE_TEMPORAL}, ${Water.HAZE_TEMPORAL}, ${Steam.HAZE_TEMPORAL}, 0.0);
+const TEMPORAL : vec4f = vec4f(${Smoke.HAZE_TEMPORAL}, ${Water.HAZE_TEMPORAL}, ${Steam.HAZE_TEMPORAL}, ${Methane.HAZE_TEMPORAL});
 
 @group(0) @binding(0) var<uniform> u : Uniforms;
 @group(0) @binding(1) var<storage, read> grid : array<u32>;
@@ -606,7 +617,8 @@ fn noOffer() -> Offer {
 // The consuming reaction the tile at (x, y) offers this step: the first of its
 // consuming rules that rolls its chance while touching the rule's other type,
 // offered to one of those neighbors picked at random. Deterministic per step, so
-// the neighbor can recompute it (takenOffer). Both tiles must be in awake chunks.
+// the neighbor can recompute it (takenOffer). Both tiles must be in awake chunks, so
+// a pending offer (touching its other type) keeps the chunk awake.
 fn offerOf(x : i32, y : i32) -> Offer {
   if (!chunkAwake(x, y)) {
     return noOffer();
@@ -621,7 +633,11 @@ fn offerOf(x : i32, y : i32) -> Offer {
       continue;
     }
     let touching = typeAround(x, y, rule.other);
-    if (touching == 0u || rand(u32(x), u32(y), stepU.step ^ (0x632BE5ABu + k)) >= rule.chance) {
+    if (touching == 0u) {
+      continue;
+    }
+    mark(x, y);
+    if (rand(u32(x), u32(y), stepU.step ^ (0x632BE5ABu + k)) >= rule.chance) {
       continue;
     }
     var pick = min(u32(rand(u32(x), u32(y), stepU.step ^ 0x1B873593u) * f32(touching)), touching - 1u);

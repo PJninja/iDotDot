@@ -1,4 +1,5 @@
 import { ElementRegistry } from '../engine/element';
+import { Acid } from './acid';
 import { Air } from './air';
 import { Bomb } from './bomb';
 import { Charcoal } from './charcoal';
@@ -9,6 +10,9 @@ import { Explosion } from './explosion';
 import { Flame } from './flame';
 import { Grass } from './grass';
 import { HotSteel } from './hot-steel';
+import { Ice } from './ice';
+import { Methane } from './methane';
+import { Mold } from './mold';
 import { Mud } from './mud';
 import { Sand } from './sand';
 import { Smoke } from './smoke';
@@ -46,5 +50,9 @@ export function createElementRegistry(): ElementRegistry {
   registry.register(new Steel());
   registry.register(new HotSteel());
   registry.register(new CoolingSteel());
+  registry.register(new Acid());
+  registry.register(new Ice());
+  registry.register(new Methane());
+  registry.register(new Mold());
   return registry;
 }

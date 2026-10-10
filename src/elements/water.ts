@@ -53,9 +53,12 @@ export class Water extends Element {
 
   /** Chance per step that water touching an ember boils off into steam. */
   static BOIL_CHANCE = 0.1;
+  /** Chance per step that water touching ice freezes (a frost front creeps through a pool). */
+  static FREEZE_CHANCE = 0.006;
   readonly blastResistance = 0.75;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.STEAM_TYPE, chance: Water.BOIL_CHANCE },
+    { with: SETTINGS.ICE_TYPE, becomes: SETTINGS.ICE_TYPE, chance: Water.FREEZE_CHANCE },
   ];
 
   getColor(_value: number, _variant: number): [number, number, number] {

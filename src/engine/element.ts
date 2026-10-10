@@ -27,7 +27,7 @@ export interface Reaction {
 }
 
 /** Most reaction rules across all elements (size of the GPU reaction table). */
-export const MAX_REACTIONS = 64;
+export const MAX_REACTIONS = 128;
 
 /** Largest reaction radius; within one chunk so a change in range always wakes the reacting chunk. */
 export const MAX_REACTION_RADIUS = 8;
@@ -88,8 +88,8 @@ export abstract class Element {
 
   /**
    * Draw this element through a haze channel instead of as tiles:
-   * 0 = smoke-style haze, 1 = water body, 2 = steam-style haze (see
-   * RENDER_WGSL). null = drawn as tiles from getColor.
+   * 0 = smoke-style haze, 1 = water body, 2 = steam-style haze, 3 = methane-style
+   * haze (see RENDER_WGSL). null = drawn as tiles from getColor.
    */
   readonly hazeChannel: number | null = null;
 
