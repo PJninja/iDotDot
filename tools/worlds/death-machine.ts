@@ -1,5 +1,5 @@
 import { Grid, T } from '../world-kit.ts';
-import { SURFACE, carvePockets, fillGround } from './underground.ts';
+import { SURFACE, carvePockets, fillGround, shaft } from './underground.ts';
 
 const S = SURFACE;
 /** Row of the middle of the fuse: a steel bar the furnace torches heat; the heat wave runs along it to the gas reservoir. */
@@ -323,11 +323,11 @@ export function buildDeathMachine(): Grid {
   rightYard(g);
   carvePockets(g, [coalBunker, furnaceHall, reservoirHall, coolantHall, bombLine, acidPit]);
   // shafts: coal chute, flue and steam stacks, the methane spine down to the reservoir
-  g.rect(70, S - 4, 6, 205 - S + 6, T.AIR);
+  shaft(g, 70, S - 4, 6, 205);
   g.rect(70, S - 4, 6, 40, T.CHARCOAL);
-  g.rect(156 + 24, 68, 8, 200 + 62 - 68, T.AIR);
-  g.rect(156 + 74, 98, 6, 200 + 50 - 98, T.AIR);
-  g.rect(SKULL_X - 1, S, 3, 210 + 62 - S, T.AIR);
+  shaft(g, 156 + 24, 68, 8, 200 + 62);
+  shaft(g, 156 + 74, 98, 6, 200 + 50);
+  shaft(g, SKULL_X - 1, S, 3, 210 + 62);
   for (let y = S; y < 210 + 62; y += 1) for (let x = SKULL_X - 1; x <= SKULL_X + 1; x++) g.set(x, y, T.METHANE);
   for (let i = 0; i < 90; i++) g.setIfAir(231 + Math.floor(g.rand() * 5), 120 + Math.floor(g.rand() * 130), T.STEAM);
   for (let i = 0; i < 70; i++) g.set(Math.floor(g.rand() * 640), 3 + Math.floor(g.rand() * 100), T.ICE);

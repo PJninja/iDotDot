@@ -1,5 +1,5 @@
 import { Grid, T } from '../world-kit.ts';
-import { POCKETS } from './underground.ts';
+import { POCKETS, shaft } from './underground.ts';
 
 const W = 640;
 const H = 348;
@@ -200,10 +200,10 @@ export function buildFarmstead(): Grid {
   }
   for (const c of CHAMBERS) g.at(c.x, c.y, () => c.draw(g));
   // shafts: the silo bore down to the boiler hall's hood, the field drain and the well down to the cistern
-  g.rect(243, 142, 6, 70, T.AIR);
-  g.rect(368, 174, 5, 72, T.AIR);
-  g.rect(418, 160, 4, 86, T.AIR);
-  g.rect(618, 142, 3, 100, T.AIR);
+  shaft(g, 243, 142, 6, 212);
+  shaft(g, 368, 174, 5, 246);
+  shaft(g, 418, 160, 4, 246);
+  shaft(g, 618, 142, 3, 242);
   for (let i = 0; i < 90; i++) g.setIfAir(243 + Math.floor(g.rand() * 6), 150 + Math.floor(g.rand() * 60), T.STEAM);
   for (let i = 0; i < 40; i++) g.setIfAir(241 + Math.floor(g.rand() * 10), 86 + Math.floor(g.rand() * 56), T.STEAM);
   for (let i = 0; i < 40; i++) g.setIfAir(618 + Math.floor(g.rand() * 3), 150 + Math.floor(g.rand() * 90), T.METHANE);

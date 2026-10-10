@@ -1,5 +1,5 @@
 import { Grid, T } from '../world-kit.ts';
-import { POCKETS, SURFACE, carvePockets, fillGround } from './underground.ts';
+import { POCKETS, SURFACE, carvePockets, fillGround, shaft } from './underground.ts';
 
 const ROOM_W = 146;
 const DIVIDER = 5;
@@ -318,8 +318,6 @@ function cistern(g: Grid): void {
   for (const x of [14, 62, 88]) g.bricks(x, 0, 6, floor + 1, T.STONE, 6, 3);
   for (const x of [14, 62, 88]) g.rect(x, 30, 6, floor - 29, T.STONE);
   for (const cx of [17, 40, 75]) g.ring(cx, 0, 13, 3, T.STONE);
-  g.rect(24, 34, 12, 4, T.ICE);
-  g.rect(70, 36, 8, 3, T.ICE);
   for (const x of [8, 26, 50, 56, 82, 96]) g.rect(x, 3, 1, 3 + Math.floor(g.rand() * 8), T.ICE);
   g.rect(48, floor - 6, 12, 6, T.WOOD);
   g.rect(48, floor - 4, 12, 1, T.STEEL);
@@ -469,9 +467,9 @@ export function buildAlchemistLab(): Grid {
   carvePockets(g, [forge, coldStore, vault, cistern, wastePit, gasCellar]);
 
   // shafts: the greenhouse drain to the cistern, the forge flue and the gas cellar vent to the surface
-  g.rect(406, SURFACE, 5, 245 - SURFACE, T.AIR);
-  g.rect(14 + 28, 118 + 3, 8, 205 + 23 - 118 - 3 + 40, T.AIR);
-  g.rect(570 + 8, SURFACE - 14, 4, 240 - SURFACE + 14, T.AIR);
+  shaft(g, 406, SURFACE, 5, 245);
+  shaft(g, 14 + 28, 118 + 3, 8, 205 + 23 + 40);
+  shaft(g, 570 + 8, SURFACE - 14, 4, 240);
   for (let i = 0; i < 24; i++) g.setIfAir(578 + Math.floor(g.rand() * 4), SURFACE + Math.floor(g.rand() * 80), T.METHANE);
 
   // roof furniture: chimneys, a weather vane, the cat, the moon and stars
