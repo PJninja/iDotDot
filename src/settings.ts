@@ -29,6 +29,12 @@ export const SETTINGS = {
   SPARK_TYPE: 11,
   EXPLOSION_TYPE: 12,
   BOMB_TYPE: 13,
+  CHARCOAL_TYPE: 14,
+  STONE_TYPE: 15,
+  GRASS_TYPE: 16,
+  STEEL_TYPE: 17,
+  HOT_STEEL_TYPE: 18,
+  COOLING_STEEL_TYPE: 19,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

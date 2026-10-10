@@ -36,6 +36,8 @@ export const FLAG_HOLDS_ON_FLAMMABLE = 4;
 export const FLAG_FUEL_FED = 8;
 /** TypeInfo.flags bits 8-15 hold the type's blastResistance as round(resistance * 255). */
 export const BLAST_RESIST_SHIFT = 8;
+/** Bit offset of the agedIntoChance byte (chance * 255) in TypeInfo.flags. */
+export const AGED_CHANCE_SHIFT = 16;
 
 /** TypeInfo.haze value for elements drawn as tiles. */
 export const HAZE_NONE = 255;
@@ -57,6 +59,7 @@ const FLAG_FLAMMABLE : u32 = ${FLAG_FLAMMABLE}u;
 const FLAG_HOLDS_ON_FLAMMABLE : u32 = ${FLAG_HOLDS_ON_FLAMMABLE}u;
 const FLAG_FUEL_FED : u32 = ${FLAG_FUEL_FED}u;
 const BLAST_RESIST_SHIFT : u32 = ${BLAST_RESIST_SHIFT}u;
+const AGED_CHANCE_SHIFT : u32 = ${AGED_CHANCE_SHIFT}u;
 const SPARK_STUCK : u32 = 0xFFu;
 
 struct TypeInfo {
@@ -710,7 +713,7 @@ fn react(x : i32, y : i32, t : u32) -> u32 {
 
 // Aging: the (type, age) a tile of type t has after this step. It gains the whole
 // part of its ageRate plus the fraction by chance; past 255 it becomes agedInto
-// (AIR = it vanishes) with a fresh age. A fuel-fed type ages slower next to fuel. A
+// (AIR = it vanishes; agedIntoChance < 1 makes it vanish otherwise) with a fresh age. A fuel-fed type ages slower next to fuel. A
 // type with an ageRate has a random change pending every step, so it keeps its chunk
 // awake.
 fn ageTile(x : i32, y : i32, t : u32, age : u32) -> vec2u {
@@ -725,7 +728,9 @@ fn ageTile(x : i32, y : i32, t : u32, age : u32) -> vec2u {
   let whole = floor(rate);
   let gain = u32(whole) + select(0u, 1u, rand(u32(x), u32(y), stepU.step ^ 0xA136AAADu) < rate - whole);
   if (age + gain > 255u) {
-    return vec2u(u.types[t].agedInto, 0u);
+    let agedChance = f32((u.types[t].flags >> AGED_CHANCE_SHIFT) & 0xFFu) / 255.0;
+    let survives = rand(u32(x), u32(y), stepU.step ^ 0x5BD1E995u) < agedChance;
+    return vec2u(select(AIR, u.types[t].agedInto, survives), 0u);
   }
   return vec2u(t, age + gain);
 }

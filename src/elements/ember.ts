@@ -5,8 +5,8 @@ import { SETTINGS } from '../settings';
 
 /**
  * Ember (type 9) - burning wood. A slow, clumpy falling tile that cools with age
- * (color ramp from bright orange through deep red to dark grey) and finally dies
- * into air. Where it touches air it turns into a flame (or, rarely, a spark), so
+ * (color ramp from bright orange through deep red to dark grey) and finally burns
+ * out: usually into air, rarely into charcoal. Where it touches air it turns into a flame (or, rarely, a spark), so
  * a burning pile is eaten away from its exposed faces; it lights wood it touches
  * (see Wood) and water puts it out (and turns to steam, see Water).
  *
@@ -32,10 +32,14 @@ export class Ember extends Element {
   static SPARK_CHANCE = 0.0005;
   /** Chance per step that an ember touching water goes out. */
   static QUENCH_CHANCE = 0.3;
+  /** Chance that an ember that burns out leaves charcoal behind instead of vanishing. */
+  static CHARCOAL_CHANCE = 0.1;
 
   readonly slideChance = Ember.SLIDE_CHANCE;
   readonly cohesion = Ember.COHESION;
   readonly ageRate = Ember.AGE_RATE;
+  readonly agedInto = SETTINGS.CHARCOAL_TYPE;
+  readonly agedIntoChance = Ember.CHARCOAL_CHANCE;
   readonly holdsOnFlammable = true;
   readonly blastResistance = 0.3;
   readonly reactions: readonly Reaction[] = [

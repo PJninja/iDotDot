@@ -8,7 +8,7 @@ import { SETTINGS } from '../settings';
  * stronger cohesion than wet sand: it clings to resting wet sand or mud beside
  * it and rarely rolls off a slope, so it lands in blobs and slumps slowly.
  * Heat dries it back into dirt: flames and embers within a couple of tiles, or a
- * touching spark.
+ * touching spark or hot steel. Grass spreads over it: mud touching grass slowly turns into grass.
  */
 export class Mud extends Element {
   readonly type = SETTINGS.MUD_TYPE;
@@ -30,11 +30,17 @@ export class Mud extends Element {
   static SPARK_DRY_CHANCE = 0.3;
   /** Heat reach of flames and embers, in tiles (Chebyshev). */
   static HEAT_RADIUS = 2;
+  /** Chance per step that a tile touching hot steel dries out. */
+  static HOT_STEEL_DRY_CHANCE = 0.1;
+  /** Chance per step that mud touching grass turns into grass. */
+  static GRASS_GROW_CHANCE = 0.002;
   readonly blastResistance = 0.5;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.DRY_CHANCE, radius: Mud.HEAT_RADIUS },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.DRY_CHANCE, radius: Mud.HEAT_RADIUS },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.SPARK_DRY_CHANCE },
+    { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.HOT_STEEL_DRY_CHANCE },
+    { with: SETTINGS.GRASS_TYPE, becomes: SETTINGS.GRASS_TYPE, chance: Mud.GRASS_GROW_CHANCE },
   ];
 
   static MUD_VARIANT_COUNT = 4;
