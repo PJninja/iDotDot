@@ -2,11 +2,17 @@
  * WGSL sources for the GPU backend.
  *
  * The grid is a storage buffer of packed tiles (one u32 each, flat index
- * `y * width + x`): type bits 0-7, value bits 8-15, variant bits 16-23.
+ * `y * width + x`): type bits 0-7, value bits 8-15, variant bits 16-23, age
+ * bits 24-31 (only types with an ageRate advance it; it picks the color row of
+ * an aging type instead of the variant).
  */
 
 import { MAX_REACTIONS } from '../element';
+import { Ember } from '../../elements/ember';
+import { Explosion } from '../../elements/explosion';
+import { Flame } from '../../elements/flame';
 import { Smoke } from '../../elements/smoke';
+import { Spark } from '../../elements/spark';
 import { Steam } from '../../elements/steam';
 import { Water } from '../../elements/water';
 import { SETTINGS } from '../../settings';
@@ -23,6 +29,16 @@ export const REACTION_BYTES = 32;
 /** Phase codes in TypeInfo.phase (see ElementPhase). */
 export const PHASE_CODES = { solid: 0, liquid: 1, gas: 2 } as const;
 
+/** TypeInfo.flags bits: some reaction consumes this type; fire sticks to this type; a falling type holds still next to flammable tiles; the type ages slower next to fuel. */
+export const FLAG_CONSUMED = 1;
+export const FLAG_FLAMMABLE = 2;
+export const FLAG_HOLDS_ON_FLAMMABLE = 4;
+export const FLAG_FUEL_FED = 8;
+/** TypeInfo.flags bits 8-15 hold the type's blastResistance as round(resistance * 255). */
+export const BLAST_RESIST_SHIFT = 8;
+/** Bit offset of the agedIntoChance byte (chance * 255) in TypeInfo.flags. */
+export const AGED_CHANCE_SHIFT = 16;
+
 /** TypeInfo.haze value for elements drawn as tiles. */
 export const HAZE_NONE = 255;
 
@@ -38,6 +54,13 @@ const PHASE_SOLID : u32 = ${PHASE_CODES.solid}u;
 const PHASE_LIQUID : u32 = ${PHASE_CODES.liquid}u;
 const PHASE_GAS : u32 = ${PHASE_CODES.gas}u;
 const HAZE_NONE : u32 = ${HAZE_NONE}u;
+const FLAG_CONSUMED : u32 = ${FLAG_CONSUMED}u;
+const FLAG_FLAMMABLE : u32 = ${FLAG_FLAMMABLE}u;
+const FLAG_HOLDS_ON_FLAMMABLE : u32 = ${FLAG_HOLDS_ON_FLAMMABLE}u;
+const FLAG_FUEL_FED : u32 = ${FLAG_FUEL_FED}u;
+const BLAST_RESIST_SHIFT : u32 = ${BLAST_RESIST_SHIFT}u;
+const AGED_CHANCE_SHIFT : u32 = ${AGED_CHANCE_SHIFT}u;
+const SPARK_STUCK : u32 = 0xFFu;
 
 struct TypeInfo {
   gravity : u32,
@@ -49,9 +72,9 @@ struct TypeInfo {
   rise : f32,
   dissipation : f32,
   cohesion : f32,
-  consumed : u32,
-  _pad1 : f32,
-  _pad2 : f32,
+  flags : u32,
+  ageRate : f32,
+  agedInto : u32,
 }
 
 struct Reaction {
@@ -81,7 +104,7 @@ struct Uniforms {
 
 /**
  * Full-screen triangle that maps each device pixel to its grid cell and
- * colors it from the (type, variant) color table. Air shows the background;
+ * colors it from the (type, variant) color table (the row is the age for aging types). Air shows the background;
  * elements with a haze channel are drawn from the haze buffer instead.
  */
 export const RENDER_WGSL = /* wgsl */ `
@@ -162,7 +185,8 @@ fn fs(@builtin(position) pos : vec4f) -> @location(0) vec4f {
   let t = p & 0xFFu;
   var color = u.background;
   if (t != 0u && u.types[t].haze == HAZE_NONE) {
-    color = textureLoad(colorTex, vec2u(t, (p >> 16u) & 0xFFu), 0);
+    let row = select((p >> 16u) & 0xFFu, p >> 24u, u.types[t].ageRate > 0.0);
+    color = textureLoad(colorTex, vec2u(t, row), 0);
   }
 
   let water = haze[i].y;
@@ -302,6 +326,21 @@ const STEAM_CONDENSE_CHANCE : f32 = ${Steam.CONDENSE_CHANCE};
 const WATER_RETURN_TRIES : u32 = 24u;
 const WATER_RETURN_REACH : i32 = 128;
 const STEAM_COOL : u32 = ${Steam.COOL_RATE}u;
+const FLAME : u32 = ${SETTINGS.FLAME_TYPE}u;
+const EMBER : u32 = ${SETTINGS.EMBER_TYPE}u;
+const FLAME_FUEL_AGE_FACTOR : f32 = ${Flame.FUEL_AGE_FACTOR};
+const EMBER_EMIT_CHANCE : f32 = ${Ember.EMIT_CHANCE};
+const EXPLOSION : u32 = ${SETTINGS.EXPLOSION_TYPE}u;
+const BLAST_HOP_COST : u32 = ${Explosion.HOP_COST}u;
+const BLAST_DIAGONAL_COST : u32 = ${Explosion.DIAGONAL_COST}u;
+const BLAST_REACH : u32 = ${Explosion.REACH}u;
+const BLAST_SPREAD_MAX_AGE : u32 = ${Explosion.SPREAD_MAX_AGE}u;
+const BLAST_ABSORB : f32 = ${Explosion.ABSORB}.0;
+const SPARK : u32 = ${SETTINGS.SPARK_TYPE}u;
+const FLAME_FLICKER : f32 = ${Flame.FLICKER};
+const FLAME_WIND_FLICKER : f32 = ${Flame.WIND_FLICKER};
+const SPARK_GRAVITY : f32 = ${Spark.GRAVITY};
+const SPARK_DRAG : f32 = ${Spark.DRAG};
 // new-element:types
 
 struct StepUniform {
@@ -318,8 +357,8 @@ struct StepUniform {
 @group(0) @binding(7) var<storage, read_write> marks : array<atomic<u32>>;
 @group(0) @binding(8) var<storage, read> activeChunks : array<u32>;
 
-fn pack(t : u32, value : u32, variant : u32) -> u32 {
-  return t | (value << 8u) | (variant << 16u);
+fn pack(t : u32, value : u32, variant : u32, age : u32) -> u32 {
+  return t | (value << 8u) | (variant << 16u) | (age << 24u);
 }
 
 fn inBounds(x : i32, y : i32) -> bool {
@@ -461,10 +500,14 @@ fn anchoredBeside(x : i32, y : i32) -> bool {
   return false;
 }
 
-// Whether the cohesive tile at (x, y) clings to an anchored cohesive neighbor this
-// step instead of falling into the open cell below it. Deterministic per step, so
-// the tiles stacked above agree with it (fallChain) and rest on it.
+// Whether the tile at (x, y) holds still this step instead of falling into the open
+// cell below it: a type that holds on flammable tiles next to one (burning wood), or a
+// cohesive tile that clings to an anchored cohesive neighbor. Deterministic per step,
+// so the tiles stacked above agree with it (fallChain) and rest on it.
 fn clings(x : i32, y : i32, t : u32) -> bool {
+  if ((u.types[t].flags & FLAG_HOLDS_ON_FLAMMABLE) != 0u && flammableAround(x, y)) {
+    return true;
+  }
   let c = u.types[t].cohesion;
   return c > 0.0 && enterable(t, x, y + 1)
     && rand(u32(x), u32(y), stepU.step ^ 0x3C6EF372u) < c && anchoredBeside(x, y);
@@ -602,7 +645,7 @@ fn offerOf(x : i32, y : i32) -> Offer {
 // The offer the tile at (x, y) (type t) takes this step: the first neighbor, in
 // scan order, whose offer targets it. Only a type some rule consumes can take one.
 fn takenOffer(x : i32, y : i32, t : u32) -> Offer {
-  if (u.types[t].consumed == 0u) {
+  if ((u.types[t].flags & FLAG_CONSUMED) == 0u) {
     return noOffer();
   }
   for (var dy = -1; dy <= 1; dy++) {
@@ -666,6 +709,30 @@ fn react(x : i32, y : i32, t : u32) -> u32 {
     }
   }
   return t;
+}
+
+// Aging: the (type, age) a tile of type t has after this step. It gains the whole
+// part of its ageRate plus the fraction by chance; past 255 it becomes agedInto
+// (AIR = it vanishes; agedIntoChance < 1 makes it vanish otherwise) with a fresh age. A fuel-fed type ages slower next to fuel. A
+// type with an ageRate has a random change pending every step, so it keeps its chunk
+// awake.
+fn ageTile(x : i32, y : i32, t : u32, age : u32) -> vec2u {
+  var rate = u.types[t].ageRate;
+  if (rate <= 0.0) {
+    return vec2u(t, age);
+  }
+  mark(x, y);
+  if ((u.types[t].flags & FLAG_FUEL_FED) != 0u && fuelAround(x, y)) {
+    rate *= FLAME_FUEL_AGE_FACTOR;
+  }
+  let whole = floor(rate);
+  let gain = u32(whole) + select(0u, 1u, rand(u32(x), u32(y), stepU.step ^ 0xA136AAADu) < rate - whole);
+  if (age + gain > 255u) {
+    let agedChance = f32((u.types[t].flags >> AGED_CHANCE_SHIFT) & 0xFFu) / 255.0;
+    let survives = rand(u32(x), u32(y), stepU.step ^ 0x5BD1E995u) < agedChance;
+    return vec2u(select(AIR, u.types[t].agedInto, survives), 0u);
+  }
+  return vec2u(t, age + gain);
 }
 
 const MAX_FALL_ATTEMPTS = 8;
@@ -862,6 +929,96 @@ fn typeWithin(x : i32, y : i32, t : u32, r : i32) -> bool {
   return false;
 }
 
+fn flammableAt(x : i32, y : i32) -> bool {
+  if (!inBounds(x, y)) {
+    return false;
+  }
+  return (u.types[readBuf[u32(y) * u.width + u32(x)] & 0xFFu].flags & FLAG_FLAMMABLE) != 0u;
+}
+
+fn flammableAround(x : i32, y : i32) -> bool {
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      if ((dx != 0 || dy != 0) && flammableAt(x + dx, y + dy)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Fuel feeds fire: a flammable tile or an ember.
+fn fuelAround(x : i32, y : i32) -> bool {
+  return flammableAround(x, y) || typeAround(x, y, EMBER) > 0u;
+}
+
+// An empty cell beside or above embers pulls a flame into itself with a chance per
+// ember, so burning wood keeps producing flames without being consumed (the cell
+// only writes itself, so no thread ever writes a second cell).
+fn emitFlame(i : u32, x : i32, y : i32, p : u32) {
+  let embers = typeAt(x - 1, y + 1, EMBER) + typeAt(x, y + 1, EMBER) + typeAt(x + 1, y + 1, EMBER)
+    + typeAt(x - 1, y, EMBER) + typeAt(x + 1, y, EMBER);
+  if (embers == 0u || solidBuf[i] != 0u) {
+    return;
+  }
+  if (rand(u32(x), u32(y), stepU.step ^ 0xD1B54A32u) < EMBER_EMIT_CHANCE * f32(embers) && claim(x, y)) {
+    commit(i, i, pack(FLAME, 0u, 0u, 0u), p);
+  }
+}
+
+// The reach an explosion has spent when it spreads into (x, y): the cheapest
+// neighboring blast tile that may still spread (younger than BLAST_SPREAD_MAX_AGE),
+// its spent reach plus the hop cost (diagonals cost more, which keeps the blast
+// round) plus absorb, the extra cost of eating through the tile there. Above
+// BLAST_REACH means no blast reaches the cell.
+fn blastSpent(x : i32, y : i32, absorb : u32) -> u32 {
+  var best = BLAST_REACH + 1u;
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      if ((dx != 0 || dy != 0) && inBounds(x + dx, y + dy)) {
+        let n = readBuf[u32(y + dy) * u.width + u32(x + dx)];
+        if ((n & 0xFFu) == EXPLOSION && (n >> 24u) < BLAST_SPREAD_MAX_AGE) {
+          let hop = select(BLAST_HOP_COST, BLAST_DIAGONAL_COST, dx != 0 && dy != 0);
+          best = min(best, ((n >> 8u) & 0xFFu) + hop + absorb);
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// The explosion tile the non-air tile t at (x, y) turns into this step (packed, with
+// the reach spent so far in its value byte), or 0 if it survives. A tile holds against
+// the blast with its blastResistance per step; a blast next to it is a random roll
+// pending, so it keeps the chunk awake.
+fn blastHit(x : i32, y : i32, t : u32) -> u32 {
+  if (t == EXPLOSION) {
+    return 0u;
+  }
+  let resist = f32((u.types[t].flags >> BLAST_RESIST_SHIFT) & 0xFFu) / 255.0;
+  let spent = blastSpent(x, y, u32(resist * BLAST_ABSORB));
+  if (spent > BLAST_REACH) {
+    return 0u;
+  }
+  mark(x, y);
+  if (rand(u32(x), u32(y), stepU.step ^ 0x4B1D0F57u) < resist) {
+    return 0u;
+  }
+  return pack(EXPLOSION, spent, 0u, 0u);
+}
+
+// An empty cell next to a spreading blast pulls it in (like emitFlame, it only writes
+// itself, and loses to any mover that already claimed it this step).
+fn blastFill(i : u32, x : i32, y : i32, p : u32) {
+  if (solidBuf[i] != 0u) {
+    return;
+  }
+  let spent = blastSpent(x, y, 0u);
+  if (spent <= BLAST_REACH && claim(x, y)) {
+    commit(i, i, pack(EXPLOSION, spent, 0u, 0u), p);
+  }
+}
+
 // Pocket closing: the neighboring empty cell enclosed by the most tiles of
 // type t (at least minCount), if moving there leaves this tile better enclosed
 // than it is now. Returns the offset to it, or (0, 0) if there is none.
@@ -920,6 +1077,102 @@ fn updateGas(x : i32, y : i32, t : u32, value : u32, rise : f32) -> Move {
     return stay(value);
   }
   return tileGone();
+}
+
+// Flame: rises with its type's riseSpeed and flickers sideways with FLICKER, both
+// rolled per tile (unlike updateGas's shared phase) so neighbors move independently.
+// Wind biases the sideways direction and makes flickers more likely. A flame under
+// a flammable tile holds still there instead of sliding off, so it stays lit long
+// enough to catch it. It tries (dx, dy), (0, dy), (dx, 0) like updateGas's first
+// candidates, then keeps its cell, and vanishes if a falling tile took that.
+fn updateFlame(x : i32, y : i32, t : u32) -> Move {
+  let rise = rand(u32(x), u32(y), stepU.step ^ 0x68E31DA4u) < u.types[t].rise;
+  let flicker = rand(u32(x), u32(y), stepU.step ^ 0xB5297A4Du) < FLAME_FLICKER + FLAME_WIND_FLICKER * abs(u.wind);
+  let right = rand(u32(x), u32(y), stepU.step ^ 0x1B56C4E9u) < 0.5 + 0.5 * u.wind;
+  let held = flammableAt(x, y - 1);
+  let dx = select(0, select(-1, 1, right), flicker && !held);
+  let dy = select(0, -1, rise && !held);
+  var cand = array<vec2i, 3>(vec2i(dx, dy), vec2i(0, dy), vec2i(dx, 0));
+  for (var k = 0; k < 3; k++) {
+    let c = cand[k];
+    if ((c.x != 0 || c.y != 0) && passable(x + c.x, y + c.y) && claim(x + c.x, y + c.y)) {
+      return moveTo(x + c.x, y + c.y, 0u);
+    }
+  }
+  if (claim(x, y)) {
+    return stay(0u);
+  }
+  return tileGone();
+}
+
+// A spark's step: its move, and whether it landed (was blocked, so it turns into a flame).
+struct SparkResult {
+  step : Move,
+  landed : bool,
+}
+
+// Spark: a ballistic tile. Its velocity (cells per step) lives in the value byte,
+// vx in bits 0-3 and vy in bits 4-7, each stored +8 so 0 means "not launched yet":
+// a fresh spark picks a random upward-cone velocity. Each step gravity pulls vy
+// down and drag decays vx; it then traces the cells toward (x + vx, y + vy) through
+// enterable cells (it passes through lighter gas) and claims the furthest one it
+// can, falling back to earlier path cells. If the path was blocked it lands, which
+// turns it into a flame in the cell it reached, unless the blocker is flammable: then
+// it sticks (value SPARK_STUCK, a vx no launch can produce) and stays put, so it keeps
+// trying to light the tile until it fades or the flammable tile around it is gone.
+fn updateSpark(x : i32, y : i32, t : u32, stored : u32) -> SparkResult {
+  var value = stored;
+  if ((value & 15u) == 15u) {
+    if (flammableAround(x, y)) {
+      if (claim(x, y)) {
+        return SparkResult(stay(SPARK_STUCK), false);
+      }
+      return SparkResult(tileGone(), false);
+    }
+    value = 0x88u;
+  }
+  var vx = i32(value & 15u) - 8;
+  var vy = i32((value >> 4u) & 15u) - 8;
+  if (value == 0u) {
+    vx = min(i32(rand(u32(x), u32(y), stepU.step ^ 0x2F6A5D13u) * 7.0), 6) - 3;
+    vy = min(i32(rand(u32(x), u32(y), stepU.step ^ 0x7ED55D16u) * 4.0), 3) - 5;
+  } else {
+    if (rand(u32(x), u32(y), stepU.step ^ 0xC761C23Cu) < SPARK_GRAVITY) {
+      vy = min(vy + 1, 7);
+    }
+    if (rand(u32(x), u32(y), stepU.step ^ 0x165667B1u) < SPARK_DRAG) {
+      vx -= sign(vx);
+    }
+  }
+  let packed = u32(vx + 8) | (u32(vy + 8) << 4u);
+
+  let n = max(abs(vx), abs(vy));
+  var path : array<vec2i, 7>;
+  var reach = 0;
+  var blocked = false;
+  var sticks = false;
+  for (var k = 1; k <= n; k++) {
+    let f = f32(k) / f32(n);
+    let c = vec2i(x + i32(round(f32(vx) * f)), y + i32(round(f32(vy) * f)));
+    if (!enterable(t, c.x, c.y)) {
+      blocked = true;
+      sticks = flammableAt(c.x, c.y);
+      break;
+    }
+    path[k - 1] = c;
+    reach = k;
+  }
+  for (var k = reach; k > 0; k--) {
+    if (claim(path[k - 1].x, path[k - 1].y)) {
+      let end = blocked && k == reach;
+      return SparkResult(moveTo(path[k - 1].x, path[k - 1].y, select(packed, SPARK_STUCK, end && sticks)), end && !sticks);
+    }
+  }
+  if (claim(x, y)) {
+    let end = blocked && reach == 0;
+    return SparkResult(stay(select(packed, SPARK_STUCK, end && sticks)), end && !sticks);
+  }
+  return SparkResult(tileGone(), false);
 }
 
 // Sideways spread direction, shared by a patch of WATER_FLOW_SCALE tiles per row
@@ -1169,7 +1422,25 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
     return;
   }
   if (reacted != t) {
-    settle(i, x, y, t, pack(reacted, 0u, variant), p);
+    settle(i, x, y, t, pack(reacted, 0u, variant, 0u), p);
+    return;
+  }
+
+  // An explosion next to the tile destroys it in place, unless it holds.
+  let blast = blastHit(x, y, t);
+  if (blast != 0u) {
+    settle(i, x, y, t, blast, p);
+    return;
+  }
+
+  // A tile that ages out turns into agedInto in place, like a reaction result.
+  let aged = ageTile(x, y, t, p >> 24u);
+  if (aged.x == AIR) {
+    markCell(i);
+    return;
+  }
+  if (aged.x != t) {
+    settle(i, x, y, t, pack(aged.x, 0u, variant, 0u), p);
     return;
   }
 
@@ -1185,14 +1456,15 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
 
   if (result.moved) {
     // The destination was claimed by this thread (claim() in the behavior).
-    commit(i, u32(result.dest.y) * u.width + u32(result.dest.x), pack(t, result.newValue, variant), p);
+    commit(i, u32(result.dest.y) * u.width + u32(result.dest.x), pack(t, result.newValue, variant, aged.y), p);
   } else {
-    settle(i, x, y, t, pack(t, result.newValue, variant), p);
+    settle(i, x, y, t, pack(t, result.newValue, variant, aged.y), p);
   }
 }
 
-// Third dispatch of every step: gases. It runs after main and mainLiquid so falling
-// tiles and liquids have already claimed the cells they displace. A gas tile always
+// Third dispatch of every step: gases (and empty cells, which may emit a flame, see
+// emitFlame). It runs after main and mainLiquid so falling tiles and liquids have
+// already claimed the cells they displace. A gas tile always
 // keeps its chunk awake (it drifts and dissipates by chance every step).
 // Steam keeps a condensation timer in its value byte: it counts up while the tile is
 // packed among other steam, drains otherwise, and a full timer turns the tile into water.
@@ -1205,6 +1477,11 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   let i = g.y * u.width + g.x;
   let p = readBuf[i];
   let t = p & 0xFFu;
+  if (t == AIR) {
+    blastFill(i, i32(g.x), i32(g.y), p);
+    emitFlame(i, i32(g.x), i32(g.y), p);
+    return;
+  }
   if (u.types[t].phase != PHASE_GAS) {
     return;
   }
@@ -1221,12 +1498,27 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
     return;
   }
   if (reacted != t && claim(x, y)) {
-    commit(i, i, pack(reacted, 0u, variant), p);
+    commit(i, i, pack(reacted, 0u, variant, 0u), p);
+    return;
+  }
+  let blast = blastHit(x, y, t);
+  if (blast != 0u && claim(x, y)) {
+    commit(i, i, blast, p);
+    return;
+  }
+
+  let aged = ageTile(x, y, t, p >> 24u);
+  if (aged.x != t) {
+    if (aged.x != AIR && claim(x, y)) {
+      commit(i, i, pack(aged.x, 0u, variant, 0u), p);
+    }
     return;
   }
 
   var value = 0u;
-  if (t == STEAM) {
+  if (t == SPARK) {
+    value = (p >> 8u) & 0xFFu;
+  } else if (t == STEAM) {
     value = (p >> 8u) & 0xFFu;
     if (typeAround(x, y, STEAM) >= STEAM_COMPACT) {
       value = min(value + 1u, 255u);
@@ -1234,12 +1526,22 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
       value = select(value - STEAM_COOL, 0u, value < STEAM_COOL);
     }
     if (value >= STEAM_CONDENSE_STEPS && rand(g.x, g.y, stepU.step ^ 0x7F4A7C15u) < STEAM_CONDENSE_CHANCE && claim(x, y)) {
-      commit(i, i, pack(WATER, 0u, 0u), p);
+      commit(i, i, pack(WATER, 0u, 0u, 0u), p);
       return;
     }
   }
 
-  let result = updateGas(x, y, t, value, u.types[t].rise);
+  var result : Move;
+  var landed = false;
+  if (t == FLAME) {
+    result = updateFlame(x, y, t);
+  } else if (t == SPARK) {
+    let spark = updateSpark(x, y, t, value);
+    result = spark.step;
+    landed = spark.landed;
+  } else {
+    result = updateGas(x, y, t, value, u.types[t].rise);
+  }
   if (result.moved && result.dest.x < 0) {
     return;
   }
@@ -1247,7 +1549,11 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   if (result.moved) {
     dest = u32(result.dest.y) * u.width + u32(result.dest.x);
   }
-  commit(i, dest, pack(t, result.newValue, variant), p);
+  if (landed) {
+    commit(i, dest, pack(FLAME, 0u, variant, 0u), p);
+  } else {
+    commit(i, dest, pack(t, result.newValue, variant, aged.y), p);
+  }
 }
 
 // Second dispatch of every step: liquids. It runs after main so sinking
@@ -1273,7 +1579,12 @@ fn mainLiquid(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) 
     return;
   }
   if (reacted != t && claim(x, y)) {
-    commit(i, i, pack(reacted, 0u, variant), p);
+    commit(i, i, pack(reacted, 0u, variant, 0u), p);
+    return;
+  }
+  let blast = blastHit(x, y, t);
+  if (blast != 0u && claim(x, y)) {
+    commit(i, i, blast, p);
     return;
   }
 
@@ -1286,7 +1597,7 @@ fn mainLiquid(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) 
   if (result.moved) {
     dest = u32(result.dest.y) * u.width + u32(result.dest.x);
   }
-  commit(i, dest, pack(t, result.newValue, variant), p);
+  commit(i, dest, pack(t, result.newValue, variant, p >> 24u), p);
 }
 `;
 

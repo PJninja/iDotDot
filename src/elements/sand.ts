@@ -45,6 +45,7 @@ export class Sand extends Element {
   /** Grains within this many tiles of water soak through (without using it up) with SOAK_CHANCE per step. */
   static SOAK_RADIUS = 4;
   static SOAK_CHANCE = 0.08;
+  readonly blastResistance = 0.2;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.WET_SAND_TYPE, chance: Sand.WETTING_CHANCE, consumes: true },
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.WET_SAND_TYPE, chance: Sand.SOAK_CHANCE, radius: Sand.SOAK_RADIUS },

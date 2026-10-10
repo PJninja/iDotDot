@@ -7,6 +7,9 @@ import { Overlay } from './ui/overlay';
 import { ElementPicker } from './ui/picker';
 import { BrushPicker } from './ui/brush-picker';
 import { PerfHud } from './ui/perf-hud';
+import { loadPreferences, savePreferences } from './ui/preferences';
+import { WorldMenu } from './ui/world-menu';
+import { pickDefaultWorld } from './worlds';
 import { showGpuErrorDialog } from './ui/gpu-error-dialog';
 
 async function main(): Promise<void> {
@@ -21,6 +24,7 @@ async function main(): Promise<void> {
   // re-measured after each rebuild); the grid's state resets on resize.
   const colliders = new ColliderManager();
   const registry = createElementRegistry();
+  const prefs = loadPreferences();
   if (!navigator.gpu) {
     showGpuErrorDialog('navigator.gpu is unavailable');
     return;
@@ -33,6 +37,7 @@ async function main(): Promise<void> {
       registry,
       window.innerWidth,
       window.innerHeight - SETTINGS.HEADER_HEIGHT,
+      prefs.tileSize,
     );
   } catch (err) {
     showGpuErrorDialog(err instanceof Error ? err.message : 'device creation failed');
@@ -41,12 +46,19 @@ async function main(): Promise<void> {
   (window as unknown as { __world: GpuSimulation }).__world = world; // DEBUG-TEMP
   const overlay = new Overlay('overlay', colliders, world);
 
+  // Every world rebuild (start, resize, tile size) clears the grid, then restores this visit's default world.
+  const defaultWorld = await pickDefaultWorld();
+  const loadDefaultWorld = (): void => {
+    if (defaultWorld !== null) world.loadWorld(defaultWorld);
+  };
+  loadDefaultWorld();
+
   // Header pickers. The brush picker is created first so its button sits
   // to the left of the element picker in the header actions block.
   const brush: Brush = {
-    shape: 'circle',
-    radius: 4,
-    density: 1,
+    shape: prefs.brushShape,
+    radius: prefs.brushRadius,
+    density: prefs.brushDensity,
     type: SETTINGS.SAND_TYPE,
   };
   const brushPicker = new BrushPicker(brush.shape, brush.radius, brush.density);
@@ -54,6 +66,7 @@ async function main(): Promise<void> {
     brush.shape = shape;
     brush.radius = radius;
     brush.density = density;
+    savePreferences({ brushShape: shape, brushRadius: radius, brushDensity: density });
   };
 
   // Element picker: selects which element the brush paints.
@@ -86,11 +99,15 @@ async function main(): Promise<void> {
     showGpuErrorDialog(`device lost: ${reason}`);
   };
 
+  new WorldMenu(world);
+
   // Third header button: toggleable performance readout and tile size dropdown.
-  const perfHud = new PerfHud(world);
+  const perfHud = new PerfHud(world, prefs.tileSize);
   perfHud.onTileSizeChange = (cssPx) => {
     world.setTileSize(cssPx);
+    savePreferences({ tileSize: cssPx });
     overlay.refreshColliders();
+    loadDefaultWorld();
     [lastGX, lastGY] = pointerGrid();
   };
 
@@ -146,6 +163,7 @@ async function main(): Promise<void> {
       resizePending = false;
       world.resize(window.innerWidth, window.innerHeight - SETTINGS.HEADER_HEIGHT);
       overlay.refreshColliders();
+      loadDefaultWorld();
       [lastGX, lastGY] = pointerGrid();
     });
   });

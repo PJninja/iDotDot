@@ -1,4 +1,4 @@
-import { Element } from '../engine/element';
+import { Element, type Reaction } from '../engine/element';
 import { SETTINGS } from '../settings';
 
 /**
@@ -50,6 +50,13 @@ export class Water extends Element {
   static EDGE_HIGH = 0.5;
   /** Weight of each new frame in the haze (0..1); water is smoothed less than smoke so it doesn't trail. */
   static HAZE_TEMPORAL = 0.6;
+
+  /** Chance per step that water touching an ember boils off into steam. */
+  static BOIL_CHANCE = 0.1;
+  readonly blastResistance = 0.75;
+  readonly reactions: readonly Reaction[] = [
+    { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.STEAM_TYPE, chance: Water.BOIL_CHANCE },
+  ];
 
   getColor(_value: number, _variant: number): [number, number, number] {
     return this.defaultColor;
