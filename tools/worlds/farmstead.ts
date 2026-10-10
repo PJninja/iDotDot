@@ -1,4 +1,5 @@
 import { Grid, T } from '../world-kit.ts';
+import { POCKETS } from './underground.ts';
 
 const W = 640;
 const H = 348;
@@ -566,11 +567,7 @@ export const ROOMS: Record<string, Room> = {
   bunker: { w: 64, h: 98, pad: 100, draw: bunker },
 };
 
-const CHAMBERS: { x: number; y: number; w: number; h: number; draw: (g: Grid) => void }[] = [
-  { x: 14, y: 205, w: 126, h: 133, draw: cellar },
-  { x: 156, y: 200, w: 106, h: 138, draw: boilerHall },
-  { x: 272, y: 210, w: 76, h: 128, draw: machineFloor },
-  { x: 366, y: 245, w: 102, h: 93, draw: cistern },
-  { x: 486, y: 225, w: 70, h: 113, draw: vatRoom },
-  { x: 570, y: 240, w: 64, h: 98, draw: bunker },
-];
+const CHAMBERS = POCKETS.map((p, i) => ({
+  ...p,
+  draw: [cellar, boilerHall, machineFloor, cistern, vatRoom, bunker][i],
+}));
