@@ -31,8 +31,6 @@ export class Flame extends Element {
   static SMOKE_CHANCE = 0.8;
   /** Chance that a flame at the end of its life throws a spark. */
   static SPARK_CHANCE = 0.03;
-  /** Chance per step that a flame touching ice melts into steam. */
-  static ICE_CHANCE = 0.2;
   /** Chance per step that a flame touching water goes out. */
   static QUENCH_CHANCE = 0.8;
 
@@ -45,7 +43,6 @@ export class Flame extends Element {
   ];
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.AIR_TYPE, chance: Flame.QUENCH_CHANCE },
-    { with: SETTINGS.ICE_TYPE, becomes: SETTINGS.STEAM_TYPE, chance: Flame.ICE_CHANCE },
   ];
 
   private readonly ramp = buildGradient([
