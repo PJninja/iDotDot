@@ -4,10 +4,10 @@ Goal: author non-empty "default worlds" in the app, ship them in the repo, and s
 
 Decisions already made:
 
-- **Sizing:** a saved world is anchored bottom-center on load; extra width/height is cropped, a smaller world leaves air.
+- **Sizing:** a saved world keeps its physical (CSS px) size: it is resampled by the ratio of saved to current tile size, then anchored bottom-center; extra width/height is cropped, a smaller world leaves air.
 - **Authoring:** Save / Load buttons in the header.
-- **On load:** several bundled worlds, one picked at random per page visit.
-- **Resize / tile size change:** reload the (same) default world instead of clearing to empty. Painted changes are lost, as today.
+- **On load:** several bundled worlds, one picked at random per page visit; `?world=<name>` forces a specific one.
+- **Resize / tile size change:** reload the same default world (not re-rolled) instead of clearing to empty. Painted changes are lost, as today.
 
 ## File format (`.idw`)
 
@@ -18,8 +18,8 @@ Binary, little-endian, no dependencies:
 | 0–3 | magic `IDW1` |
 | 4–5 | width in cells (u16) |
 | 6–7 | height in cells (u16) |
-| 8–9 | tile size in CSS px x 100 at save time (u16; informational, see open question 1) |
-| 10–15 | reserved (zero) |
+| 8–11 | tile size in CSS px at save time (f32; `GpuSimulation.tileSize`, drives resampling) |
+| 12–15 | reserved (zero) |
 | 16– | `gzip(Uint32Array(width * height))` via `CompressionStream('gzip')` |
 
 The payload is the packed grid word as the GPU stores it (type 0–7, value 8–15, variant 16–23, age 24–31), row-major `y*W+x`. Mostly air, so gzip makes files tiny, and there is no custom RLE to maintain. Type ids are stable constants in `SETTINGS`, so files stay valid as long as ids are never renumbered. On load, a type that is not registered becomes air. Loading validates magic, nonzero dimensions, and decompressed length == `w*h*4`.
@@ -32,19 +32,24 @@ New methods on `GpuSimulation`:
 
 - `snapshotWorld(): Promise<WorldSnapshot>`: wraps the existing `readGrid()` plus current `width`, `height`, `tileSize`.
 - `loadWorld(snapshot)`: sync.
-  1. Build a `width*height` `Uint32Array` of air, copy the snapshot rows in with `dx = floor((W - sw) / 2)`, `dy = H - sh` (negative `dy` crops the top; negative `dx` crops both sides).
+  1. Resample to the current tile size (below), then build a `width*height` `Uint32Array` of air and copy the resampled rows in with `dx = floor((W - sw') / 2)`, `dy = H - sh'` (negative `dy` crops the top; negative `dx` crops both sides).
   2. Zero any cell inside a collider. The solid mask is already built on the CPU in `rebuildSolidMask`; factor the mask construction into a helper both use, so a loaded world never puts tiles inside overlay rects.
   3. Zero types that are not registered.
   4. `queue.writeBuffer` into **both** grid buffers (keeps the "sleeping chunks have matching buffers" invariant trivially true).
   5. Set `wakeAllPending = true` and call `wake()`, the same path wind and collider changes use, so every chunk is awake before the first step and the world settles and sleeps on its own.
 - `resize()` and `setTileSize()` stay clearing. The caller loads the default afterwards (below), before the first step runs, so there is no visible empty frame.
 
+**Resampling.** `f = savedTile / currentTile` (cells of the saved world per current cell is `1 / f`). If `|f - 1| < 0.01` the grid is copied as is. Otherwise the scene is scaled to keep its physical size: `sw' = round(sw * f)`, `sh' = round(sh * f)`, in `resampleWorld(snapshot, f)` in `world-file.ts` (pure, so it is testable in Node):
+- **Enlarging** (`f > 1`, current tiles smaller): nearest neighbor; each destination cell copies `src[floor(x / f), floor(y / f)]`.
+- **Shrinking** (`f < 1`, current tiles bigger): each destination cell covers a block of source cells; it takes the most common type in the block (variant, value and age from the first matching cell), with ties and a block that is half air going to the non-air type, so thin walls and lines are not lost.
+- A pile of falling tiles that came out slightly off settles on its own after the wake-all, so no extra cleanup is needed.
+
 Nothing changes in the shaders or the uniform layout.
 
 ## Default worlds
 
 - Files live in `src/worlds/*.idw`. Vite bundles them with `import.meta.glob('./worlds/*.idw', { query: '?url', import: 'default', eager: true })` (no runtime dependency, no new config; `vite/client` types for `import.meta.glob`).
-- New `src/worlds/index.ts`: `pickDefaultWorld(): Promise<WorldSnapshot | null>` picks a random url once per page visit (module-level cache of the decoded snapshot, so resizes reuse the same world), fetches and decodes it. Returns `null` when the folder is empty or decoding fails (log a warning), and the app falls back to an empty world exactly as today.
+- New `src/worlds/index.ts`: `pickDefaultWorld(): Promise<WorldSnapshot | null>` chooses once per page visit (module-level cache of the decoded snapshot, so resizes and tile size changes reuse the same world), fetches and decodes it. The choice is the `?world=<name>` query param if present (`<name>` is the file's base name, e.g. `?world=meadow` for `src/worlds/meadow.idw`; an unknown name logs a warning listing the available names and falls back to random), otherwise a random file. Returns `null` when the folder is empty or decoding fails (log a warning), and the app falls back to an empty world exactly as today.
 - `src/main.ts`:
   - after `GpuSimulation.create` and before `world.start()`: `const defaultWorld = await pickDefaultWorld(); if (defaultWorld) world.loadWorld(defaultWorld);`
   - in the resize handler and in `perfHud.onTileSizeChange`: call `world.loadWorld(defaultWorld)` right after `world.resize(...)` / `world.setTileSize(...)` (before `overlay.refreshColliders()` is fine, since `loadWorld` reads the collider list at call time, but call `loadWorld` **after** `refreshColliders()` so the mask is current).
@@ -69,12 +74,13 @@ Authoring loop: paint a scene, click Save, move the file into `src/worlds/`, reb
 ## Risks
 
 - **Looks different per screen.** With crop/pad, a scene authored on a wide monitor loses its sides on a phone. Author worlds with the important content near the horizontal center and the floor.
+- **Resampling is lossy.** Scaling a world down to bigger tiles merges cells (a 1-tile-thick line at 4 px becomes half a tile at 8 px and is kept as a whole tile by the non-air tie-break, so it gets relatively thicker); scaling up only repeats cells. Author at the tile size most visitors see (4 px) and treat other sizes as approximations.
 - **Everything starts awake.** Loading a big world wakes all chunks for `CHUNK_KEEPALIVE_STEPS`; it is the same cost as a wind change and then settles.
 - **Pools never sleep** (known water wander), so a default world with water keeps the sim from idling; that is existing behavior, not new.
 - **Id stability.** Renumbering a type in `SETTINGS` silently corrupts saved worlds. Add a note next to the type constants; new types get new ids.
 
-## Open questions
+## Resolved questions
 
-1. **Tile size mismatch.** A world saved at 4 px tiles loaded at 8 px (or on a different devicePixelRatio) is cropped, not scaled. Default plan: ignore it in v1 (the header records the saved tile size so resampling can be added later). Alternative: nearest-neighbor resample by the tile-size ratio on load.
-2. **Randomness on resize.** The plan keeps the same random world for the whole visit; re-rolling on every resize would be one line to change.
-3. **Dev override.** A `?world=<file-name>` query param to force a specific default would help testing; it is small, but not in scope unless wanted.
+1. Tile size mismatch: resample on load (above).
+2. Randomness on resize: the same random world is kept for the whole visit.
+3. Dev override: `?world=<name>` is supported.
