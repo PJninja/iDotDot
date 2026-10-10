@@ -19,7 +19,7 @@ export class CoolingSteel extends Element {
   static AGE_RATE = 0.4;
 
   readonly ageRate = CoolingSteel.AGE_RATE;
-  readonly agedInto = SETTINGS.STEEL_TYPE;
+  readonly agedInto = [{ type: SETTINGS.STEEL_TYPE, chance: 1 }];
   readonly blastResistance = 0.98;
 
   private readonly ramp = buildGradient([

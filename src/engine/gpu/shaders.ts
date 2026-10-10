@@ -7,8 +7,7 @@
  * an aging type instead of the variant).
  */
 
-import { MAX_REACTIONS } from '../element';
-import { Ember } from '../../elements/ember';
+import { MAX_OUTCOMES, MAX_REACTIONS } from '../element';
 import { Explosion } from '../../elements/explosion';
 import { Flame } from '../../elements/flame';
 import { Methane } from '../../elements/methane';
@@ -24,21 +23,21 @@ const wgslColor = (c: readonly number[]): string => `vec3f(${c.map((v) => v / 25
 export const CHUNK_SIZE = 16;
 
 /** Byte size of one TypeInfo entry and one Reaction entry (must match UNIFORMS_WGSL). */
-export const TYPE_INFO_BYTES = 48;
+export const TYPE_INFO_BYTES = 64;
 export const REACTION_BYTES = 32;
+export const OUTCOME_BYTES = 16;
 
 /** Phase codes in TypeInfo.phase (see ElementPhase). */
 export const PHASE_CODES = { solid: 0, liquid: 1, gas: 2 } as const;
 
-/** TypeInfo.flags bits: some reaction consumes this type; fire sticks to this type; a falling type holds still next to flammable tiles; the type ages slower next to fuel. */
+/** TypeInfo.flags bits: some reaction consumes this type; fire sticks to this type; a falling type holds still next to flammable tiles; the type ages slower next to fuel; its emitter also emits below itself. */
 export const FLAG_CONSUMED = 1;
 export const FLAG_FLAMMABLE = 2;
 export const FLAG_HOLDS_ON_FLAMMABLE = 4;
 export const FLAG_FUEL_FED = 8;
+export const FLAG_EMITS_BELOW = 16;
 /** TypeInfo.flags bits 8-15 hold the type's blastResistance as round(resistance * 255). */
 export const BLAST_RESIST_SHIFT = 8;
-/** Bit offset of the agedIntoChance byte (chance * 255) in TypeInfo.flags. */
-export const AGED_CHANCE_SHIFT = 16;
 
 /** TypeInfo.haze value for elements drawn as tiles. */
 export const HAZE_NONE = 255;
@@ -46,11 +45,13 @@ export const HAZE_NONE = 255;
 /**
  * Uniform buffer layout shared by every module: a 48-byte header (time and
  * frameSteps are written each frame) followed by the per-type table and the
- * reaction rules, both built from the element registry. A type's reaction
- * rules are `reactions[start .. start + count)`, packed `start | count << 16`.
+ * reaction rules and aged-out outcomes, all built from the element registry. A type's reaction
+ * rules are `reactions[start .. start + count)`, packed `start | count << 16`; its aged-out
+ * outcomes are `outcomes[start .. start + count)` packed the same way.
  */
 export const UNIFORMS_WGSL = /* wgsl */ `
 const MAX_REACTIONS : u32 = ${MAX_REACTIONS}u;
+const MAX_OUTCOMES : u32 = ${MAX_OUTCOMES}u;
 const PHASE_SOLID : u32 = ${PHASE_CODES.solid}u;
 const PHASE_LIQUID : u32 = ${PHASE_CODES.liquid}u;
 const PHASE_GAS : u32 = ${PHASE_CODES.gas}u;
@@ -59,8 +60,8 @@ const FLAG_CONSUMED : u32 = ${FLAG_CONSUMED}u;
 const FLAG_FLAMMABLE : u32 = ${FLAG_FLAMMABLE}u;
 const FLAG_HOLDS_ON_FLAMMABLE : u32 = ${FLAG_HOLDS_ON_FLAMMABLE}u;
 const FLAG_FUEL_FED : u32 = ${FLAG_FUEL_FED}u;
+const FLAG_EMITS_BELOW : u32 = ${FLAG_EMITS_BELOW}u;
 const BLAST_RESIST_SHIFT : u32 = ${BLAST_RESIST_SHIFT}u;
-const AGED_CHANCE_SHIFT : u32 = ${AGED_CHANCE_SHIFT}u;
 const SPARK_STUCK : u32 = 0xFFu;
 
 struct TypeInfo {
@@ -75,7 +76,18 @@ struct TypeInfo {
   cohesion : f32,
   flags : u32,
   ageRate : f32,
-  agedInto : u32,
+  outcomes : u32,
+  emitType : u32,
+  emitChance : f32,
+  _pad0 : u32,
+  _pad1 : u32,
+}
+
+struct Outcome {
+  result : u32,
+  chance : f32,
+  _pad0 : u32,
+  _pad1 : u32,
 }
 
 struct Reaction {
@@ -100,6 +112,7 @@ struct Uniforms {
   background : vec4f,
   types : array<TypeInfo, 256>,
   reactions : array<Reaction, MAX_REACTIONS>,
+  outcomes : array<Outcome, MAX_OUTCOMES>,
 }
 `;
 
@@ -340,7 +353,6 @@ const STEAM_COOL : u32 = ${Steam.COOL_RATE}u;
 const FLAME : u32 = ${SETTINGS.FLAME_TYPE}u;
 const EMBER : u32 = ${SETTINGS.EMBER_TYPE}u;
 const FLAME_FUEL_AGE_FACTOR : f32 = ${Flame.FUEL_AGE_FACTOR};
-const EMBER_EMIT_CHANCE : f32 = ${Ember.EMIT_CHANCE};
 const EXPLOSION : u32 = ${SETTINGS.EXPLOSION_TYPE}u;
 const BLAST_HOP_COST : u32 = ${Explosion.HOP_COST}u;
 const BLAST_DIAGONAL_COST : u32 = ${Explosion.DIAGONAL_COST}u;
@@ -728,8 +740,8 @@ fn react(x : i32, y : i32, t : u32) -> u32 {
 }
 
 // Aging: the (type, age) a tile of type t has after this step. It gains the whole
-// part of its ageRate plus the fraction by chance; past 255 it becomes agedInto
-// (AIR = it vanishes; agedIntoChance < 1 makes it vanish otherwise) with a fresh age. A fuel-fed type ages slower next to fuel. A
+// part of its ageRate plus the fraction by chance; past 255 one of its aged-out outcomes
+// is rolled (AIR = it vanishes when none is) with a fresh age. A fuel-fed type ages slower next to fuel. A
 // type with an ageRate has a random change pending every step, so it keeps its chunk
 // awake.
 fn ageTile(x : i32, y : i32, t : u32, age : u32) -> vec2u {
@@ -744,9 +756,17 @@ fn ageTile(x : i32, y : i32, t : u32, age : u32) -> vec2u {
   let whole = floor(rate);
   let gain = u32(whole) + select(0u, 1u, rand(u32(x), u32(y), stepU.step ^ 0xA136AAADu) < rate - whole);
   if (age + gain > 255u) {
-    let agedChance = f32((u.types[t].flags >> AGED_CHANCE_SHIFT) & 0xFFu) / 255.0;
-    let survives = rand(u32(x), u32(y), stepU.step ^ 0x5BD1E995u) < agedChance;
-    return vec2u(select(AIR, u.types[t].agedInto, survives), 0u);
+    let outcomes = u.types[t].outcomes;
+    let roll = rand(u32(x), u32(y), stepU.step ^ 0x5BD1E995u);
+    var threshold = 0.0;
+    for (var k = 0u; k < (outcomes >> 16u); k++) {
+      let outcome = u.outcomes[(outcomes & 0xFFFFu) + k];
+      threshold += outcome.chance;
+      if (roll < threshold) {
+        return vec2u(outcome.result, 0u);
+      }
+    }
+    return vec2u(AIR, 0u);
   }
   return vec2u(t, age + gain);
 }
@@ -968,17 +988,33 @@ fn fuelAround(x : i32, y : i32) -> bool {
   return flammableAround(x, y) || typeAround(x, y, EMBER) > 0u;
 }
 
-// An empty cell beside or above embers pulls a flame into itself with a chance per
-// ember, so burning wood keeps producing flames without being consumed (the cell
-// only writes itself, so no thread ever writes a second cell).
-fn emitFlame(i : u32, x : i32, y : i32, p : u32) {
-  let embers = typeAt(x - 1, y + 1, EMBER) + typeAt(x, y + 1, EMBER) + typeAt(x + 1, y + 1, EMBER)
-    + typeAt(x - 1, y, EMBER) + typeAt(x + 1, y, EMBER);
-  if (embers == 0u || solidBuf[i] != 0u) {
+// An empty cell beside or above an emitter (also below it for emitters with
+// FLAG_EMITS_BELOW) pulls in the emitter's product with its emitChance per step, so
+// embers keep producing flames and springs keep producing water without being used up
+// (the cell only writes itself, so no thread ever writes a second cell). Each emitter
+// rolls independently; the first to succeed wins.
+fn emit(i : u32, x : i32, y : i32, p : u32) {
+  if (solidBuf[i] != 0u) {
     return;
   }
-  if (rand(u32(x), u32(y), stepU.step ^ 0xD1B54A32u) < EMBER_EMIT_CHANCE * f32(embers) && claim(x, y)) {
-    commit(i, i, pack(FLAME, 0u, 0u, 0u), p);
+  var k = 0u;
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      let n = vec2i(x + dx, y + dy);
+      if ((dx == 0 && dy == 0) || !inBounds(n.x, n.y)) {
+        continue;
+      }
+      let nt = readBuf[u32(n.y) * u.width + u32(n.x)] & 0xFFu;
+      let product = u.types[nt].emitType;
+      if (product == AIR || (dy == -1 && (u.types[nt].flags & FLAG_EMITS_BELOW) == 0u)) {
+        continue;
+      }
+      k++;
+      if (rand(u32(x), u32(y), stepU.step ^ (0xD1B54A32u + k)) < u.types[nt].emitChance && claim(x, y)) {
+        commit(i, i, pack(product, 0u, 0u, 0u), p);
+        return;
+      }
+    }
   }
 }
 
@@ -1023,7 +1059,7 @@ fn blastHit(x : i32, y : i32, t : u32) -> u32 {
   return pack(EXPLOSION, spent, 0u, 0u);
 }
 
-// An empty cell next to a spreading blast pulls it in (like emitFlame, it only writes
+// An empty cell next to a spreading blast pulls it in (like emit, it only writes
 // itself, and loses to any mover that already claimed it this step).
 fn blastFill(i : u32, x : i32, y : i32, p : u32) {
   if (solidBuf[i] != 0u) {
@@ -1430,6 +1466,9 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
   let variant = (p >> 16u) & 0xFFu;
   let x = i32(g.x);
   let y = i32(g.y);
+  if (u.types[t].emitType != AIR) {
+    mark(x, y);
+  }
 
   // A tile that reacts turns into the result in place this step.
   let reacted = react(x, y, t);
@@ -1478,8 +1517,8 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
   }
 }
 
-// Third dispatch of every step: gases (and empty cells, which may emit a flame, see
-// emitFlame). It runs after main and mainLiquid so falling tiles and liquids have
+// Third dispatch of every step: gases (and empty cells, which may pull in an emitter's product, see
+// emit). It runs after main and mainLiquid so falling tiles and liquids have
 // already claimed the cells they displace. A gas tile always
 // keeps its chunk awake (it drifts and dissipates by chance every step).
 // Steam keeps a condensation timer in its value byte: it counts up while the tile is
@@ -1495,7 +1534,7 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   let t = p & 0xFFu;
   if (t == AIR) {
     blastFill(i, i32(g.x), i32(g.y), p);
-    emitFlame(i, i32(g.x), i32(g.y), p);
+    emit(i, i32(g.x), i32(g.y), p);
     return;
   }
   if (u.types[t].phase != PHASE_GAS) {

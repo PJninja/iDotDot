@@ -32,6 +32,8 @@ export class Mud extends Element {
   static HEAT_RADIUS = 2;
   /** Chance per step that a tile touching hot steel dries out. */
   static HOT_STEEL_DRY_CHANCE = 0.1;
+  /** Chance per step that mud touching acid neutralizes it into dirt (the acid turns to smoke, see Acid). */
+  static ACID_NEUTRALIZE_CHANCE = 0.1;
   /** Chance per step that mud touching grass turns into grass. */
   static GRASS_GROW_CHANCE = 0.002;
   readonly blastResistance = 0.5;
@@ -41,6 +43,7 @@ export class Mud extends Element {
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.SPARK_DRY_CHANCE },
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.HOT_STEEL_DRY_CHANCE },
     { with: SETTINGS.GRASS_TYPE, becomes: SETTINGS.GRASS_TYPE, chance: Mud.GRASS_GROW_CHANCE },
+    { with: SETTINGS.ACID_TYPE, becomes: SETTINGS.DIRT_TYPE, chance: Mud.ACID_NEUTRALIZE_CHANCE },
   ];
 
   static MUD_VARIANT_COUNT = 4;
