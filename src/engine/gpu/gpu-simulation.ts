@@ -363,6 +363,7 @@ export class GpuSimulation {
     registry: ElementRegistry,
     cssWidth: number,
     cssHeight: number,
+    tileSize: number = SETTINGS.TILE_SIZE,
   ): Promise<GpuSimulation> {
     const adapter = await navigator.gpu.requestAdapter();
     if (adapter === null) throw new Error('No WebGPU adapter');
@@ -378,6 +379,7 @@ export class GpuSimulation {
       colliders,
       registry,
     );
+    sim.requestedTileSize = tileSize;
     sim.resize(cssWidth, cssHeight);
     return sim;
   }
