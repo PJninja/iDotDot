@@ -27,7 +27,7 @@ There is no test framework. Validate with `npx tsc --noEmit` + `npm run build`, 
 - **Conflict-free write model:** the awake chunks' write (and claim) cells are cleared to air by `clearChunk`; stayers write themselves, movers write their destination, air writes nothing. A mover's destination is air in the read state and claimed exclusively with an atomic (`atomicCompareExchangeWeak(...).exchanged`, first claim wins, loser stays — tiles are conserved). Tie-breaks are nondeterministic by design.
 - **Chunk sleeping:** the grid is split into 16×16 chunks (`CHUNK_SIZE`). Every write that changes a cell goes through `commit()`, which marks the chunk (`marksBuf`); the chunk pass keeps a chunk awake for `SETTINGS.CHUNK_KEEPALIVE_STEPS` (at least 2) after a mark in its 3×3 neighborhood (`awakeBuf` countdown) and compacts the awake chunks into `activeListBuf` + the indirect args (`argsBuf`). Sleeping chunks are not dispatched and need no copy: a chunk only sleeps after a step with no change in it, so both grid buffers already match there. Movers may write into air in a sleeping chunk (the write marks it), but a fluid in a sleeping chunk cannot be displaced or stack-followed (`enterable` / `fallsAlong` check `chunkAwake`; trying wakes it). Random moves that have not fired yet must keep their chunk awake with `mark()` (friction rolls, liquid spread, reactions; gases always do), so a new stochastic behavior must too. Painting and wake-all (wind, collider changes) run the chunk pass before the first step so the touched chunks are awake.
 - **Idle:** the awake chunk count is read back (`readActivity`); at 0 the sim stops stepping (`asleep`), the haze keeps blending for `SETTLE_STEPS`, then frames stop being submitted (`idle`; the canvas keeps its last frame and the rAF loop keeps running). `paintStroke`, `setWind`, collider changes and `resize` wake it; a readback from before a wake is ignored (`wakeGeneration`). `prefers-reduced-motion` freezes the wisp animation clock.
-- `resize(cssW, cssH)` rebuilds all size-dependent resources (grid state resets). `rebuildSolidMask()` re-rasterizes colliders; `ColliderManager.onChange` marks it dirty and it is rebuilt at the start of the next frame. `readGrid()` is a debug readback (conservation checks). `paintStroke(ax, ay, bx, by, brush)` queues a brush stamp swept along a segment (max `MAX_STAMPS` per frame); at the next stepping frame all stamps are uploaded and `PAINT_WGSL` rasterizes them on the GPU in one dispatch over their bounding box, before the sim steps.
+- `resize(cssW, cssH)` rebuilds all size-dependent resources (grid state resets). `rebuildSolidMask()` re-rasterizes colliders; `ColliderManager.onChange` marks it dirty and it is rebuilt at the start of the next frame. `readGrid()` is a debug readback (conservation checks). `snapshotWorld()` / `loadWorld(snapshot)` save and restore the grid (see World files). `paintStroke(ax, ay, bx, by, brush)` queues a brush stamp swept along a segment (max `MAX_STAMPS` per frame); at the next stepping frame all stamps are uploaded and `PAINT_WGSL` rasterizes them on the GPU in one dispatch over their bounding box, before the sim steps.
 
 ### Shaders (`src/engine/gpu/shaders.ts`)
 - `RENDER_WGSL`: full-screen triangle; maps each device pixel to a grid cell (`(pos - gridOrigin) / tilePx`, no stretching), air → background, else `colorTex[(type, variant)]`. Water haze is read per cell (blocky, matches the tiles); smoke and steam haze is sampled bilinearly between cell centers (`hazeSmooth`) so gas edges stay smooth on large tiles.
@@ -68,6 +68,11 @@ There is no test framework. Validate with `npx tsc --noEmit` + `npm run build`, 
 - Perf HUD (`ui/perf-hud.ts`): third header button toggles a small readout under the header (fps/ms, tiles, moving vs resting, awake chunks + idle, GPU ms, steps/s, grid) and a Tile Size dropdown (1/2/4/8/16 px; the panel's clicks don't paint). The text is color-coded for low fps and for dropped sim steps (`perf.droppedStepsPerSecond`: backlog beyond `MAX_STEPS_PER_FRAME` discarded while the sim is awake, i.e. it ran slower than real time). `GpuSimulation.perf` holds the numbers; the tile counters (`STATS_WGSL`) only run while the HUD is visible. "moving" = tiles that changed cell last step (see `STATS_WGSL`).
 - If `navigator.gpu` is missing, device creation fails, or the device is lost mid-session (`GpuSimulation.onDeviceLost`), `ui/gpu-error-dialog.ts` shows a blocking popup ("Oh no! We need a GPU to run the simulation, and can't find one :(") with a Try Again button that reloads the page.
 
+### World files (`src/engine/world-file.ts`, `src/worlds/`, `src/ui/world-menu.ts`)
+- `.idw` = 16-byte header (magic `IDW1`, width u16, height u16, tile size in CSS px f32, 4 reserved) + gzipped packed grid words (`CompressionStream`). Type ids are stable constants: never renumber them or saved worlds corrupt. `encodeWorld` / `decodeWorld` validate; `resampleWorld` / `fitWorld` are pure (no GPU), so they can be checked in Node.
+- `GpuSimulation.loadWorld` resamples the world by saved/current tile size (enlarging repeats cells; shrinking takes the most common non-air type of each block, air when most of it is air), anchors it bottom-center (crop/pad), clears collider cells and unregistered types, writes both grid buffers and wakes all chunks. `resize` / `setTileSize` still clear the grid; `main.ts` then calls `loadDefaultWorld` (after `refreshColliders`, so the solid mask is current).
+- Default worlds are `src/worlds/*.idw`, bundled by `import.meta.glob`. `pickDefaultWorld()` (`src/worlds/index.ts`) chooses once per visit (random, or `?world=<file base name>`) and caches it, so resizes reload the same world; no files or a decode failure = start empty. Author one with the header Save / Load buttons (`WorldMenu`): paint, Save, move the file into `src/worlds/`. Author at 4 px tiles; other sizes are lossy resamples.
+
 ### Colliders (`src/engine/collider.ts`)
 - Rect list in grid coordinates, rasterized into the GPU solid mask (`forEachRect`). Solid cells are not passable.
 
@@ -94,6 +99,7 @@ src/
   main.ts            Bootstrap: GPU sim create, brush painting, input, resize
   settings.ts        Global constants (SIM_HZ, GRAVITY, type IDs, flags)
   engine/
+    world-file.ts    WorldSnapshot, .idw encode/decode, resampleWorld / fitWorld
     gpu/
       gpu-simulation.ts  Device, buffers, step loop, render, resize
       shaders.ts         UNIFORMS_WGSL, RENDER_WGSL, HAZE_WGSL, COMPUTE_WGSL, PAINT_WGSL, CHUNKS_WGSL, STATS_WGSL
@@ -124,7 +130,8 @@ src/
     hot-steel.ts     Type 18, hidden aging heated steel (lights flammables, heats steel)
     cooling-steel.ts Type 19, hidden aging refractory stage between hot steel and steel
     index.ts         createElementRegistry — register all elements here
-  ui/                header.ts, overlay.ts, picker.ts, brush-picker.ts, perf-hud.ts, gpu-error-dialog.ts
+  worlds/            index.ts (pickDefaultWorld) + bundled default *.idw worlds
+  ui/                world-menu.ts, header.ts, overlay.ts, picker.ts, brush-picker.ts, perf-hud.ts, gpu-error-dialog.ts
   styles/main.css
 plans/               webgpu-compute-port.md (architecture history), fire.md (proposal)
 dev.bat, new-element.bat   Windows helper scripts (see Commands)

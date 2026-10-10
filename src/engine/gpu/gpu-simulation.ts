@@ -1,6 +1,7 @@
 import { SETTINGS } from '../../settings';
 import type { ColliderManager } from '../collider';
 import { MAX_REACTIONS, type ElementRegistry } from '../element';
+import { fitWorld, type WorldSnapshot } from '../world-file';
 import {
   CHUNK_SIZE,
   CHUNKS_WGSL,
@@ -457,6 +458,10 @@ export class GpuSimulation {
   /** Re-rasterize collider rects into the solid mask (1 = blocked cell). */
   rebuildSolidMask(): void {
     if (this.solidBuf === null) return;
+    this.device.queue.writeBuffer(this.solidBuf, 0, this.buildSolidMask());
+  }
+
+  private buildSolidMask(): Uint32Array {
     const mask = new Uint32Array(this.width * this.height);
     this.colliders.forEachRect((r) => {
       const x0 = Math.max(0, r.x);
@@ -465,7 +470,29 @@ export class GpuSimulation {
       const y1 = Math.min(this.height, r.y + r.h);
       for (let y = y0; y < y1; y++) mask.fill(1, y * this.width + x0, y * this.width + x1);
     });
-    this.device.queue.writeBuffer(this.solidBuf, 0, mask);
+    return mask;
+  }
+
+  /** Copy the current grid out as a savable snapshot (see engine/world-file.ts). */
+  async snapshotWorld(): Promise<WorldSnapshot> {
+    return { width: this.width, height: this.height, tileCss: this.tileSize, cells: await this.readGrid() };
+  }
+
+  /**
+   * Replace the grid with a saved world, resampled to the current tile size and anchored
+   * bottom-center. Collider cells and unregistered types are cleared, and every chunk is
+   * woken so the world settles on its own.
+   */
+  loadWorld(world: WorldSnapshot): void {
+    if (this.gridBufs === null) return;
+    const cells = fitWorld(world, this.width, this.height, this.tileSize);
+    const solid = this.buildSolidMask();
+    for (let i = 0; i < cells.length; i++) {
+      if (solid[i] !== 0 || this.registry.get(cells[i] & 0xff) === null) cells[i] = 0;
+    }
+    for (const buf of this.gridBufs) this.device.queue.writeBuffer(buf, 0, cells);
+    this.wakeAllPending = true;
+    this.wake();
   }
 
   start(): void {
