@@ -90,8 +90,8 @@ function skullTower(g: Grid): void {
     g.rect(tx + 3, 111, 5, 5, T.BOMB);
   }
   // methane spine from the chamber down through the neck into the rock
-  g.rect(cx - 4, 66, 9, S - 66, T.STONE);
-  g.rect(cx - 1, 66, 3, S - 66, T.METHANE);
+  g.rect(cx - 6, 66, 13, S - 66, T.STONE);
+  g.rect(cx - 3, 66, 7, S - 66, T.METHANE);
   // flaming horns
   for (const hx of [cx - 31, cx + 23]) {
     g.bricks(hx, 16, 8, 28, T.STONE, 4, 3);
@@ -248,7 +248,7 @@ function reservoirHall(g: Grid): void {
   g.rect(34, 87, 6, 3, T.AIR);
   g.rect(30, 88, 12, 1, T.STEEL);
   for (let y = 66; y < 98; y++) for (let x = 38; x < 72; x++) g.setIfAir(x, y, T.METHANE);
-  g.rect(spineX - 1, 56, 3, 10, T.AIR);
+  g.rect(spineX - 3, 56, 7, 10, T.AIR);
   // bomb magazine under the reservoir
   for (let r = 0; r < 3; r++) g.rect(10, 107 + r * 5, 56, 4, T.BOMB);
   g.rect(8, floor - 3, 62, 3, T.WOOD);
@@ -328,8 +328,8 @@ export function buildDeathMachine(): Grid {
   g.rect(70, S - 4, 6, 40, T.CHARCOAL);
   shaft(g, 156 + 24, 68, 8, 200 + 62);
   shaft(g, 156 + 74, 98, 6, 200 + 50);
-  shaft(g, SKULL_X - 1, S, 3, 210 + 62);
-  for (let y = S; y < 210 + 62; y += 1) for (let x = SKULL_X - 1; x <= SKULL_X + 1; x++) g.set(x, y, T.METHANE);
+  shaft(g, SKULL_X - 3, S, 7, 210 + 62);
+  for (let y = S; y < 210 + 62; y += 1) for (let x = SKULL_X - 3; x <= SKULL_X + 3; x++) g.set(x, y, T.METHANE);
   for (let i = 0; i < 90; i++) g.setIfAir(231 + Math.floor(g.rand() * 5), 120 + Math.floor(g.rand() * 130), T.STEAM);
   for (let i = 0; i < 70; i++) g.set(Math.floor(g.rand() * 640), 3 + Math.floor(g.rand() * 100), T.ICE);
   if (process.env.DM_IGNITE) g.rect(272 + 38, 210 + 87, 8, 3, T.HOT_STEEL);
