@@ -1,6 +1,7 @@
 import { SETTINGS } from '../../settings';
 import type { ColliderManager } from '../collider';
 import { MAX_REACTIONS, type ElementRegistry } from '../element';
+import { fitWorld, type WorldSnapshot } from '../world-file';
 import {
   CHUNK_SIZE,
   CHUNKS_WGSL,
@@ -14,6 +15,12 @@ import {
   STAMP_BYTES,
   STATS_WGSL,
   TYPE_INFO_BYTES,
+  AGED_CHANCE_SHIFT,
+  BLAST_RESIST_SHIFT,
+  FLAG_CONSUMED,
+  FLAG_FLAMMABLE,
+  FLAG_HOLDS_ON_FLAMMABLE,
+  FLAG_FUEL_FED,
 } from './shaders';
 
 const UNIFORM_HEADER_BYTES = 48;
@@ -91,6 +98,9 @@ export interface PerfStats {
  * Idle: when no chunk is awake the sim stops stepping; once the haze has
  * settled it stops submitting frames entirely (the canvas keeps its last
  * frame) until painting, wind, collider or size changes wake it.
+ *
+ * A packed tile is a u32: type bits 0-7, value 8-15, variant 16-23, age 24-31
+ * (see Element.ageRate; painted tiles and reaction results start at age 0).
  *
  * The grid lives in storage buffers rather than `r32uint` textures:
  * WebGPU has no `fillTexture`/`fillBuffer` (only `clearBuffer`), and
@@ -353,6 +363,7 @@ export class GpuSimulation {
     registry: ElementRegistry,
     cssWidth: number,
     cssHeight: number,
+    tileSize: number = SETTINGS.TILE_SIZE,
   ): Promise<GpuSimulation> {
     const adapter = await navigator.gpu.requestAdapter();
     if (adapter === null) throw new Error('No WebGPU adapter');
@@ -368,6 +379,7 @@ export class GpuSimulation {
       colliders,
       registry,
     );
+    sim.requestedTileSize = tileSize;
     sim.resize(cssWidth, cssHeight);
     return sim;
   }
@@ -448,6 +460,10 @@ export class GpuSimulation {
   /** Re-rasterize collider rects into the solid mask (1 = blocked cell). */
   rebuildSolidMask(): void {
     if (this.solidBuf === null) return;
+    this.device.queue.writeBuffer(this.solidBuf, 0, this.buildSolidMask());
+  }
+
+  private buildSolidMask(): Uint32Array {
     const mask = new Uint32Array(this.width * this.height);
     this.colliders.forEachRect((r) => {
       const x0 = Math.max(0, r.x);
@@ -456,7 +472,29 @@ export class GpuSimulation {
       const y1 = Math.min(this.height, r.y + r.h);
       for (let y = y0; y < y1; y++) mask.fill(1, y * this.width + x0, y * this.width + x1);
     });
-    this.device.queue.writeBuffer(this.solidBuf, 0, mask);
+    return mask;
+  }
+
+  /** Copy the current grid out as a savable snapshot (see engine/world-file.ts). */
+  async snapshotWorld(): Promise<WorldSnapshot> {
+    return { width: this.width, height: this.height, tileCss: this.tileSize, cells: await this.readGrid() };
+  }
+
+  /**
+   * Replace the grid with a saved world, resampled to the current tile size and anchored
+   * bottom-center. Collider cells and unregistered types are cleared, and every chunk is
+   * woken so the world settles on its own.
+   */
+  loadWorld(world: WorldSnapshot): void {
+    if (this.gridBufs === null) return;
+    const cells = fitWorld(world, this.width, this.height, this.tileSize);
+    const solid = this.buildSolidMask();
+    for (let i = 0; i < cells.length; i++) {
+      if (solid[i] !== 0 || this.registry.get(cells[i] & 0xff) === null) cells[i] = 0;
+    }
+    for (const buf of this.gridBufs) this.device.queue.writeBuffer(buf, 0, cells);
+    this.wakeAllPending = true;
+    this.wake();
   }
 
   start(): void {
@@ -933,7 +971,13 @@ export class GpuSimulation {
       f32[o + 6] = element.riseSpeed;
       f32[o + 7] = element.dissipationChance;
       f32[o + 8] = element.cohesion;
-      u32[o + 9] = consumedTypes.has(element.type) ? 1 : 0;
+      u32[o + 9] = (consumedTypes.has(element.type) ? FLAG_CONSUMED : 0) | (element.flammable ? FLAG_FLAMMABLE : 0)
+        | (element.holdsOnFlammable ? FLAG_HOLDS_ON_FLAMMABLE : 0)
+        | (element.fuelFed ? FLAG_FUEL_FED : 0)
+        | (Math.round(element.blastResistance * 255) << BLAST_RESIST_SHIFT)
+        | (Math.round(element.agedIntoChance * 255) << AGED_CHANCE_SHIFT);
+      f32[o + 10] = element.ageRate;
+      u32[o + 11] = element.agedInto;
       for (const reaction of element.reactions) {
         const r = (REACTIONS_OFFSET_BYTES + rule * REACTION_BYTES) / 4;
         u32[r] = reaction.with;
@@ -950,7 +994,8 @@ export class GpuSimulation {
   /**
    * 256x256 rgba8unorm table indexed by (x = type, y = variant), built from
    * each element's getColor. Color on the GPU therefore depends on
-   * (type, variant) only, never on the value byte.
+   * (type, variant) only, never on the value byte; for aging types (ageRate > 0)
+   * the row is the tile's age instead of its variant.
    */
   private buildColorTexture(): GPUTexture {
     const pixels = new Uint8Array(COLOR_TEX_SIZE * COLOR_TEX_SIZE * 4);
