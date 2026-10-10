@@ -26,6 +26,8 @@ export class Wood extends Element {
   static SPARK_IGNITE_CHANCE = 0.1;
   /** Chance per step that wood touching hot steel catches. */
   static HOT_STEEL_IGNITE_CHANCE = 0.004;
+  /** Chance per step that wood touching mold rots into mold. */
+  static MOLD_CHANCE = 0.0012;
   readonly flammable = true;
   readonly blastResistance = 0.3;
   readonly reactions: readonly Reaction[] = [
@@ -33,6 +35,7 @@ export class Wood extends Element {
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.EMBER_IGNITE_CHANCE },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.SPARK_IGNITE_CHANCE },
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.HOT_STEEL_IGNITE_CHANCE },
+    { with: SETTINGS.MOLD_TYPE, becomes: SETTINGS.MOLD_TYPE, chance: Wood.MOLD_CHANCE },
   ];
 
   private readonly variantColors: [number, number, number][];

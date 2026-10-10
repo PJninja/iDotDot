@@ -35,6 +35,14 @@ export const SETTINGS = {
   STEEL_TYPE: 17,
   HOT_STEEL_TYPE: 18,
   COOLING_STEEL_TYPE: 19,
+  ACID_TYPE: 20,
+  ICE_TYPE: 21,
+  METHANE_TYPE: 22,
+  MOLD_TYPE: 23,
+  ASH_TYPE: 24,
+  RUBBLE_TYPE: 25,
+  SPRING_TYPE: 26,
+  TORCH_TYPE: 27,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

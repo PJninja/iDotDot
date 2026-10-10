@@ -27,15 +27,25 @@ export class Flame extends Element {
   static AGE_RATE = 8;
   /** Multiplier on the age rate while touching fuel (flammable tile or ember): flames burn longer where they are fed. */
   static FUEL_AGE_FACTOR = 0.35;
+  /** Chance that a flame at the end of its life leaves smoke (otherwise it vanishes cleanly). */
+  static SMOKE_CHANCE = 0.8;
+  /** Chance that a flame at the end of its life throws a spark. */
+  static SPARK_CHANCE = 0.03;
+  /** Chance per step that a flame touching ice melts into steam. */
+  static ICE_CHANCE = 0.2;
   /** Chance per step that a flame touching water goes out. */
   static QUENCH_CHANCE = 0.8;
 
   readonly riseSpeed = Flame.RISE_SPEED;
   readonly ageRate = Flame.AGE_RATE;
   readonly fuelFed = true;
-  readonly agedInto = SETTINGS.SMOKE_TYPE;
+  readonly agedInto = [
+    { type: SETTINGS.SMOKE_TYPE, chance: Flame.SMOKE_CHANCE },
+    { type: SETTINGS.SPARK_TYPE, chance: Flame.SPARK_CHANCE },
+  ];
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.AIR_TYPE, chance: Flame.QUENCH_CHANCE },
+    { with: SETTINGS.ICE_TYPE, becomes: SETTINGS.STEAM_TYPE, chance: Flame.ICE_CHANCE },
   ];
 
   private readonly ramp = buildGradient([

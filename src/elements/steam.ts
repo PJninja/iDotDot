@@ -1,4 +1,4 @@
-import { Element } from '../engine/element';
+import { Element, type Reaction } from '../engine/element';
 import { SETTINGS } from '../settings';
 
 /**
@@ -44,8 +44,14 @@ export class Steam extends Element {
   static LIGHT_COLOR: [number, number, number] = [214, 222, 234];
   static DENSE_COLOR: [number, number, number] = [255, 255, 255];
 
+  /** Chance per step that steam touching ice condenses into water. */
+  static ICE_CONDENSE_CHANCE = 0.05;
+
   readonly riseSpeed = Steam.RISE_SPEED;
   readonly dissipationChance = Steam.DISSIPATION_CHANCE;
+  readonly reactions: readonly Reaction[] = [
+    { with: SETTINGS.ICE_TYPE, becomes: SETTINGS.WATER_TYPE, chance: Steam.ICE_CONDENSE_CHANCE },
+  ];
 
   private readonly ramp: [number, number, number][];
 
