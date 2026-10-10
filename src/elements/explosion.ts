@@ -4,7 +4,7 @@ import { SETTINGS } from '../settings';
 
 /**
  * Explosion (type 12) - the blast itself, hidden from the picker. A static solid that
- * ages like fire: a fresh tile is white-hot and cools through orange to dark red until
+ * ages like fire (fading blast tiles leave smoke, flames, sparks and rubble): a fresh tile is white-hot and cools through orange to dark red until
  * it vanishes. Its value byte is the reach the blast has spent getting here (0 at an
  * origin). Empty cells and non-resistant tiles next to a blast tile that can still
  * spread join the blast with a spent reach of that tile plus a hop cost, until the
@@ -32,8 +32,19 @@ export class Explosion extends Element {
   static SPREAD_MAX_AGE = 128;
   /** Extra reach spent eating through a tile, times its blastResistance. */
   static ABSORB = 20;
+  /** Chances that a fading blast tile leaves smoke, a flame, a spark or rubble (otherwise it vanishes). */
+  static SMOKE_CHANCE = 0.25;
+  static FLAME_CHANCE = 0.08;
+  static SPARK_CHANCE = 0.02;
+  static RUBBLE_CHANCE = 0.06;
 
   readonly ageRate = Explosion.AGE_RATE;
+  readonly agedInto = [
+    { type: SETTINGS.SMOKE_TYPE, chance: Explosion.SMOKE_CHANCE },
+    { type: SETTINGS.FLAME_TYPE, chance: Explosion.FLAME_CHANCE },
+    { type: SETTINGS.SPARK_TYPE, chance: Explosion.SPARK_CHANCE },
+    { type: SETTINGS.RUBBLE_TYPE, chance: Explosion.RUBBLE_CHANCE },
+  ];
 
   private readonly ramp = buildGradient([
     { at: 0, color: [255, 252, 224] },

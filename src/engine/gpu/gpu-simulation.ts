@@ -1,6 +1,6 @@
 import { SETTINGS } from '../../settings';
 import type { ColliderManager } from '../collider';
-import { MAX_REACTIONS, type ElementRegistry } from '../element';
+import { MAX_OUTCOMES, MAX_REACTIONS, type ElementRegistry } from '../element';
 import { fitWorld, type WorldSnapshot } from '../world-file';
 import {
   CHUNK_SIZE,
@@ -15,12 +15,13 @@ import {
   STAMP_BYTES,
   STATS_WGSL,
   TYPE_INFO_BYTES,
-  AGED_CHANCE_SHIFT,
   BLAST_RESIST_SHIFT,
   FLAG_CONSUMED,
   FLAG_FLAMMABLE,
   FLAG_HOLDS_ON_FLAMMABLE,
   FLAG_FUEL_FED,
+  FLAG_EMITS_BELOW,
+  OUTCOME_BYTES,
 } from './shaders';
 
 const UNIFORM_HEADER_BYTES = 48;
@@ -34,7 +35,8 @@ const WIND_OFFSET_BYTES = 12;
 const TIME_OFFSET_BYTES = 24;
 const TYPES_OFFSET_BYTES = UNIFORM_HEADER_BYTES;
 const REACTIONS_OFFSET_BYTES = TYPES_OFFSET_BYTES + 256 * TYPE_INFO_BYTES;
-const UNIFORM_BYTES = REACTIONS_OFFSET_BYTES + MAX_REACTIONS * REACTION_BYTES;
+const OUTCOMES_OFFSET_BYTES = REACTIONS_OFFSET_BYTES + MAX_REACTIONS * REACTION_BYTES;
+const UNIFORM_BYTES = OUTCOMES_OFFSET_BYTES + MAX_OUTCOMES * OUTCOME_BYTES;
 const COLOR_TEX_SIZE = 256;
 /** How often the HUD counters are sampled from the GPU, in ms. */
 const STATS_INTERVAL_MS = 500;
@@ -960,6 +962,7 @@ export class GpuSimulation {
       this.registry.list().flatMap((e) => e.reactions.filter((r) => r.consumes).map((r) => r.with)),
     );
     let rule = 0;
+    let outcome = 0;
     for (const element of this.registry.list()) {
       const o = TYPES_OFFSET_BYTES / 4 + element.type * typeWords;
       u32[o] = element.gravityQuantum;
@@ -974,10 +977,18 @@ export class GpuSimulation {
       u32[o + 9] = (consumedTypes.has(element.type) ? FLAG_CONSUMED : 0) | (element.flammable ? FLAG_FLAMMABLE : 0)
         | (element.holdsOnFlammable ? FLAG_HOLDS_ON_FLAMMABLE : 0)
         | (element.fuelFed ? FLAG_FUEL_FED : 0)
-        | (Math.round(element.blastResistance * 255) << BLAST_RESIST_SHIFT)
-        | (Math.round(element.agedIntoChance * 255) << AGED_CHANCE_SHIFT);
+        | (element.emitBelow ? FLAG_EMITS_BELOW : 0)
+        | (Math.round(element.blastResistance * 255) << BLAST_RESIST_SHIFT);
       f32[o + 10] = element.ageRate;
-      u32[o + 11] = element.agedInto;
+      u32[o + 11] = outcome | (element.agedInto.length << 16);
+      u32[o + 12] = element.emitType;
+      f32[o + 13] = element.emitChance;
+      for (const aged of element.agedInto) {
+        const a = (OUTCOMES_OFFSET_BYTES + outcome * OUTCOME_BYTES) / 4;
+        u32[a] = aged.type;
+        f32[a + 1] = aged.chance;
+        outcome++;
+      }
       for (const reaction of element.reactions) {
         const r = (REACTIONS_OFFSET_BYTES + rule * REACTION_BYTES) / 4;
         u32[r] = reaction.with;
