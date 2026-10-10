@@ -7,6 +7,8 @@ import { Overlay } from './ui/overlay';
 import { ElementPicker } from './ui/picker';
 import { BrushPicker } from './ui/brush-picker';
 import { PerfHud } from './ui/perf-hud';
+import { WorldMenu } from './ui/world-menu';
+import { pickDefaultWorld } from './worlds';
 import { showGpuErrorDialog } from './ui/gpu-error-dialog';
 
 async function main(): Promise<void> {
@@ -40,6 +42,13 @@ async function main(): Promise<void> {
   }
   (window as unknown as { __world: GpuSimulation }).__world = world; // DEBUG-TEMP
   const overlay = new Overlay('overlay', colliders, world);
+
+  // Every world rebuild (start, resize, tile size) clears the grid, then restores this visit's default world.
+  const defaultWorld = await pickDefaultWorld();
+  const loadDefaultWorld = (): void => {
+    if (defaultWorld !== null) world.loadWorld(defaultWorld);
+  };
+  loadDefaultWorld();
 
   // Header pickers. The brush picker is created first so its button sits
   // to the left of the element picker in the header actions block.
@@ -86,11 +95,14 @@ async function main(): Promise<void> {
     showGpuErrorDialog(`device lost: ${reason}`);
   };
 
+  new WorldMenu(world);
+
   // Third header button: toggleable performance readout and tile size dropdown.
   const perfHud = new PerfHud(world);
   perfHud.onTileSizeChange = (cssPx) => {
     world.setTileSize(cssPx);
     overlay.refreshColliders();
+    loadDefaultWorld();
     [lastGX, lastGY] = pointerGrid();
   };
 
@@ -146,6 +158,7 @@ async function main(): Promise<void> {
       resizePending = false;
       world.resize(window.innerWidth, window.innerHeight - SETTINGS.HEADER_HEIGHT);
       overlay.refreshColliders();
+      loadDefaultWorld();
       [lastGX, lastGY] = pointerGrid();
     });
   });

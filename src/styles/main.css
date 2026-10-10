@@ -315,3 +315,22 @@ body {
 .gpu-error-retry:hover {
   background: rgba(255, 255, 255, 0.18);
 }
+
+/* Short error message under the header from the world save/load buttons. */
+.world-message {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 6px 10px;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #ff6b6b;
+  background: rgba(10, 10, 20, 0.85);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.world-message[hidden] {
+  display: none;
+}
