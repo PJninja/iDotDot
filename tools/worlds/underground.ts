@@ -44,3 +44,12 @@ export function carvePockets(g: Grid, draws: ((g: Grid) => void)[]): void {
   }
   POCKETS.forEach((p, i) => g.at(p.x, p.y, () => draws[i](g)));
 }
+
+/** Carve a vertical shaft and wall it with stone through the soil, so loose dirt cannot slump into it. */
+export function shaft(g: Grid, x: number, y0: number, w: number, y1: number): void {
+  g.rect(x, y0, w, y1 - y0, T.AIR);
+  for (let y = Math.max(y0, SURFACE - 2); y < SURFACE + 16; y++) {
+    g.set(x - 1, y, T.STONE);
+    g.set(x + w, y, T.STONE);
+  }
+}
