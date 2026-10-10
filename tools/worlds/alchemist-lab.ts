@@ -333,10 +333,10 @@ function cistern(g: Grid): void {
   g.scatter(62, 20, 6, 10, T.MOLD, 0.3, T.STONE);
 }
 
-/** Waste pit (pocket 5): a stone tank of spent acid eating its wall, leaking drums over a mud bed. */
+/** Waste pit (pocket 5): a glass tank of spent acid dissolving a skull, leaking drums over a mud bed. */
 function wastePit(g: Grid): void {
   const floor = 112;
-  g.vessel(4, 66, 40, floor - 65, 5, T.STONE, T.ACID, 28);
+  g.vessel(4, 66, 40, floor - 65, 2, T.ICE, T.ACID, 28);
   g.stamp(20, floor - 18, [
     '..#####..',
     '.#######.',
