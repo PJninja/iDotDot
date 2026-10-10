@@ -1,6 +1,6 @@
 # Portfolio content
 
-Goal: list 10-20 projects as cards that live inside the falling-sands world instead of on top of it. Each card expands to a preview and then to a detail view with text and screenshots.
+Goal: list 10-20 projects as cards that live inside the falling-sands world instead of on top of it. A card opens a centered preview and then a detail view with text and screenshots.
 
 This file is intent. `AGENTS.md` and the code are the current state. The plan itself is written to be easy to scan; the guidelines below apply to what the plan builds (site UI and copy), not to how the plan is written.
 
@@ -12,7 +12,7 @@ This file is intent. `AGENTS.md` and the code are the current state. The plan it
 | Physics | A chip's interior is a collider, so sand, water and fire respect it. |
 | Borders | Each chip is surrounded by a ring of static element tiles (sand rests on it, wood burns, acid dissolves steel, ice melts). Material is chosen per project. |
 | Damage | Cosmetic. Lasts until the world rebuilds (reload or resize). |
-| Expanding | Two stages: chip, grown preview, detail panel. |
+| Expanding | Two stages: click a chip to open a centered preview panel, then open the detail panel. The chip itself never moves or grows. |
 | Content | One typed TS module per project. A chip shows an icon, title, description and three tags. |
 | Extras | Plain-HTML view, name and contact made of tiles, tag filter using the elements, portfolio and play modes, structured case studies with video. |
 
@@ -97,13 +97,14 @@ Stamping last puts the rings on top of whatever the default world contains.
 ## Expanding
 
 **Stage 1: preview**
-- A click grows the chip to about two by two chips, showing the `blurb`, the first screenshot and two controls (open detail, close).
-- Steps: clear the old ring, change the DOM rect, stamp the new ring, all in one frame with no CSS transition, so collider and ring are correct from the first frame.
-- Only one chip is in the preview state at a time. Collapsing reverses the steps.
+- A click opens a preview panel centered in the viewport. The chip itself does not change, so its collider and ring stay put and neighbors are never displaced.
+- The preview shows the `blurb`, the first screenshot and two controls (open detail, close). It is its own collider with its own ring in the project's material, stamped when it opens and cleared when it closes.
+- It opens in one frame with no CSS transition, so the collider and ring are correct from the first frame. Sand under its footprint is deleted.
+- Only one preview is open at a time. Opening another replaces it. Escape or the close control removes it.
 
 **Stage 2: detail panel**
 - Shows the sections, gallery and links.
-- The panel is its own collider with its own ring in the project's material. Square corners, no shadow, no blur, no dimming layer. The board and world stay visible and running around it. The fill is a flat palette color.
+- The panel uses the same collider and ring treatment as the preview, sized larger and replacing it. Square corners, no shadow, no blur, no dimming layer. The board and world stay visible and running around it. The fill is a flat palette color.
 - Deep link: the hash `#/<id>` opens it. Back or `hashchange` closes it. Loading a URL with a hash opens that project after the first rebuild.
 
 ## Case-study content
@@ -124,20 +125,19 @@ Every project has the same shape so the detail view renders it the same way: a f
 
 - The tags used across projects are listed as plain words in a free area of the board. Several can be selected, and a project matches when it has any selected tag.
 - Each word is a `<button>` with `aria-pressed` and no fill or border. A selected word is underlined.
-- Matching chips get a lit ring (a torch or ember tile placed on it). Non-matching chips get an ice ring and dimmed text. Both use `stampFrame` and `clearFrame`, and clearing the filter restores each chip's own material.
-- Filtering overwrites border damage on the chips it touches, which is accepted since the visitor asked for it.
-- Non-matching chips stay focusable and clickable.
+- Matching chips get a lit ring (a torch or ember tile placed on it). Nothing else changes on non-matching chips. This uses `stampFrame` and `clearFrame`, and clearing the filter restores each chip's own material.
+- Filtering overwrites border damage on the matching chips, which is accepted since the visitor asked for it.
+- Non-matching chips are untouched, so they stay focusable and clickable.
 - The filter is mirrored in the URL as `?tag=webgpu` and read back after the first rebuild.
 
 ## Name and contact in the world
 
-- The name and a one-line tagline are stamped into the default world as tiles (stone or wood) near the top of the board. They are authored with the Save and Load tooling at 4 px tiles, since worlds resample by tile size.
+- The name and a one-line tagline are stamped into the default world as tiles near the top of the board. Each letter is layered: a stone core with steel edges and wood accents, so partial burning leaves a visible skeleton. They are authored with the Save and Load tooling at 4 px tiles, since worlds resample by tile size.
 - An `<h1>` and the tagline stay in the page for accessibility and indexing, visually hidden or placed under the tile lettering.
 - This is part of the world and not a hero section: it takes only the space the lettering needs, with no background, call to action or illustration.
-- Contact is one line of plain text links under the name: email, GitHub, resume and others. Each is underlined text with no ring of its own.
+- Contact is one line of plain text links under the name: email, GitHub and resume. Each is underlined text with no ring of its own.
 - Email copies the address on click and the link text changes to "Copied".
-- The main contact link has a permanent torch tile beside it, so it is the one lit thing on the board.
-- The line's position is reserved in the board layout, so a grown preview never covers it.
+- The line sits outside the centered preview region, so an open preview never covers it.
 
 ## Portfolio mode and play mode
 
@@ -177,16 +177,14 @@ Every project has the same shape so the detail view renders it the same way: a f
 
 ## Open questions
 
-1. **Grid vs the guidelines.** The earlier decision was a grid of compact chips, and the guidelines ask for no feature-grid layouts. A uniform grid of equal cards with icon, title, text and tags is that layout. Options:
-   - Keep a grid but vary chip widths with content and stagger the rows.
-   - Place chips on tile ledges at different heights, so sand piles on shelves.
-   - Keep the plain grid as decided.
-2. **Growing a preview.** What the sim does with existing sand when a collider grows over it is unverified. `rebuildSolidMask` and `wakeAllPending` wake the chunks, but tiles in newly solid cells must be cleared or displaced. Deleting is simplest, shoving outward looks better. Where a preview goes when its neighbors are adjacent is also undecided.
-3. **Alignment.** At 125% and 150% device pixel ratios `tileSize` is fractional. Check chip edges and ring alignment at several tile sizes. The icon format (inline SVG or imported asset) affects how it pixelates.
-4. **Name and contact.** Wood (visitors can burn it) or stone for the name. Which contact links to include and which one gets the torch.
-5. **Filter details.** Ice or only dimmed text for non-matching chips. Ice melts next to the lit rings of neighbors.
-6. **Plain view build.** Vite plugin vs post-build script, and whether the fallback markup and the live app share templates.
-7. **Video.** Size budget, formats, and whether `preload="none"` is enough on slow connections.
+1. ~~**Grid vs the guidelines.**~~ Resolved: keep the chip grid as decided. The chips' tile rings, per-project materials and physical interaction with the sim are what separate it from a stock feature grid.
+2. ~~**Growing a preview.**~~ Resolved: the preview opens centered and the chip does not move. Sand under the preview footprint is deleted (shoving it outward can come later). Verify first that `rebuildSolidMask` plus `wakeAllPending` handle tiles inside newly solid cells (the shaders skip solid cells, but existing tiles there must not linger).
+3. **Alignment (verification, not a decision).** At 125% and 150% device pixel ratios `tileSize` is fractional. Check chip edges and ring alignment at several tile sizes when the board is built.
+4. ~~**Name and contact.**~~ Resolved: the name is layered strokes (stone core, steel edges, wood accents). Contact links are email, GitHub and resume. No torch on the contact line.
+5. ~~**Filter details.**~~ Resolved: matching chips get a lit ring and nothing else changes.
+6. ~~**Plain view build.**~~ Resolved: a small Vite plugin in the normal build.
+7. ~~**Video.**~~ Resolved: short silent clips of a few MB each, `.webm` plus `.mp4`.
+8. ~~**Icons.**~~ Resolved: inline SVG strings in each project module, pixelated with CSS.
 
 ## Build order
 
@@ -194,7 +192,7 @@ Every project has the same shape so the detail view renders it the same way: a f
 2. Plain view and case-study fields (depend only on the data, so they can start before the default-worlds work lands).
 3. `stampFrame` / `clearFrame` and the `rebuildWorld()` refactor in `main.ts`. Wait for the default-worlds work, since both touch `main.ts` and the rebuild path.
 4. Board with chips, colliders, rings and keyboard support.
-5. Preview expand and collapse.
+5. Centered preview panel open and close.
 6. Detail panel with gallery, deep link and video.
 7. Tag filter.
 8. Name and contact line.
