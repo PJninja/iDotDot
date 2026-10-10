@@ -300,7 +300,7 @@ function bombLine(g: Grid): void {
 /** Pocket 6: a spiked acid pit that a leaking drum and a dripping spring keep topped up and diluted. */
 function acidPit(g: Grid): void {
   const floor = 97;
-  g.vessel(4, 44, 56, floor - 43, 3, T.STONE, T.ACID, 34);
+  g.vessel(4, 44, 56, floor - 43, 2, T.ICE, T.ACID, 34);
   for (const x of [14, 24, 34, 44]) g.rect(x, floor - 18, 1, 14, T.STEEL);
   g.stamp(28, floor - 34, SKULL_ART, { '#': T.ICE });
   g.rect(34, floor - 35, 1, 20, T.AIR);
