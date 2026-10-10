@@ -30,7 +30,7 @@ export class Mold extends Element {
   static SPARK_IGNITE_CHANCE = 0.05;
 
   readonly ageRate = Mold.AGE_RATE;
-  readonly agedInto = SETTINGS.DIRT_TYPE;
+  readonly agedInto = [{ type: SETTINGS.DIRT_TYPE, chance: 1 }];
   readonly flammable = true;
   readonly blastResistance = 0.1;
   readonly reactions: readonly Reaction[] = [

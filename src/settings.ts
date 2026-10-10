@@ -39,6 +39,10 @@ export const SETTINGS = {
   ICE_TYPE: 21,
   METHANE_TYPE: 22,
   MOLD_TYPE: 23,
+  ASH_TYPE: 24,
+  RUBBLE_TYPE: 25,
+  SPRING_TYPE: 26,
+  TORCH_TYPE: 27,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

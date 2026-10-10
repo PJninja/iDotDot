@@ -26,6 +26,19 @@ export interface Reaction {
   radius?: number;
 }
 
+/**
+ * One possible result of an aging tile running out of life: it turns into `type` with
+ * `chance`. An element's outcomes are rolled once, in order, and their chances add up
+ * (at most 1); whatever is left over means the tile vanishes.
+ */
+export interface AgedOutcome {
+  type: number;
+  chance: number;
+}
+
+/** Most aged-out outcomes across all elements (size of the GPU outcome table). */
+export const MAX_OUTCOMES = 32;
+
 /** Most reaction rules across all elements (size of the GPU reaction table). */
 export const MAX_REACTIONS = 128;
 
@@ -101,11 +114,17 @@ export abstract class Element {
    */
   readonly ageRate: number = 0;
 
-  /** What an aging tile turns into once its age passes 255 (AIR = it vanishes). */
-  readonly agedInto: number = SETTINGS.AIR_TYPE;
+  /** What an aging tile can turn into once its age passes 255, with their chances; the rest of the time it vanishes. */
+  readonly agedInto: readonly AgedOutcome[] = [];
 
-  /** Chance (0..1) that an aged-out tile turns into agedInto; otherwise it vanishes. */
-  readonly agedIntoChance: number = 1;
+  /**
+   * Emitter: an empty cell beside or above a tile of this element (also below it with
+   * `emitBelow`) pulls in a tile of `emitType` with `emitChance` per step, without
+   * using the emitter up. AIR = does not emit.
+   */
+  readonly emitType: number = SETTINGS.AIR_TYPE;
+  readonly emitChance: number = 0;
+  readonly emitBelow: boolean = false;
 
   /**
    * Falling elements only: a tile holds still while any of its 8 neighbors is
@@ -161,11 +180,28 @@ export class ElementRegistry {
     if (!Number.isFinite(element.ageRate) || element.ageRate < 0 || element.ageRate > 255) {
       throw new Error(`Age rate of "${element.name}" must be in [0, 255], got ${element.ageRate}`);
     }
-    if (!Number.isInteger(element.agedInto) || element.agedInto < 0 || element.agedInto > 255) {
-      throw new Error(`agedInto of "${element.name}" is an invalid type ${element.agedInto}`);
+    let agedChance = 0;
+    for (const outcome of element.agedInto) {
+      if (!Number.isInteger(outcome.type) || outcome.type < 0 || outcome.type > 255) {
+        throw new Error(`agedInto of "${element.name}" names invalid type ${outcome.type}`);
+      }
+      if (!(outcome.chance > 0 && outcome.chance <= 1)) {
+        throw new Error(`agedInto chance of "${element.name}" must be in (0, 1], got ${outcome.chance}`);
+      }
+      agedChance += outcome.chance;
     }
-    if (!(element.agedIntoChance >= 0 && element.agedIntoChance <= 1)) {
-      throw new Error(`agedIntoChance of "${element.name}" must be in [0, 1], got ${element.agedIntoChance}`);
+    if (agedChance > 1 + 1e-9) {
+      throw new Error(`agedInto chances of "${element.name}" add up to ${agedChance}, more than 1`);
+    }
+    if (!Number.isInteger(element.emitType) || element.emitType < 0 || element.emitType > 255) {
+      throw new Error(`emitType of "${element.name}" is an invalid type ${element.emitType}`);
+    }
+    if (!(element.emitChance >= 0 && element.emitChance <= 1)) {
+      throw new Error(`emitChance of "${element.name}" must be in [0, 1], got ${element.emitChance}`);
+    }
+    const outcomeCount = this.list().reduce((n, e) => n + e.agedInto.length, 0);
+    if (outcomeCount + element.agedInto.length > MAX_OUTCOMES) {
+      throw new Error(`More than ${MAX_OUTCOMES} aged-out outcomes registered`);
     }
     if (!(element.blastResistance >= 0 && element.blastResistance < 1)) {
       throw new Error(`Blast resistance of "${element.name}" must be in [0, 1), got ${element.blastResistance}`);

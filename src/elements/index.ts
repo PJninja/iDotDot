@@ -1,6 +1,7 @@
 import { ElementRegistry } from '../engine/element';
 import { Acid } from './acid';
 import { Air } from './air';
+import { Ash } from './ash';
 import { Bomb } from './bomb';
 import { Charcoal } from './charcoal';
 import { CoolingSteel } from './cooling-steel';
@@ -14,12 +15,15 @@ import { Ice } from './ice';
 import { Methane } from './methane';
 import { Mold } from './mold';
 import { Mud } from './mud';
+import { Rubble } from './rubble';
 import { Sand } from './sand';
 import { Smoke } from './smoke';
 import { Spark } from './spark';
+import { Spring } from './spring';
 import { Steam } from './steam';
 import { Steel } from './steel';
 import { Stone } from './stone';
+import { Torch } from './torch';
 import { Water } from './water';
 import { WetSand } from './wet-sand';
 import { Wood } from './wood';
@@ -54,5 +58,9 @@ export function createElementRegistry(): ElementRegistry {
   registry.register(new Ice());
   registry.register(new Methane());
   registry.register(new Mold());
+  registry.register(new Ash());
+  registry.register(new Rubble());
+  registry.register(new Spring());
+  registry.register(new Torch());
   return registry;
 }

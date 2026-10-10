@@ -25,6 +25,8 @@ export class Acid extends Element {
   static CHARCOAL_CHANCE = 0.08;
   static GRASS_CHANCE = 0.15;
   static MOLD_CHANCE = 0.12;
+  /** Chance per step that an acid tile touching mud is neutralized into smoke (the mud turns to dirt, see Mud). */
+  static MUD_NEUTRALIZE_CHANCE = 0.1;
   /** Chance per step that an acid tile touching water is diluted into water. */
   static DILUTE_CHANCE = 0.005;
 
@@ -44,6 +46,7 @@ export class Acid extends Element {
       [SETTINGS.MOLD_TYPE, Acid.MOLD_CHANCE],
     ].map(([target, chance]): Reaction => ({ with: target, becomes: SETTINGS.SMOKE_TYPE, chance, consumes: true })),
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.WATER_TYPE, chance: Acid.DILUTE_CHANCE },
+    { with: SETTINGS.MUD_TYPE, becomes: SETTINGS.SMOKE_TYPE, chance: Acid.MUD_NEUTRALIZE_CHANCE },
   ];
 
   private readonly variantColors: [number, number, number][];

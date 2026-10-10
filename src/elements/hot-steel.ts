@@ -1,5 +1,5 @@
 import { buildGradient } from '../engine/colors';
-import { Element } from '../engine/element';
+import { Element, type Reaction } from '../engine/element';
 import { SETTINGS } from '../settings';
 
 /**
@@ -18,9 +18,15 @@ export class HotSteel extends Element {
   /** Age steps per sim step (mean hot time about 256 / rate steps, 0.6 = about 7 s). */
   static AGE_RATE = 0.6;
 
+  /** Chance per step that hot steel touching water quenches into cooling steel (the water boils, see Water). */
+  static QUENCH_CHANCE = 0.15;
+
   readonly ageRate = HotSteel.AGE_RATE;
-  readonly agedInto = SETTINGS.COOLING_STEEL_TYPE;
+  readonly agedInto = [{ type: SETTINGS.COOLING_STEEL_TYPE, chance: 1 }];
   readonly blastResistance = 0.98;
+  readonly reactions: readonly Reaction[] = [
+    { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.COOLING_STEEL_TYPE, chance: HotSteel.QUENCH_CHANCE },
+  ];
 
   private readonly ramp = buildGradient([
     { at: 0, color: [255, 214, 150] },
