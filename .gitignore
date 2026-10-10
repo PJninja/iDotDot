@@ -12,11 +12,13 @@
 !dev.bat
 !new-element.bat
 
-# Source and docs
+# Source, docs and the world generator
 !src/
 !src/**
 !plans/
 !plans/**
+!tools/
+!tools/**
 
 # Shared dev-server config (launch.json only; local settings stay ignored)
 !.claude/
