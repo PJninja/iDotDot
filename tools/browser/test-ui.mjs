@@ -11,23 +11,39 @@ const ORIGIN = 'http://localhost:5173';
 const HARNESS = `${ORIGIN}/tools/browser/harness/harness.html`;
 const filter = process.argv[2];
 const results = [];
-const check = (group, name, pass, detail = '') => {
-  results.push({ group, name, pass });
-  console.log(`${pass ? 'PASS' : 'FAIL'}  ${group}: ${name}${detail ? ` (${detail})` : ''}`);
-};
+const queue = [];
 
-/** Run `body(page, t)` on a page without WebGPU; an uncaught page error fails the group. */
-async function group(name, url, body, options = {}) {
+/** Queue a group; it runs on a page without WebGPU, and an uncaught page error fails it. */
+function group(name, url, body, options = {}) {
   if (filter && !name.includes(filter)) return;
+  queue.push({ name, url, body, options });
+}
+
+/** Run one queued group and print its lines together, so parallel groups do not interleave. */
+async function runGroup({ name, url, body, options }) {
+  const lines = [];
+  const report = (check, pass, detail = '') => {
+    results.push(pass);
+    lines.push(`${pass ? 'PASS' : 'FAIL'}  ${name}: ${check}${detail ? ` (${detail})` : ''}`);
+  };
   try {
     await withPage(url, async (page, log) => {
       await page.waitForTimeout(400);
-      await body(page, (n, pass, detail) => check(name, n, pass, detail));
-      if (log.pageErrors.length > 0) check(name, 'no uncaught page errors', false, log.pageErrors.join(' | ').slice(0, 200));
+      await body(page, report);
+      if (log.pageErrors.length > 0) report('no uncaught page errors', false, log.pageErrors.join(' | ').slice(0, 200));
     }, { gpu: false, ...options });
   } catch (error) {
-    check(name, 'ran to completion', false, String(error).slice(0, 200));
+    report('ran to completion', false, String(error).slice(0, 200));
   }
+  console.log(lines.join('\n'));
+}
+
+/** Run the queue with a few browsers at a time (each group is its own Chromium). */
+async function runAll(limit = 4) {
+  let next = 0;
+  await Promise.all(Array.from({ length: limit }, async () => {
+    while (next < queue.length) await runGroup(queue[next++]);
+  }));
 }
 
 /** Final tiles stamped by the board (later stamps replace earlier ones), colliders, and fit. */
@@ -71,12 +87,15 @@ try {
   // the ring/collider alignment and the lettering width have broken before.
   // Pixel ratios that divide the 4 px tile evenly (1x, 1.25x, 1.5x, 2x, 3x) behave like 1x. Browser
   // zoom (110%, 90%, ...) and some phones (Pixel-class 2.625x) give a fractional tile size instead.
+  // Only combinations that can occur are listed.
   const screens = [
     ['desktop 1280x720, 20 projects', '?n=20', { width: 1280, height: 720 }, true],
     ['large 1920x1080, 20 projects', '?n=20', { width: 1920, height: 1080 }, true],
     ['browser zoom 110% (fractional tile size)', '?n=12', { width: 1280, height: 720, deviceScaleFactor: 1.1 }, true],
     ['Pixel-class phone 412x915 at 2.625x', '?n=3', { width: 412, height: 915, deviceScaleFactor: 2.625 }, true],
     ['phone 390x844, too many projects', '?n=10', { width: 390, height: 844 }, false],
+    // The tile size dropdown (1, 2, 4, 8, 16 px); 4 px is the default and is covered above.
+    ...[1, 2, 8, 16].map((tile) => [`${tile} px tiles, 12 projects`, `?n=12&tile=${tile}`, { width: 1280, height: 720 }, true]),
   ];
   for (const [label, query, options, fits] of screens) {
     await group(`layout: ${label}`, `${HARNESS}${query}`, async (page, t) => {
@@ -141,10 +160,11 @@ try {
     const notice = await page.evaluate(() => document.querySelector('.plain-notice')?.textContent);
     t('a browser without WebGPU gets the plain page with the reason', notice === 'WebGPU is not available in this browser, so the simulation cannot run.', notice);
   }, { initScript: () => Object.defineProperty(navigator, 'gpu', { value: undefined }) });
+  await runAll();
 } finally {
   stop();
 }
 
-const failed = results.filter((r) => !r.pass);
-console.log(`\n${results.length - failed.length} passed, ${failed.length} failed`);
-process.exit(failed.length > 0 ? 1 : 0);
+const failed = results.filter((pass) => !pass).length;
+console.log(`\n${results.length - failed} passed, ${failed} failed`);
+process.exit(failed > 0 ? 1 : 0);
