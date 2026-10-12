@@ -24,6 +24,13 @@ import {
 const { positional, named } = parseArgs(process.argv.slice(3));
 const command = process.argv[2];
 
+/**
+ * The browser's own chrome (tab strip, infobars) takes this many CSS px from the window height, and
+ * differs between runs. The window starts this much taller than asked so the app sees a window big
+ * enough for the board on load; `fitWindow` then trims it to the exact size.
+ */
+const WINDOW_CHROME_MARGIN = 250;
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const killGroup = (pid) => {
   try {
@@ -86,7 +93,7 @@ async function start() {
   const profile = mkdtempSync(join(tmpdir(), 'idotdot-session-'));
   const browser = spawn(
     chromiumPath(),
-    [...CHROMIUM_FLAGS, '--headless', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${width},${height}`, '--no-first-run', 'about:blank'],
+    [...CHROMIUM_FLAGS, '--headless', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, `--window-size=${width},${height + WINDOW_CHROME_MARGIN}`, '--no-first-run', 'about:blank'],
     { detached: true, stdio: 'ignore' },
   );
   browser.unref();
@@ -97,22 +104,29 @@ async function start() {
   }
   writeFileSync(SESSION_FILE, JSON.stringify({ port, url, browserPid: browser.pid, serverPid: stopServer.startedPid, profile }));
   const began = Date.now();
-  const hasSim = await withSession(async (page) => {
-    await page.goto(url);
-    await page.addStyleTag({ content: FAST_COMPOSITING_CSS });
-    const found = await page.waitForFunction(() => window.__world?.width > 0, null, { timeout: 15000 }).then(() => true, () => false);
-    if (!found) return false;
-    await settleSim(page);
-    await page.evaluate(() => window.__world.readGrid());
-    return true;
-  });
-  await fitWindow(width, height);
-  if (!hasSim) {
-    console.log(`Session started on port ${port} at ${url} (no simulation on this page, nothing to warm).`);
-    return;
+  try {
+    const hasSim = await withSession(async (page) => {
+      await page.goto(url);
+      await page.addStyleTag({ content: FAST_COMPOSITING_CSS });
+      const found = await page.waitForFunction(() => window.__world?.width > 0, null, { timeout: 15000 }).then(() => true, () => false);
+      if (!found) return false;
+      await settleSim(page);
+      await page.evaluate(() => window.__world.readGrid());
+      return true;
+    });
+    await fitWindow(width, height);
+    if (!hasSim) {
+      console.log(`Session started on port ${port} at ${url} (no simulation on this page, nothing to warm).`);
+      return;
+    }
+    const plain = await withSession((page) => page.evaluate(() => document.documentElement.classList.contains('plain')));
+    if (plain) console.log(`Note: at ${width}x${height} the app shows the plain page (the board needs a window of about 760 x 650 or more), so the sim is not running.`);
+    console.log(`Session warm on port ${port} at ${url} after ${Date.now() - began} ms (viewport ${width}x${height}).`);
+    console.log('The sim is stopped so no GPU work queues up; run it with: session.mjs eval "__world.start()"');
+  } catch (error) {
+    await stop();
+    throw error;
   }
-  console.log(`Session warm on port ${port} at ${url} after ${Date.now() - began} ms (viewport ${width}x${height}).`);
-  console.log('The sim is stopped so no GPU work queues up; run it with: session.mjs eval "__world.start()"');
 }
 
 async function stop() {
