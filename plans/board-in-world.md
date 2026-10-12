@@ -47,7 +47,7 @@ A 600 px canvas shows world rows 198 to 348, so everything the board needs has t
 | Chip row 2 | 241 to 272 |
 | Gallery: a lined corridor holding the filter, tag words and pager, one line of text | 276 to 288 |
 | What is left under the block (columns 229 to 411) | 292 to 337, about 45 rows: short cellars or rock |
-| Pockets 1, 4, 5, 6 (outside the block, or tall enough already) | unchanged |
+| Pockets 1, 5, 6 (outside the block) | unchanged |
 
 Three pockets overlap the block's footprint (columns 229 to 411, rows 202 to 288): pocket 2 (columns 156 to 262) on its left edge, pocket 3 (272 to 348) fully under it, and pocket 4 (366 to 468, top at row 245) on its right edge. Squeezing their rooms into 45 rows would waste them, so each world's theme picks per pocket: narrow it to the side of the block (pocket 2 to columns 156 to 224 and pocket 4 to 420 to 468 keep their full height), drop it below the block as a short cellar, or remove it and leave rock.
 
