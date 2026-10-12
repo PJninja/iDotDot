@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "worlds": "node tools/make-worlds.ts"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
