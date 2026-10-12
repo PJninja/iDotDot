@@ -150,8 +150,10 @@ export class Board {
       element.style.height = `${box.gh * tile}px`;
     };
     placement.chips.forEach((box, i) => boxStyle(this.slots[i].element, box));
+    for (const slot of this.slots) slot.element.style.setProperty('--chip-scale', String(placement.chipScale));
     boxStyle(this.gallery.element, placement.gallery);
-    this.gallery.setCompact(placement.mode === 'narrow');
+    this.gallery.element.style.setProperty('--gallery-scale', String(placement.galleryScale));
+    this.gallery.setCompact(placement.mode !== 'wide');
     this.setGalleryShown(true);
     this.gallery.render(this.pageSize);
 

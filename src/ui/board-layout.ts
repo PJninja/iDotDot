@@ -1,5 +1,7 @@
 import { worldPlacement } from '../engine/world-file';
 import {
+  COMPACT,
+  COMPACT_MIN_WIDTH,
   MIN_CANVAS_HEIGHT,
   NARROW,
   NARROW_MIN_WIDTH,
@@ -20,10 +22,10 @@ export interface CellBox {
   gh: number;
 }
 
-/** Shortest gallery, in CSS px: one line of 13px text with room for its underline. */
+/** Shortest gallery at text scale 1, in CSS px: one line of 13px text with room for its underline. */
 const GALLERY_MIN_PX = 24;
 
-export type BoardMode = 'wide' | 'narrow';
+export type BoardMode = 'wide' | 'narrow' | 'compact';
 
 export interface BoardPlacement {
   mode: BoardMode;
@@ -33,6 +35,9 @@ export interface BoardPlacement {
   gallery: CellBox;
   /** Ring thickness in cells. */
   ring: number;
+  /** Chip and gallery text scale of the layout. */
+  chipScale: number;
+  galleryScale: number;
 }
 
 export interface PlacementInput {
@@ -48,18 +53,19 @@ export interface PlacementInput {
 }
 
 /**
- * Place the board for the current window: the wide block (six slots) from `WIDE_MIN_WIDTH`,
- * the narrow column (two slots) below it. Slots are world cells mapped through the same
+ * Place the board for the current window: the wide block (four big chips) from
+ * `WIDE_MIN_WIDTH`, one column of two big chips from `NARROW_MIN_WIDTH`, and one column of
+ * two small chips below that. Slots are world cells mapped through the same
  * bottom-center anchor as the default world, so a chip stays on the same patch of rock at
  * every window size. Null when the canvas is shorter than `MIN_CANVAS_HEIGHT`, narrower than
- * the narrow layout, or the board would fall outside the visible grid; the caller then
+ * the compact layout, or the board would fall outside the visible grid; the caller then
  * shows the plain page.
  */
 export function placeBoard(input: PlacementInput): BoardPlacement | null {
   if (input.windowHeight - input.headerHeight < MIN_CANVAS_HEIGHT) return null;
-  if (input.windowWidth < NARROW_MIN_WIDTH) return null;
-  const mode: BoardMode = input.windowWidth >= WIDE_MIN_WIDTH ? 'wide' : 'narrow';
-  const geometry: BoardGeometry = mode === 'wide' ? WIDE : NARROW;
+  if (input.windowWidth < COMPACT_MIN_WIDTH) return null;
+  const mode: BoardMode = input.windowWidth >= WIDE_MIN_WIDTH ? 'wide' : input.windowWidth >= NARROW_MIN_WIDTH ? 'narrow' : 'compact';
+  const geometry: BoardGeometry = { wide: WIDE, narrow: NARROW, compact: COMPACT }[mode];
 
   const { tile, gridWidth, gridHeight } = input;
   const at = worldPlacement(WORLD_CELLS, gridWidth, gridHeight, tile);
@@ -79,12 +85,12 @@ export function placeBoard(input: PlacementInput): BoardPlacement | null {
   const chips = geometry.slots.map(map);
   const gallery = map(geometry.gallery);
   // Large tiles make the corridor shorter than one line of text; grow it down into the lining.
-  gallery.gh = Math.max(gallery.gh, Math.ceil(GALLERY_MIN_PX / tile));
+  gallery.gh = Math.max(gallery.gh, Math.ceil((GALLERY_MIN_PX * geometry.galleryScale) / tile));
   const visibleColumns = Math.floor(input.windowWidth / tile);
   const boxes = [...geometry.slots.map((s) => footprint(s)), geometry.gallery].map(map);
   for (const box of boxes) {
     const inside = box.gx >= 0 && box.gy >= 0 && box.gx + box.gw <= Math.min(gridWidth, visibleColumns) && box.gy + box.gh <= gridHeight;
     if (!inside || box.gw < 1 || box.gh < 1) return null;
   }
-  return { mode, chips, gallery, ring };
+  return { mode, chips, gallery, ring, chipScale: geometry.chipScale, galleryScale: geometry.galleryScale };
 }
