@@ -1,7 +1,8 @@
 // Shared helpers for driving the sim in headless Chromium. Plain Node (22+), no dependencies of its own:
 // Playwright is found on the machine, not in this repo (the repo's only devDependencies are typescript and vite).
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -63,13 +64,13 @@ export async function loadPlaywright() {
   }
 }
 
-function chromiumPath() {
+export function chromiumPath() {
   return CHROMIUM_CANDIDATES.find((p) => p && existsSync(p));
 }
 
 /**
  * Make sure a Vite dev server answers at `origin`, starting `npx vite` if nothing does. Returns
- * a function that stops the server only if this call started it.
+ * a function that stops the server only if this call started it (`startedPid` is set in that case).
  */
 export async function ensureDevServer(origin = 'http://localhost:5173') {
   const alive = async () => {
@@ -79,7 +80,7 @@ export async function ensureDevServer(origin = 'http://localhost:5173') {
       return false;
     }
   };
-  if (await alive()) return () => {};
+  if (await alive()) return Object.assign(() => {}, { startedPid: undefined });
   const url = new URL(origin);
   const child = spawn('npx', ['vite', '--port', url.port || '5173', '--strictPort'], {
     cwd: REPO_ROOT,
@@ -88,7 +89,7 @@ export async function ensureDevServer(origin = 'http://localhost:5173') {
   });
   child.unref();
   for (let i = 0; i < 50; i++) {
-    if (await alive()) return () => process.kill(-child.pid);
+    if (await alive()) return Object.assign(() => process.kill(-child.pid), { startedPid: child.pid });
     await new Promise((r) => setTimeout(r, 200));
   }
   process.kill(-child.pid);
@@ -103,13 +104,14 @@ const isDeviceLoss = (text) => /Instance reference no longer exists|device lost/
  * `log` collects console errors and page errors; `log.deviceLost` is true if the GPU process was
  * killed. Options: width, height, css (a stylesheet added before the page's own scripts run;
  * defaults to FAST_COMPOSITING_CSS), initScript (a function run before the page's scripts),
- * flags (extra Chromium flags). The browser is always closed.
+ * flags (extra Chromium flags), gpu (false = skip the WebGPU flags, for pages that never touch
+ * the GPU). The browser is always closed.
  */
 export async function withPage(url, run, options = {}) {
   const { chromium } = await loadPlaywright();
   const browser = await chromium.launch({
     executablePath: chromiumPath(),
-    args: [...CHROMIUM_FLAGS, ...(options.flags ?? [])],
+    args: [...(options.gpu === false ? ['--no-sandbox'] : CHROMIUM_FLAGS), ...(options.flags ?? [])],
   });
   const startedAt = Date.now();
   const log = { errors: [], pageErrors: [], failedRequests: [], deviceLost: false, elapsedMs: () => Date.now() - startedAt };
@@ -143,6 +145,9 @@ export async function withPage(url, run, options = {}) {
   }
 }
 
+/** Flags that never take a value, so `--session out.png` keeps out.png as a positional argument. */
+const BOOLEAN_FLAGS = new Set(['session', 'resume', 'hide-canvas']);
+
 /** Parse `--name value` and `--flag` arguments; the rest are positional. */
 export function parseArgs(argv, defaults = {}) {
   const positional = [];
@@ -155,7 +160,7 @@ export function parseArgs(argv, defaults = {}) {
     }
     const name = arg.slice(2);
     const next = argv[i + 1];
-    if (next === undefined || next.startsWith('--')) named[name] = true;
+    if (BOOLEAN_FLAGS.has(name) || next === undefined || next.startsWith('--')) named[name] = true;
     else {
       named[name] = Number.isNaN(Number(next)) ? next : Number(next);
       i++;
@@ -178,4 +183,52 @@ export function reportLog(log) {
   for (const r of log.failedRequests) console.log('[failed request]', r);
   if (log.deviceLost) console.log(`[note] the GPU process was killed (${log.elapsedMs()} ms after launch)`);
   return errors.length + log.pageErrors.length + log.failedRequests.length > 0 || log.deviceLost;
+}
+
+/** Where `session.mjs start` records the warm browser so later commands can attach to it. */
+export const SESSION_FILE = join(tmpdir(), 'idotdot-browser-session.json');
+
+/** The recorded warm session, or null. */
+export function readSession() {
+  try {
+    return JSON.parse(readFileSync(SESSION_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Like withPage, but attaches to the browser that `session.mjs start` left running instead of
+ * launching one, so the GPU device (and its roughly 7 s shader compile) is reused. The page keeps
+ * its state between commands; the browser is only disconnected from, never closed.
+ */
+export async function withSession(run) {
+  const session = readSession();
+  if (session === null) throw new Error('No warm session. Start one with: node tools/browser/session.mjs start');
+  const { chromium } = await loadPlaywright();
+  let browser;
+  try {
+    browser = await chromium.connectOverCDP(`http://127.0.0.1:${session.port}`);
+  } catch {
+    throw new Error(`The recorded session (port ${session.port}) is not answering. Run session.mjs stop, then start.`);
+  }
+  const startedAt = Date.now();
+  const log = { errors: [], pageErrors: [], failedRequests: [], deviceLost: false, elapsedMs: () => Date.now() - startedAt };
+  try {
+    const pages = browser.contexts()[0]?.pages() ?? [];
+    const page = pages.find((p) => p.url().startsWith('http')) ?? pages[0];
+    if (!page) throw new Error('The warm session has no page open');
+    page.on('console', (m) => {
+      if (m.type() !== 'error' && m.type() !== 'warning') return;
+      if (isDeviceLoss(m.text())) log.deviceLost = true;
+      else if (m.type() === 'error') log.errors.push(m.text());
+    });
+    page.on('pageerror', (e) => {
+      if (isDeviceLoss(e.message)) log.deviceLost = true;
+      else log.pageErrors.push(e.message);
+    });
+    return await run(page, log, session);
+  } finally {
+    await browser.close();
+  }
 }

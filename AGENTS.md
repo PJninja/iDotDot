@@ -13,23 +13,36 @@ The canvas fills the viewport below a fixed 48px header; HTML overlays carry the
 | Type-check | `npx tsc --noEmit` |
 | Regenerate the default worlds | `npm run worlds` (`node tools/make-worlds.ts [world ...] [--out dir] [--preview dir [--crop x,y,w,h --scale n]]`; needs Node 22.18+, which strips the TypeScript itself) |
 | Build | `npm run build` (`tsc && vite build`) |
+| UI tests (no GPU, seconds) | `npm run test:ui` |
 | Check software WebGPU works here | `node tools/browser/smoke.mjs` |
+| Warm browser for fast sim checks | `node tools/browser/session.mjs start`, then `readgrid.mjs --session` / `shot.mjs --session`, then `session.mjs stop` |
 | Read the grid back (counts per element, optional PNG of the world) | `node tools/browser/readgrid.mjs [url] [--png out.png]` |
-| Screenshot the page (DOM only, see Testing in headless Chromium) | `node tools/browser/shot.mjs [url] [out.png] [--hide-canvas]` |
+| Screenshot the page (DOM only, see Testing in headless Chromium) | `node tools/browser/shot.mjs [url] [out.png] [--hide-canvas] [--session]` |
 | Scaffold an element | `new-element.bat <kebab-case-name> [falling\|static\|bare] [yes\|no]` — generates `src/elements/<name>.ts` (display + tuning metadata) and auto-wires the `SETTINGS.*_TYPE` constant and the `index.ts` import + registration. Behavior still has to be added to the compute shader. |
 
 There is no test framework. Validate with `npx tsc --noEmit` + `npm run build`, and verify behavior in a WebGPU browser (the work happens on the GPU, so it cannot run in Node). Check GPU validation errors: the device logs `uncapturederror` to the console, and a failed shader/pipeline makes the whole command buffer silently do nothing, so an error scope (`device.pushErrorScope('validation')`) is the reliable check.
 
 ### Testing in headless Chromium (`tools/browser/`)
-Plain Node scripts (Node 22+) that start the dev server if it is not running, open the page in a fresh headless Chromium with working software WebGPU and print what they find. Playwright is not a repo dependency: `launch.mjs` finds it in `node_modules`, the global install, or `/opt/node-tools/node_modules/playwright`, and the browser at `$CHROMIUM_PATH` or `/opt/pw-browsers/chromium`. Start with `smoke.mjs`; if it fails, the environment is the problem, not the sim. Write new scripts on `withPage(url, (page, log) => ...)` from `launch.mjs`, which adds the flags below and collects console errors, page errors and failed requests.
+Plain Node scripts (Node 22+) that start the dev server if it is not running and drive a headless Chromium with working software WebGPU. Playwright is not a repo dependency: `launch.mjs` finds it in `node_modules`, the global install, or `/opt/node-tools/node_modules/playwright`, and the browser at `$CHROMIUM_PATH` or `/opt/pw-browsers/chromium`. Write new scripts on `withPage(url, (page, log) => ...)` (a fresh browser) or `withSession((page, log) => ...)` (the warm one) from `launch.mjs`, which collect console errors, page errors and failed requests.
+
+Pick the cheapest tool that answers the question:
+- **UI behavior** (layout, windows, filters, routing, modes, the plain page): `npm run test:ui`. It runs the real board, window, tag filter and route code in `tools/browser/harness/` against a fake world that records `stampCells` and draws the tiles into a 2D canvas, so there is no GPU and no shader compile; it takes seconds. Add a check to `test-ui.mjs` (a `group(name, url, body)` with `t(name, pass)`), and `window.__h` exposes the board, window, colliders and stamped tiles. The harness is type-checked with the app (`tsconfig.json`). Pass a name filter to run one group.
+- **Simulation state** (what the grid holds, behavior over steps): the warm session below, with `readgrid.mjs`. This is the only way to test sim behavior, since there is no test framework.
+- **Does WebGPU work at all here:** `smoke.mjs` (under a second); if it fails the environment is the problem, not the sim.
+- **A one-off look** at the DOM or the grid on a fresh page: `shot.mjs` / `readgrid.mjs` without `--session` (about 8 s each).
+
+**Warm session (`session.mjs`).** Every fresh page pays about 7.5 s for the first GPU work (software shader compile, per GPU device). Measured: a persistent profile, a smaller window (14k cells instead of 54k) and a second page in the same browser all cost the same, so only keeping one page alive helps. `session.mjs start [url] [--width --height]` launches one Chromium, loads the app, compiles and leaves it running; later commands attach over CDP and take milliseconds (grid read 0.1 to 1 s, PNG 0.6 s, screenshot 0.13 s):
+- `readgrid.mjs --session [--steps N] [--png out.png] [--resume]`, `shot.mjs --session [out.png] [--hide-canvas]`, `session.mjs eval "<js>"` (run anything on `window.__world`, e.g. `eval "__world.paintStroke(100, 30, 100, 30, {shape:'circle', radius:3, density:1, type:1})"`), `status`, `goto <url>` (pays the compile again), `stop` (kills the browser and a dev server it started).
+- **Keep the sim stopped between commands.** `start` leaves it stopped, and reads stop it again. A running sim queues frames far faster than the software GPU finishes them and a readback waits for all of them: a read after 10 s of running took 55 s. To run it on purpose, `eval "__world.start()"`, then `--steps N` (run N steps, then stop and read) is the safe way to advance.
+- The session state is in `$TMPDIR/idotdot-browser-session.json`; one session at a time (`--port` to change 9222).
 
 What the sandbox does (each point cost time to find, so trust it before re-deriving it):
 - **Flags** (`CHROMIUM_FLAGS`): the Vulkan/swiftshader set gives an adapter, `--use-angle=swiftshader` is what keeps the device alive (without it the GPU process dies on the first presented frame with "A valid external Instance reference no longer exists", which the app reports as a device loss), and `--disable-accelerated-2d-canvas --disable-gpu-rasterization` keep 2D canvas text off the GPU (the first `fillText` otherwise froze the page for about 9 s). The page must be on `http://localhost`: `navigator.gpu` does not exist on `about:blank`.
-- **Slow start:** the first sim frame appears about 7 s after load (software shader compile), then the sim runs at a few steps per second on a full grid, far below the 60 the HUD's submit rate suggests. The header's `backdrop-filter` blur, composited in software over the canvas, cuts it further; `withPage` switches it off by default (`FAST_COMPOSITING_CSS`).
-- **`page.screenshot` shows the WebGPU canvas as blank white**, even while the sim steps. Screenshots are still right for the DOM (header, chips, the project window, the plain page); pass `--hide-canvas` to `shot.mjs` to get the page background instead of white. To look at the world, use `readgrid.mjs --png`, which draws the grid with the registry colors (smoke, steam and water haze come out as plain tiles).
-- **Reading state:** `window.__world` is the `GpuSimulation` (set in `main.ts`). `readGrid()` waits for every queued GPU command, and the page queues frames much faster than the software GPU finishes them, so a running sim makes the read take many seconds. `readgrid.mjs` stops the sim as soon as it starts (`--steps N` lets it run N steps first) and hides the header and overlay while it reads.
+- **Speed:** after the compile the sim runs at a few steps per second on a full grid, far below the 60 the HUD's submit rate suggests. The header's `backdrop-filter` blur, composited in software over the canvas, cuts it further; `withPage` and the session switch it off (`FAST_COMPOSITING_CSS`).
+- **`page.screenshot` shows the WebGPU canvas as blank white**, even while the sim steps. Screenshots are still right for the DOM; pass `--hide-canvas` to get the page background instead of white. To look at the world, use `readgrid.mjs --png`, which draws the grid with the registry colors (smoke, steam and water haze come out as plain tiles).
+- **Reading state:** `window.__world` is the `GpuSimulation` (set in `main.ts`). `readGrid()` waits for every queued GPU command, hence the stop-before-read rule above.
+- **Window size in a session:** a viewport override disappears when a connection closes, so `start` sets the real window bounds and corrects them by measuring the loaded page (the browser's own chrome changes the inner size).
 - **Noise:** the dev server 404s `/favicon.ico` and Chromium logs it as a console error; `reportLog` ignores that one message unless a request made by the page also failed.
-- UI that does not need the GPU (layout, windows, filters, routing) is quicker to check by loading the real modules against a fake world drawn into a 2D canvas than by waiting for the sim.
 
 `plans/` holds design docs: `webgpu-compute-port.md` (how the GPU architecture came about) and `fire.md` (the fire/aging design; implemented, the tuning numbers in it are starting points). Treat plans as intent; this file and the code are the current state.
 
@@ -177,6 +190,6 @@ src/
   styles/main.css
 plans/               webgpu-compute-port.md (architecture history), fire.md (proposal)
 tools/               make-worlds.ts (builds src/worlds/*.idw), make-rooms.ts, world-kit.ts (drawing kit), worlds/*.ts (scene scripts),
-                     vite-plain-view.ts (build plugin), browser/ (headless Chromium kit: launch.mjs, smoke.mjs, shot.mjs, readgrid.mjs)
+                     vite-plain-view.ts (build plugin), browser/ (headless Chromium kit: launch.mjs, session.mjs, grid.mjs, smoke.mjs, shot.mjs, readgrid.mjs, test-ui.mjs, harness/)
 dev.bat, new-element.bat   Windows helper scripts (see Commands)
 ```
