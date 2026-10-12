@@ -23,13 +23,13 @@ body {
   color: #e8e8f0;
 }
 
-/* 48px header bar, above all other layers */
+/* 48px header bar (snapped to whole device pixels by JS: --header-height), above all other layers */
 #header {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 48px;
+  height: var(--header-height, 48px);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -212,7 +212,7 @@ body {
 /* HTML overlay layer: between header (100) and canvas (auto/0) */
 #overlay {
   position: fixed;
-  top: 48px;
+  top: var(--header-height, 48px);
   left: 0;
   right: 0;
   bottom: 0;
@@ -229,7 +229,7 @@ body {
    from SETTINGS.CANVAS_BACKGROUND by the renderer. */
 #sandbox {
   position: fixed;
-  top: 48px;
+  top: var(--header-height, 48px);
   left: 0;
   display: block;
   pointer-events: none;
