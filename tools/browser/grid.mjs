@@ -7,11 +7,13 @@
  * itself once the app has loaded the world.
  */
 export async function settleSim(page, { steps = 0, restart = false, timeout = 30000 } = {}) {
-  await page.waitForFunction(
+  const state = await page.waitForFunction(
     ({ steps, restart }) => {
       const world = window.__world;
       if (!world || !(world.width > 0)) return false;
       if (!world.running) {
+        // The app stops the sim and shows the plain page when the window is too small for the board.
+        if (document.documentElement.classList.contains('plain')) return 'plain';
         if (!restart) return false;
         world.start();
       }
@@ -19,11 +21,17 @@ export async function settleSim(page, { steps = 0, restart = false, timeout = 30
       if (world.stepCount < window.__readTarget) return false;
       world.stop();
       delete window.__readTarget;
-      return true;
+      return 'settled';
     },
     { steps, restart },
     { polling: 10, timeout },
   );
+  if ((await state.jsonValue()) === 'plain') {
+    throw new Error(
+      'The app is showing the plain page, so the simulation is not running: the window is too small for the board ' +
+        '(it needs a canvas at least 600 px tall, so a window of about 760 x 650 or more).',
+    );
+  }
 }
 
 /**
