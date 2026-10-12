@@ -4,7 +4,7 @@ import shot from './placeholder-b/shot-1.svg';
 const project: Project = {
   id: 'placeholder-b',
   title: 'Placeholder project B',
-  summary: 'A second stand-in entry, with a wooden border that can burn.',
+  summary: 'A second stand-in, with a wooden border that can burn.',
   tags: ['Placeholder', 'Sample', 'Wood border'],
   icon:
     '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">' +

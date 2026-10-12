@@ -277,7 +277,7 @@ body {
   padding: 0 2px;
 }
 
-/* Blocking popup shown when WebGPU is unavailable or the device is lost. */
+/* Blocking popup shown when the GPU device is lost. Flat panel with stepped corners and a solid button, like the project window. */
 .gpu-error-backdrop {
   position: fixed;
   inset: 0;
@@ -286,20 +286,22 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(10, 10, 20, 0.7);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(6, 6, 14, 0.74);
 }
 
 .gpu-error-dialog {
+  --block: 4px;
   max-width: 360px;
-  padding: 24px;
+  padding: 24px 28px;
   text-align: center;
-  background: rgba(20, 20, 36, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   color: #e8e8f0;
+  background: #20203a;
+  clip-path: polygon(
+    var(--block) 0, calc(100% - var(--block)) 0, calc(100% - var(--block)) var(--block), 100% var(--block),
+    100% calc(100% - var(--block)), calc(100% - var(--block)) calc(100% - var(--block)),
+    calc(100% - var(--block)) 100%, var(--block) 100%, var(--block) calc(100% - var(--block)),
+    0 calc(100% - var(--block)), 0 var(--block), var(--block) var(--block)
+  );
 }
 
 .gpu-error-message {
@@ -309,18 +311,23 @@ body {
 }
 
 .gpu-error-retry {
-  padding: 8px 18px;
+  padding: 8px 20px;
   font: inherit;
-  font-weight: 600;
-  color: #e8e8f0;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  font-weight: 700;
+  color: #1a1a2e;
+  background: #f4c44a;
+  border: 0;
+  border-radius: 0;
   cursor: pointer;
 }
 
 .gpu-error-retry:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: #ffd866;
+}
+
+.gpu-error-retry:focus-visible {
+  outline: 2px solid #e8e8f0;
+  outline-offset: 3px;
 }
 
 /* Short error message under the header from the world save/load buttons. */
@@ -481,7 +488,6 @@ html[data-mode='portfolio'] .world-message {
   -webkit-box-orient: vertical;
 }
 
-.chip-tags,
 .win-tags {
   display: flex;
   flex-wrap: nowrap;
@@ -490,25 +496,33 @@ html[data-mode='portfolio'] .world-message {
   color: #9a9ab0;
 }
 
+/* Tags wrap rather than cut off; a separator that lands at a line start is clipped by the container. */
 .chip-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px 16px;
   margin-top: auto;
+  overflow: hidden;
   font-size: calc(10px * var(--s));
+  color: #9a9ab0;
 }
 
 .chip-tags span {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  position: relative;
+  white-space: nowrap;
 }
 
-.chip-tags i {
-  flex: none;
-  align-self: center;
-  margin-bottom: 0;
+.chip-tags span + span::before {
+  position: absolute;
+  top: 50%;
+  left: -9px;
+  width: 3px;
+  height: 3px;
+  margin-top: -1px;
+  content: '';
+  background: currentColor;
 }
 
-.chip-tags i,
 .win-tags span + span::before {
   display: inline-block;
   width: 3px;
@@ -576,12 +590,14 @@ html[data-mode='portfolio'] .world-message {
 
 .first-hint {
   position: fixed;
-  bottom: 18px;
+  bottom: 14px;
   left: 50%;
   z-index: 60;
+  padding: 6px 12px;
   transform: translateX(-50%);
-  font-size: 13px;
-  color: #9a9ab0;
+  font-size: 14px;
+  color: #e8e8f0;
+  background: #1a1a2e;
   pointer-events: none;
 }
 

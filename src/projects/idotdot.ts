@@ -5,7 +5,7 @@ import world from './idotdot/shot-world.svg';
 const project: Project = {
   id: 'idotdot',
   title: 'iDotDot',
-  summary: 'This site: a falling-sands world simulated on the GPU, with the page laid over it.',
+  summary: 'This site: a falling-sands world simulated on the GPU.',
   tags: ['WebGPU', 'TypeScript', 'Simulation'],
   icon:
     '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">' +

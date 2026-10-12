@@ -1,4 +1,4 @@
-import { BORDER_MATERIALS, type Project } from './project';
+import { BORDER_MATERIALS, MAX_SUMMARY_CHARS, MAX_TAG_CHARS, type Project } from './project';
 
 const modules = import.meta.glob<{ default: Project }>(['./*.ts', '!./index.ts', '!./project.ts'], { eager: true });
 
@@ -8,6 +8,8 @@ function validate(project: Project, file: string): void {
   };
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(project.id)) fail(`id "${project.id}" is not kebab-case`);
   if (project.tags.length !== 3 || project.tags.some((t) => t.trim() === '')) fail('needs exactly three non-empty tags');
+  if (project.summary.length > MAX_SUMMARY_CHARS) fail(`summary is over ${MAX_SUMMARY_CHARS} characters, so the chip would cut it off`);
+  if (project.tags.some((t) => t.length > MAX_TAG_CHARS)) fail(`a tag is over ${MAX_TAG_CHARS} characters`);
   if (!BORDER_MATERIALS.includes(project.border)) fail(`unknown border material "${project.border}"`);
   if (project.screenshots.length === 0) fail('needs at least one screenshot');
   if (project.screenshots.some((s) => s.alt.trim() === '')) fail('every screenshot needs alt text');

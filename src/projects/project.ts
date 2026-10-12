@@ -2,6 +2,10 @@
 export const BORDER_MATERIALS = ['stone', 'steel', 'wood', 'ice'] as const;
 export type BorderMaterial = (typeof BORDER_MATERIALS)[number];
 
+/** Longest chip description and tag that fit a chip without being cut off. */
+export const MAX_SUMMARY_CHARS = 56;
+export const MAX_TAG_CHARS = 14;
+
 export interface Screenshot {
   /** Bundled image URL (import it with Vite). */
   src: string;
@@ -34,7 +38,7 @@ export interface Project {
   /** kebab-case; also the URL hash (`#/<id>`). */
   id: string;
   title: string;
-  /** Chip description, two lines at most. */
+  /** Chip description, two lines at most (`MAX_SUMMARY_CHARS`). */
   summary: string;
   /** Exactly three, shown on the chip and used by the tag filter. */
   tags: readonly [string, string, string];

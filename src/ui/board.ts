@@ -94,12 +94,11 @@ export class Board {
 
     const tags = document.createElement('span');
     tags.className = 'chip-tags';
-    project.tags.forEach((tag, i) => {
-      if (i > 0) tags.appendChild(document.createElement('i'));
+    for (const tag of project.tags) {
       const word = document.createElement('span');
       word.textContent = tag;
       tags.appendChild(word);
-    });
+    }
 
     chip.append(head, summary, tags);
     const [r, g, b] = this.registry.getByName(project.border)?.defaultColor ?? BACKGROUND;
