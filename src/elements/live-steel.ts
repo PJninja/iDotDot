@@ -19,7 +19,7 @@ export class LiveSteel extends Element {
   /** Age steps per sim step (8 = 32 steps, about 0.5 s); shorter-lived than SpentSteel, or the pulse bounces. */
   static AGE_RATE = 8;
   /** Chance that a finished pulse leaves hot steel instead of spent steel, per tile per pulse. */
-  static OVERLOAD_CHANCE = 0.003;
+  static OVERLOAD_CHANCE = 0.0005;
   /** Chance per step, per empty cell beside the tile, that the cell fills with an arc. */
   static ARC_CHANCE = 0.01;
 

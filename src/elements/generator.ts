@@ -16,7 +16,7 @@ export class Generator extends Element {
   readonly defaultColor: [number, number, number] = [92, 106, 168];
 
   /** Chance per step, per empty cell beside the generator, that the cell fills with an arc. */
-  static ARC_CHANCE = 0.01;
+  static ARC_CHANCE = 0.002;
 
   static GENERATOR_VARIANT_COUNT = 4;
   static GENERATOR_COLOR_VARIANCE = 14;

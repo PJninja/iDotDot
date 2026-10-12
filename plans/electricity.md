@@ -1,6 +1,6 @@
 # Electricity: Live Steel, Arcs, Generators, Shocked Water
 
-Status: proposal, nothing implemented. Every number below is a starting point to be tuned in a running sim. Revised after the browser test suite landed on `v2-webgpu` (`7546741`, see Testing below).
+Status: implemented (phases 0 to 5; see As built below). The numbers in the design sections are the starting points; the as-built values differ where noted. Revised after the browser test suite landed on `v2-webgpu` (`7546741`, see Testing below).
 Scope: 9 new elements (4 pickable, 5 hidden), reaction rules on Steel, Water, Wood, Grass, Charcoal, Bomb and Methane, and **no shader changes**. Everything uses mechanisms that already exist: one-sided reactions, aging with `agedInto`, the emitter (`emitType`), and static aging solids (as `Explosion` is).
 
 Decisions already made:
@@ -11,6 +11,34 @@ Decisions already made:
 - Generator: pulses on its own, forever.
 - Conductors: steel and water only. Acid and everything else insulate.
 - The default worlds in `tools/worlds/` stay unchanged. Electricity is a playground feature for now.
+
+## As built
+
+Everything in the plan was built with rules and data only, in `src/elements/` (nine new files, registered in `index.ts`, type ids 28 to 36 in `settings.ts`). No shader code changed. Checked in a headless Chromium with the warm session (scene scripts that stamp steel, water, a bomb, a fuse, rubber, methane and wood into a cleared grid), plus `npm run test:pulse`.
+
+Measured:
+
+- **Pulse:** crosses a 60-cell wire in about 180 to 210 steps (about 18 to 20 cells/s, a little above the planned 12) with a pulse 9 to 12 tiles long. It does not bounce, the wire is all steel again afterwards, and the sim goes idle once the pulse is gone. A 1000-tile plate (100 x 10) carries the pulse as a ring and also returns to steel.
+- **Refractory margin:** a spent stage of 13 steps (`SpentSteel.AGE_RATE` 20) still passes, because a neighbor's live stage ends only a few steps after the tile's own. At 1 step (rate 255) the pulse bounces for ever. The shipped 64 steps is a wide margin; the plan's rule "spent outlasts live" is sufficient, not necessary.
+- **Water:** a pulse fed into one side of a 49-wide stone-walled pool crossed it as shocked then numb water and set off a steel wire leaving the far side; all water was restored afterwards (473 tiles before and after).
+- **Bomb:** live steel at the end of a wire detonated the bomb.
+- **Methane:** live steel inside a closed stone box of methane ignited it (flames and an explosion).
+- **Fuse:** the first pulse crossed a three-tile fuse and the fuse tiles were gone afterwards; a second pulse stopped at the gap (the far side saw no live or spent tile).
+- **Rubber:** a three-tile rubber gap in a wire blocked the pulse.
+- **Wood:** live steel touching a row of wood set several tiles alight within one pulse (0.004 per step); the fire then spread. This is intended but strong; lower `Wood.LIVE_STEEL_IGNITE_CHANCE` if wires should be safer.
+- **Generator:** with the first values (arcs 0.01, steel 0.01) a generator kept a 60-cell wire charged almost all the time, because its arcs relit the touching tile as soon as it returned to steel. Tuned to `Generator.ARC_CHANCE` 0.002, `Steel.ARC_CHANCE` 0.15 and `Steel.GENERATOR_CHANCE` 0.002: separate pulses about every 2 to 4 s.
+- **Overload:** at 0.003 per tile per pulse a 1000-tile plate turned almost entirely to hot steel within about 600 steps, because one hot tile spreads heat through the whole plate (steel's own heat rule, 3% per step for about 7 s, is supercritical in 2D). Lowered to `LiveSteel.OVERLOAD_CHANCE` 0.0005. At that value a single pulse on the 1000-tile plate caused no overload; a 60-cell wire has about a 3% chance per pulse.
+
+Deviations from the design:
+
+- `Steel.ARC_CHANCE` is 0.15 (planned 0.5) and `Steel.GENERATOR_CHANCE` 0.002 (planned 0.01), from the generator tuning above. `LiveSteel.ARC_CHANCE` is 0.01 and `Generator.ARC_CHANCE` 0.002.
+- The fuse melts into air (not a flame) when touched by a flame, ember or hot steel, at `Fuse.MELT_CHANCE` 0.03.
+- Acid dissolves live and spent steel (added to Acid's table at the steel chance); the plan listed only steel.
+- Numb water's age rate is 10 (26 steps, planned 12), so shocked plus numb (42 steps) clearly outlasts live steel (32 steps) when arcs also shock water.
+- Live steel's ignition rules are separate, lower-chance rules next to the arc rules (wood 0.004, grass 0.01, charcoal 0.004, bomb 0.1, methane 0.1), as planned.
+- Phase 0 found that stepping stays at a few steps per second on the software GPU even when almost nothing is awake, so a pulse test takes about 45 s. It is `npm run test:pulse`, separate from `test:gpu` (which stays under 10 s), not a `test:gpu` check.
+
+Not done: painting hidden ids was not tried through the picker (the scenes stamp with `stampCells`); the colors and the pool flash were not looked at in a render (`readgrid.mjs --png` was not run); delay element, diode and lightning remain out of scope.
 
 ## The idea
 
@@ -179,8 +207,8 @@ What this means for electricity:
   2. Advance with `readgrid.mjs --session --steps N`, which runs N steps, stops and prints the tile count per element name. `live-steel`, `spent-steel` and `arc` counts over a few reads show a pulse starting, traveling and ending. `--png` draws the grid; it picks the color row from the age byte for types with an `ageRate`, so the aging electric types render correctly.
   3. For the front position, run `eval` with `readGrid()` and find the largest x holding the live type.
   4. Keep the sim stopped between commands (a read after running queues behind unfinished frames).
-- **Step rate decides how long a check takes, and I have two numbers that disagree.** `AGENTS.md` says the software GPU runs at a few steps per second on a full grid. On a 320 x 133 grid with the farmstead world I measured 358 steps in 6 s (about 60 per second), mostly asleep. A 60-cell wire at the planned 0.2 cells/step needs about 300 steps to carry a pulse end to end. Measure on the actual test scene first (phase 1); if a pulse test finishes in about 10 s it could be one `test:gpu` check, and if not it stays a manual protocol.
-- **A possible `test:gpu` check**, only if phase 1 shows it is fast and reliable: stamp a steel wire, light one end, run a fixed number of steps, and assert that the live tile count rose and then returned to zero with the wire fully steel again (the pulse crossed and no tile stayed live or spent). It covers the first thing that would break silently: a refractory stage shorter than live steel makes the pulse bounce forever. The suite's rule applies: break the spent steel age rate once and confirm the check fails before keeping it.
+- **Step rate decides how long a check takes.** I measured two very different rates: about 60 steps per second right after loading the farmstead world while most chunks slept, and only a few steps per second once the world was awake or a whole-grid stamp had woken every chunk (a 60-cell wire pulse took 85 s in the farmstead world). Even in a cleared grid with only a wire awake the software GPU manages roughly 6 steps per second. A sim with nothing awake goes idle and stops stepping, so a loop that waits for a step count must also stop on `perf.idle`.
+- **The `test:gpu` pulse check became `npm run test:pulse`.** It stamps a 31-cell wire into a cleared grid, lights one end, and asserts the pulse reached the far end and the wire is all steel with the sim idle. It takes about 45 s, so it is separate from `test:gpu`. I broke the spent stage once (age rate 255) and it failed as intended.
 - **Not tested by the suite and left to review**: colors, ramps, crackle density, and the shocked-water flash. These need a look at `readgrid.mjs --png` frames.
 - **Start-up caveat seen while preparing this revision**: `session.mjs start` timed out in `settleSim` (30 s) in two runs here, although the page loaded and later `eval` and `status` calls worked. If it happens again, stop the session and check `status` before trusting a read.
 

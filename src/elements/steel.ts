@@ -30,9 +30,9 @@ export class Steel extends Element {
   /** Chance per step that steel touching live steel, a live fuse or shocked water turns live (about 60 * this cells/s along a wire). */
   static PULSE_CHANCE = 0.2;
   /** Chance per step that steel touching an arc turns live. */
-  static ARC_CHANCE = 0.5;
+  static ARC_CHANCE = 0.15;
   /** Chance per step that steel touching a generator turns live. */
-  static GENERATOR_CHANCE = 0.01;
+  static GENERATOR_CHANCE = 0.002;
 
   readonly blastResistance = 0.98;
   readonly reactions: readonly Reaction[] = [
