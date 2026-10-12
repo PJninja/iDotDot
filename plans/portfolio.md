@@ -2,7 +2,7 @@
 
 Goal: list 10-20 projects as cards that live inside the falling-sands world instead of on top of it. A card opens a centered preview window above the sim and then a detail view with text and screenshots.
 
-This file is intent. `AGENTS.md` and the code are the current state. Status: implemented, with the deviations listed under "As built" at the end. The plan itself is written to be easy to scan; the guidelines below apply to what the plan builds (site UI and copy), not to how the plan is written.
+This file is intent. `AGENTS.md` and the code are the current state. Status: implemented, with the deviations listed under "As built" at the end. The board layout (chips in the world, pages, search) was revised by `board-in-world.md`. The plan itself is written to be easy to scan; the guidelines below apply to what the plan builds (site UI and copy), not to how the plan is written.
 
 ## Decisions already made
 

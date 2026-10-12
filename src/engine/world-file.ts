@@ -111,17 +111,43 @@ export function resampleWorld(world: WorldSnapshot, scale: number): WorldSnapsho
   return { width, height, tileCss: world.tileCss / scale, cells };
 }
 
+/** Where a saved world lands on a grid: its resampled size and the offset of its top-left cell. */
+export interface WorldPlacement {
+  /** Source cells per world cell (saved tile size / target tile size; 1 when close enough). */
+  scale: number;
+  width: number;
+  height: number;
+  /** Grid column and row of the placed world's cell (0, 0); negative when it is cropped. */
+  dx: number;
+  dy: number;
+}
+
+/**
+ * Anchor rule shared by `fitWorld` and the portfolio board: resample to the target tile
+ * size, then center horizontally and sit on the bottom edge.
+ */
+export function worldPlacement(
+  world: Pick<WorldSnapshot, 'width' | 'height' | 'tileCss'>,
+  gridWidth: number,
+  gridHeight: number,
+  tileCss: number,
+): WorldPlacement {
+  const ratio = world.tileCss / tileCss;
+  const scale = Math.abs(ratio - 1) < SAME_SCALE_EPSILON ? 1 : ratio;
+  const width = scale === 1 ? world.width : Math.max(1, Math.round(world.width * scale));
+  const height = scale === 1 ? world.height : Math.max(1, Math.round(world.height * scale));
+  return { scale, width, height, dx: Math.floor((gridWidth - width) / 2), dy: gridHeight - height };
+}
+
 /**
  * Fit a saved world onto a grid of the given size and tile size: resample to the target
- * tile size, then anchor it bottom-center, cropping what overflows and leaving air where
- * it falls short.
+ * tile size, then anchor it bottom-center (`worldPlacement`), cropping what overflows and
+ * leaving air where it falls short.
  */
 export function fitWorld(world: WorldSnapshot, width: number, height: number, tileCss: number): Uint32Array {
-  const scale = world.tileCss / tileCss;
-  const source = Math.abs(scale - 1) < SAME_SCALE_EPSILON ? world : resampleWorld(world, scale);
+  const { scale, dx, dy } = worldPlacement(world, width, height, tileCss);
+  const source = scale === 1 ? world : resampleWorld(world, scale);
   const fitted = new Uint32Array(width * height);
-  const dx = Math.floor((width - source.width) / 2);
-  const dy = height - source.height;
   for (let sy = Math.max(0, -dy); sy < source.height; sy++) {
     const y = sy + dy;
     if (y >= height) break;

@@ -1,6 +1,6 @@
 # Board in the world
 
-Goal: the chips stop floating over whichever part of the world happens to be at the top of the window. They sit underground in a fixed place in each world, with the underground scenery built around them, and the title block shrinks to the header. Status: proposal, all open questions answered. `AGENTS.md` and the code are the current state; `plans/portfolio.md` is the plan this revises.
+Goal: the chips stop floating over whichever part of the world happens to be at the top of the window. They sit underground in a fixed place in each world, with the underground scenery built around them, and the title block shrinks to the header. Status: implemented (see As built at the end). `AGENTS.md` and the code are the current state; `plans/portfolio.md` is the plan this revises.
 
 The layout is checked in a static reconstruction (the real DOM, `.idw` worlds and tile-art on a 2D canvas), because the simulation itself could not run where this was written. Row numbers below are world rows (640 x 348 cells, 4 px tiles, anchored bottom-center like every world).
 
@@ -94,3 +94,14 @@ Per world:
 ## Open questions
 
 None. The five questions raised earlier are answered in the decisions table.
+
+## As built
+
+Differences from the plan above:
+
+- **No `<world>.board.json` sidecar.** All three worlds use the same slot geometry, so it lives in one import-free module, `src/worlds/board-slots.ts`, imported by the runtime board and by the scene scripts. A per-world layout can come back as data if a world ever needs different slots.
+- **The narrow layout is two slots** (the middle column of the block), not a separate authored column, so the scenery needs no second slot list. Its gallery is 80 cells wide inside the same corridor. The narrow floor is 320 px wide, and the gallery grows to at least 24 px tall at large tile sizes.
+- **The block is an air hall, not rock.** A stone ring on stone rock had no visible edge, so `boardHall` carves a brick-lined cavity around the whole block and the pipe lattice runs wall to wall inside it. Empty slots are dark niches. The keep-out rule still applies, and `finishBoard` also fails the build if the hall or the gallery leaks into other air.
+- **Pocket choices per world.** Pocket 2 is narrowed to columns 152 to 222 in all three; pocket 3 is a low hall (168 x 41 cells) under the corridor holding the strongroom (lab), machine hall (farm) or reservoir hall (death machine); pocket 4 is narrowed to the east. The death machine moves its stacks west (flue at columns 166 to 173, steam at 199 to 204), moves pocket 4 to column 430, and routes its methane spine along the rock at rows 184 to 190, down columns 418 to 424 and through a tunnel into a reservoir chamber at the east end of the hall; the fuse (steel at row 318) runs from the furnace hall through the rock into the hall.
+- **Drain and duct re-routing.** The lab's greenhouse drain moved east to column 416. The farm's silo bore now ends in a duct at rows 190 to 194 that runs west to the boiler hood, and its field drain runs east along rows 190 to 194 to the well shaft.
+- **Not run.** The scenes were checked with a flood fill for leaks, the keep-out check and static renders, not simulated: the sandbox's software WebGPU loses its device on startup. Each world needs a run in a WebGPU browser, in particular the death machine's fuse and methane chain and the lab's drain into the cistern.

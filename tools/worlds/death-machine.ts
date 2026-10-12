@@ -1,10 +1,14 @@
 import { Grid, T } from '../world-kit.ts';
-import { SURFACE, carvePockets, fillGround, shaft } from './underground.ts';
+import { SURFACE, carvePockets, fillGround, finishBoard, boardHall, galleryCorridor, lined, pipeLattice, shaft } from './underground.ts';
 
 const S = SURFACE;
 /** Row of the middle of the fuse: a steel bar the furnace torches heat; the heat wave runs along it to the gas reservoir. */
-const FUSE_Y = 298;
+const FUSE_Y = 318;
 const SKULL_X = 324;
+/** The methane spine runs along the rock under the soil, down the east side of the chips and into the hall below them. */
+const DUCT_Y = 184;
+const SPINE_X = 418;
+const HALL = { x: 236, y: 296 };
 
 /** Points of an ellipse outline, for brick-patterned polygons. */
 function ellipsePoints(cx: number, cy: number, rx: number, ry: number, n = 72): [number, number][] {
@@ -43,18 +47,18 @@ function fuelYard(g: Grid): void {
   g.rect(106, S - 3, 2, 3, T.ASH);
 }
 
-/** The furnace's flue stack and the boiler's steam stack, both reaching down into the hall below. */
+/** The furnace's flue stack and the boiler's steam stack, both reaching down into the furnace hall left of the chips. */
 function stacks(g: Grid): void {
-  g.bricks(176, 70, 18, S - 69, T.STONE, 8, 4);
-  g.rect(181, 68, 8, S - 66, T.AIR);
-  g.rect(174, 66, 22, 3, T.STEEL);
-  for (let y = 86; y < S - 6; y += 20) g.rect(174, y, 22, 2, T.STEEL);
-  g.bricks(226, 100, 14, S - 99, T.STONE, 7, 4);
-  g.rect(230, 98, 6, S - 96, T.AIR);
-  g.rect(224, 96, 18, 3, T.STEEL);
-  for (let y = 116; y < S - 6; y += 18) g.rect(224, y, 18, 2, T.STEEL);
-  for (let i = 0; i < 20; i++) g.setIfAir(182 + Math.floor(g.rand() * 6), 70 + Math.floor(g.rand() * 50), T.SMOKE);
-  for (let i = 0; i < 40; i++) g.setIfAir(231 + Math.floor(g.rand() * 4), 100 + Math.floor(g.rand() * 56), T.STEAM);
+  g.bricks(161, 70, 18, S - 69, T.STONE, 8, 4);
+  g.rect(166, 68, 8, S - 66, T.AIR);
+  g.rect(159, 66, 22, 3, T.STEEL);
+  for (let y = 86; y < S - 6; y += 20) g.rect(159, y, 22, 2, T.STEEL);
+  g.bricks(195, 100, 14, S - 99, T.STONE, 7, 4);
+  g.rect(199, 98, 6, S - 96, T.AIR);
+  g.rect(193, 96, 18, 3, T.STEEL);
+  for (let y = 116; y < S - 6; y += 18) g.rect(193, y, 18, 2, T.STEEL);
+  for (let i = 0; i < 20; i++) g.setIfAir(167 + Math.floor(g.rand() * 6), 70 + Math.floor(g.rand() * 50), T.SMOKE);
+  for (let i = 0; i < 40; i++) g.setIfAir(200 + Math.floor(g.rand() * 4), 100 + Math.floor(g.rand() * 56), T.STEAM);
 }
 
 /** The skull: a stone head with a methane brain, torch eyes, bomb teeth and flaming horns, on a neck over the spine. */
@@ -193,88 +197,74 @@ function coalBunker(g: Grid): void {
 /** Pocket 2: furnace torches under the fuse bar, a boiler tank resting on it, flue and steam shafts to the surface. */
 function furnaceHall(g: Grid): void {
   const floor = 137;
-  g.bricks(4, 60, 48, floor - 59, T.STONE, 8, 4);
-  g.air(8, 80, 40, 31);
-  for (const x of [12, 20, 28, 36]) g.rect(x, 111, 3, 1, T.TORCH);
-  for (const x of [11, 19, 27, 35]) g.set(x + 1, 110, T.EMBER, { age: 60 });
-  g.rect(24, -22, 8, 84, T.AIR);
+  g.bricks(2, 80, 32, floor - 79, T.STONE, 8, 4);
+  g.air(5, 100, 26, 31);
+  for (const x of [7, 12, 17, 22]) g.rect(x, 131, 3, 1, T.TORCH);
+  for (const x of [8, 13, 18, 23]) g.set(x + 1, 130, T.EMBER, { age: 60 });
+  g.rect(14, -22, 8, 122, T.AIR);
   // the fuse bar: through the flames, under the boiler, out through the wall
-  g.rect(8, 97, 112, 3, T.STEEL);
-  for (let x = 10; x < 44; x++) for (let y = 97; y <= 99; y++) if (g.rand() < 0.7) g.set(x, y, T.HOT_STEEL, { age: Math.floor(g.rand() * 100) });
-  for (let i = 0; i < 16; i++) g.setIfAir(10 + Math.floor(g.rand() * 36), 84 + Math.floor(g.rand() * 10), T.SMOKE);
-  for (let i = 0; i < 6; i++) g.setIfAir(12 + Math.floor(g.rand() * 32), 100 + Math.floor(g.rand() * 8), T.FLAME);
-  for (let i = 0; i < 5; i++) g.setIfAir(14 + Math.floor(g.rand() * 28), 92 + Math.floor(g.rand() * 5), T.SPARK);
+  g.rect(2, 117, 68, 3, T.STEEL);
+  for (let x = 4; x < 30; x++) for (let y = 117; y <= 119; y++) if (g.rand() < 0.7) g.set(x, y, T.HOT_STEEL, { age: Math.floor(g.rand() * 100) });
+  for (let i = 0; i < 16; i++) g.setIfAir(6 + Math.floor(g.rand() * 24), 102 + Math.floor(g.rand() * 10), T.SMOKE);
+  for (let i = 0; i < 6; i++) g.setIfAir(7 + Math.floor(g.rand() * 22), 121 + Math.floor(g.rand() * 8), T.FLAME);
+  for (let i = 0; i < 5; i++) g.setIfAir(8 + Math.floor(g.rand() * 20), 112 + Math.floor(g.rand() * 5), T.SPARK);
   // boiler tank on the bar
-  g.rect(56, 76, 44, 21, T.STEEL);
-  g.rect(59, 79, 38, 15, T.AIR);
-  g.rect(59, 89, 38, 5, T.WATER);
-  g.rect(72, 56, 10, 21, T.STEEL);
-  g.rect(74, 50, 6, 27, T.AIR);
-  for (const vx of [60, 90]) {
-    g.rect(vx, 68, 4, 9, T.STEEL);
-    g.rect(vx + 1, 68, 2, 10, T.AIR);
-    g.rect(vx - 1, 66, 6, 2, T.STEEL);
+  g.rect(36, 96, 30, 21, T.STEEL);
+  g.rect(39, 99, 24, 15, T.AIR);
+  g.rect(39, 109, 24, 5, T.WATER);
+  g.rect(45, 76, 10, 21, T.STEEL);
+  g.rect(47, 70, 6, 27, T.AIR);
+  for (const vx of [38, 60]) {
+    g.rect(vx, 88, 4, 9, T.STEEL);
+    g.rect(vx + 1, 88, 2, 10, T.AIR);
+    g.rect(vx - 1, 86, 6, 2, T.STEEL);
   }
-  for (let i = 0; i < 50; i++) g.setIfAir(60 + Math.floor(g.rand() * 36), 80 + Math.floor(g.rand() * 8), T.STEAM);
-  g.ring(78, 86, 6, 2, T.STEEL);
-  g.line(78, 86, 81, 82, T.STEEL, 1);
-  g.bricks(60, 100, 6, floor - 99, T.STONE, 6, 3);
-  g.bricks(90, 100, 6, floor - 99, T.STONE, 6, 3);
-  // pipes, a spare barrel, rubble
-  g.rect(8, 22, 60, 2, T.STEEL);
-  g.rect(66, 22, 2, 28, T.STEEL);
-  g.vessel(70, floor - 16, 14, 16, 2, T.STEEL, T.WATER, 8);
-  g.poly([[2, floor], [12, floor], [10, floor - 5], [2, floor - 7]], T.RUBBLE);
-  g.scatter(56, floor - 2, 46, 2, T.ASH, 0.15, T.AIR);
+  for (let i = 0; i < 40; i++) g.setIfAir(40 + Math.floor(g.rand() * 22), 100 + Math.floor(g.rand() * 8), T.STEAM);
+  g.ring(50, 106, 5, 2, T.STEEL);
+  g.line(50, 106, 52, 103, T.STEEL, 1);
+  g.bricks(38, 120, 6, floor - 119, T.STONE, 6, 3);
+  g.bricks(58, 120, 6, floor - 119, T.STONE, 6, 3);
+  // steam pipe overhead, ash on the floor
+  g.rect(4, 22, 42, 2, T.STEEL);
+  g.rect(44, 22, 2, 48, T.STEEL);
+  g.scatter(36, floor - 2, 32, 2, T.ASH, 0.15, T.AIR);
 }
 
-/** Pocket 3: the fuse thins to a wire past a wooden hopper of sand, then reaches the methane reservoir over the bomb magazine. */
+/** Pocket 3, the hall under the chips: the fuse thins to a wire past a wooden hopper of sand and reaches the methane reservoir, with the bomb magazine beside it. */
 function reservoirHall(g: Grid): void {
-  const floor = 127;
-  const spineX = SKULL_X - 272;
-  g.rect(-10, 88, 40, 1, T.STEEL);
-  g.rect(-10, 87, 40, 3, T.AIR);
-  g.rect(-10, 88, 46, 1, T.STEEL);
-  // wooden hopper
-  g.rect(6, 60, 24, 3, T.WOOD);
-  g.rect(6, 44, 3, 19, T.WOOD);
-  g.rect(27, 44, 3, 19, T.WOOD);
-  g.rect(6, 63, 3, 24, T.WOOD);
-  g.rect(27, 63, 3, 24, T.WOOD);
-  g.rect(9, 48, 18, 12, T.SAND);
-  // reservoir
-  g.bricks(34, 62, 42, 42, T.STONE, 8, 4);
-  g.air(38, 66, 34, 32);
-  g.rect(34, 87, 6, 3, T.AIR);
-  g.rect(30, 88, 12, 1, T.STEEL);
-  for (let y = 66; y < 98; y++) for (let x = 38; x < 72; x++) g.setIfAir(x, y, T.METHANE);
-  g.rect(spineX - 3, 56, 7, 10, T.AIR);
-  // bomb magazine under the reservoir
-  for (let r = 0; r < 3; r++) g.rect(10, 107 + r * 5, 56, 4, T.BOMB);
-  g.rect(8, floor - 3, 62, 3, T.WOOD);
-  g.poly([[0, floor], [8, floor], [8, floor - 12], [0, floor - 12]], T.WET_SAND);
-  g.stamp(10, 44, SKULL_ART, { '#': T.ICE });
-  g.poly([[60, floor - 15], [74, floor - 15], [74, floor], [62, floor]], T.SAND);
+  const floor = 40;
+  g.rect(0, 21, 66, 3, T.STEEL);
+  // wooden hopper above the wire
+  g.rect(76, 6, 24, 3, T.WOOD);
+  g.rect(76, 0, 3, 21, T.WOOD);
+  g.rect(97, 0, 3, 21, T.WOOD);
+  g.rect(79, 0, 18, 6, T.SAND);
+  // reservoir: a brick chamber filling the right end, fed from the spine through its east wall
+  g.bricks(120, 0, 48, floor + 1, T.STONE, 8, 4);
+  g.air(124, 4, 40, 32);
+  g.rect(120, 21, 4, 3, T.AIR);
+  g.rect(64, 22, 64, 1, T.STEEL);
+  for (let y = 4; y < 36; y++) for (let x = 124; x < 164; x++) g.setIfAir(x, y, T.METHANE);
+  // bomb magazine under the bar, well away from the steel
+  for (let r = 0; r < 3; r++) g.rect(16, 27 + r * 4, 44, 4, T.BOMB);
+  g.rect(14, 39, 48, 2, T.WOOD);
+  g.poly([[0, floor], [8, floor], [8, 28], [0, 28]], T.WET_SAND);
+  g.poly([[64, floor], [76, floor], [76, floor - 12], [68, floor - 12]], T.SAND);
+  g.stamp(24, 8, SKULL_ART, { '#': T.ICE });
 }
 
-/** Pocket 4: acid in glass on a steel frame, a mud neutralizing bed, a coolant spring over a drain basin. */
+/** Pocket 4 (right of the chips): acid in glass on a steel frame over a mud neutralizing bed. */
 function coolantHall(g: Grid): void {
   const floor = 92;
-  g.rect(8, 10, 4, floor - 9, T.STEEL);
-  g.rect(60, 10, 4, floor - 9, T.STEEL);
-  g.line(10, floor - 10, 62, 44, T.STEEL, 1);
-  g.line(62, floor - 10, 10, 44, T.STEEL, 1);
-  g.rect(6, 42, 60, 3, T.STEEL);
-  g.vessel(14, 12, 28, 30, 2, T.ICE, T.ACID, 20);
-  g.vessel(34, 48, 28, 30, 2, T.ICE, T.ACID, 18);
-  g.rect(6, 78, 60, 3, T.STEEL);
-  g.vessel(4, floor - 9, 62, 10, 2, T.STONE, T.MUD, 6);
-  g.pipe([[86, 0], [86, 24]], 3, 1, T.STEEL);
-  g.rect(84, 24, 5, 2, T.STEEL);
-  g.rect(85, 24, 3, 4, T.AIR);
-  for (const x of [85, 86, 87]) g.set(x, 22, T.SPRING);
-  g.vessel(76, floor - 24, 22, 24, 2, T.STEEL, T.WATER, 6);
-  g.rect(86, 40, 1, 24, T.STEEL);
+  g.rect(2, 10, 4, floor - 9, T.STEEL);
+  g.rect(40, 10, 4, floor - 9, T.STEEL);
+  g.line(4, floor - 10, 42, 44, T.STEEL, 1);
+  g.line(42, floor - 10, 4, 44, T.STEEL, 1);
+  g.rect(0, 42, 46, 3, T.STEEL);
+  g.vessel(6, 12, 20, 30, 2, T.ICE, T.ACID, 20);
+  g.vessel(22, 48, 20, 30, 2, T.ICE, T.ACID, 18);
+  g.rect(0, 78, 46, 3, T.STEEL);
+  g.vessel(0, floor - 9, 46, 10, 2, T.STONE, T.MUD, 6);
 }
 
 /** Pocket 5: a conveyor of bombs under a steel press and an overhead crane. */
@@ -322,16 +312,32 @@ export function buildDeathMachine(): Grid {
   acidTower(g);
   depot(g);
   rightYard(g);
-  carvePockets(g, [coalBunker, furnaceHall, reservoirHall, coolantHall, bombLine, acidPit]);
-  // shafts: coal chute, flue and steam stacks, the methane spine down to the reservoir
+  carvePockets(g, [coalBunker, furnaceHall, reservoirHall, coolantHall, bombLine, acidPit], { 3: { x: 430, w: 48 } });
+  // the methane spine: from the skull's neck along the rock above the chips and down their east side
+  const spine: [number, number, number, number][] = [
+    [SKULL_X - 3, S, 7, DUCT_Y + 7 - S],
+    [SKULL_X - 3, DUCT_Y, SPINE_X + 7 - (SKULL_X - 3), 7],
+    [SPINE_X, DUCT_Y, 7, HALL.y + 10 - DUCT_Y],
+  ];
+  lined(g, spine, T.METHANE);
+  // ...then west through a tunnel in the walls of the hall into the reservoir chamber, which the tunnel must open into
+  const tunnelX = HALL.x + 164;
+  g.rect(tunnelX, HALL.y + 2, SPINE_X - tunnelX, 1, T.STONE);
+  g.rect(tunnelX, HALL.y + 10, SPINE_X - tunnelX, 1, T.STONE);
+  g.rect(tunnelX, HALL.y + 3, SPINE_X - tunnelX + 1, 7, T.METHANE);
+  // the fuse bar through the rock between the furnace hall and the hall under the chips
+  g.rect(222, FUSE_Y - 1, 14, 3, T.STEEL);
+  // shafts: coal chute, flue and steam stacks
   shaft(g, 70, S - 4, 6, 205);
   g.rect(70, S - 4, 6, 40, T.CHARCOAL);
-  shaft(g, 156 + 24, 68, 8, 200 + 62);
-  shaft(g, 156 + 74, 98, 6, 200 + 50);
-  shaft(g, SKULL_X - 3, S, 7, 210 + 62);
-  for (let y = S; y < 210 + 62; y += 1) for (let x = SKULL_X - 3; x <= SKULL_X + 3; x++) g.set(x, y, T.METHANE);
-  for (let i = 0; i < 90; i++) g.setIfAir(231 + Math.floor(g.rand() * 5), 120 + Math.floor(g.rand() * 130), T.STEAM);
+  shaft(g, 166, 68, 8, 262);
+  shaft(g, 199, 98, 6, 270);
+  for (let i = 0; i < 90; i++) g.setIfAir(200 + Math.floor(g.rand() * 5), 120 + Math.floor(g.rand() * 130), T.STEAM);
   for (let i = 0; i < 70; i++) g.set(Math.floor(g.rand() * 640), 3 + Math.floor(g.rand() * 100), T.ICE);
-  if (process.env.DM_IGNITE) g.rect(272 + 38, 210 + 87, 8, 3, T.HOT_STEEL);
+  if (process.env.DM_IGNITE) g.rect(HALL.x + 70, FUSE_Y, 8, 3, T.HOT_STEEL);
+  boardHall(g);
+  pipeLattice(g, 196, T.STEEL, T.AIR);
+  galleryCorridor(g);
+  finishBoard(g, 'death-machine');
   return g;
 }

@@ -13,7 +13,8 @@ import { WorldMenu } from './ui/world-menu';
 import { pickDefaultWorld } from './worlds';
 import { MESSAGE_NO_WEBGPU, showGpuErrorDialog } from './ui/gpu-error-dialog';
 import { Board } from './ui/board';
-import { TagFilter } from './ui/tag-filter';
+import { ProjectFilter } from './ui/project-filter';
+import { ContactMenu } from './ui/contact-menu';
 import { ProjectWindow } from './ui/project-window';
 import { ProjectRoute } from './ui/project-route';
 import { ModeControls } from './ui/mode-controls';
@@ -21,7 +22,7 @@ import { PlainView } from './ui/plain-view';
 import { showFirstHint } from './ui/first-hint';
 
 const NOTICE_GPU_FAILED = 'The GPU could not be started, so the simulation cannot run.';
-const NOTICE_TOO_SMALL = 'This window is too small to show every project beside the simulation.';
+const NOTICE_TOO_SMALL = 'This window is too small to show the project board beside the simulation.';
 
 async function main(): Promise<void> {
   const projects = loadProjects();
@@ -67,10 +68,8 @@ async function main(): Promise<void> {
   const overlay = new Overlay('overlay', colliders, world);
 
   // --- Portfolio board ---------------------------------------------------------
-  const board = new Board(world, overlay, registry, projects);
-  const filter = new TagFilter(board.tagBar, projects);
-  filter.onChange = (matching) => board.setLit(matching);
-  board.setLit(filter.matching(), false);
+  const filter = new ProjectFilter(projects);
+  const board = new Board(world, overlay, registry, filter);
   const projectWindow = new ProjectWindow(
     (project) => board.borderElement(project),
     () => world.tileSize,
@@ -83,6 +82,7 @@ async function main(): Promise<void> {
   const loadDefaultWorld = (): void => {
     if (defaultWorld !== null) world.loadWorld(defaultWorld);
   };
+  board.setBase(defaultWorld);
 
   // The simulation yields to the plain page when the chips cannot fit the window.
   let plainForSize = false;
@@ -175,6 +175,7 @@ async function main(): Promise<void> {
   };
 
   const modeControls = new ModeControls(prefs.mode);
+  new ContactMenu(modeControls.links, modeControls.resetLink);
   modeControls.onModeChange = (mode) => savePreferences({ mode });
   modeControls.onReset = resizeWorld;
   if (!prefs.hintSeen) showFirstHint(() => savePreferences({ hintSeen: true }));

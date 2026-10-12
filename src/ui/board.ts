@@ -1,254 +1,269 @@
 import type { ElementRegistry } from '../engine/element';
 import type { GpuSimulation } from '../engine/gpu/gpu-simulation';
+import { fitWorld, type WorldSnapshot } from '../engine/world-file';
 import type { Project } from '../projects/project';
 import { SITE } from '../site';
-import { BOARD_MARGIN, layoutChips, type BoardLayout } from './board-layout';
+import { SETTINGS } from '../settings';
+import { WIDE } from '../worlds/board-slots';
+import { placeBoard, type BoardPlacement, type CellBox } from './board-layout';
+import { Gallery } from './gallery';
 import type { Overlay } from './overlay';
-import { fitRows, hashString, letterCells, ringCells, seededRandom, textMask } from './tile-art';
+import type { ProjectFilter } from './project-filter';
+import { hashString, ringCells, seededRandom } from './tile-art';
 
-const TOP_PX = 16;
-const NAME_PX = 44;
-const TAGLINE_PX = 28;
-const MIN_LETTER_ROWS = 5;
 const CHIP_FILL_MIX = 0.2;
 const BACKGROUND: [number, number, number] = [26, 26, 46];
 
-interface Chip {
-  project: Project;
+interface Slot {
   element: HTMLButtonElement;
-  type: number;
+  icon: HTMLElement;
+  title: HTMLElement;
+  summary: HTMLElement;
+  tags: HTMLElement;
+  /** The project shown in this slot, null when the slot is empty on this page. */
+  project: Project | null;
   lit: boolean;
 }
 
 /**
- * The portfolio laid over the world: one chip per project (a collider ringed with tiles of
- * the project's own material), the name in tile lettering, a contact line and a tag bar.
- * Layout is in whole cells so every DOM edge lands on a cell edge; the tiles themselves
- * are written into the grid by `stamp`, which must run after every grid reset.
+ * The portfolio laid into the world: a block of chip slots in the rock under the surface and
+ * a gallery corridor with the search, tags and pager. Positions come from the shared slot
+ * geometry (`worlds/board-slots.ts`) through the same anchor as the default world, so the
+ * scenery built around the slots lines up at every window size. Each slot is a collider with
+ * a ring of the project's material stamped around it; an empty slot shows the world's own
+ * rock. `stamp` must run after every grid reset.
  */
 export class Board {
-  private readonly chips: Chip[] = [];
-  private readonly heading: HTMLHeadingElement;
-  private readonly contact: HTMLElement;
-  readonly tagBar: HTMLElement;
-  private layout: BoardLayout | null = null;
-  private nameRows = 0;
-  private taglineRows = 0;
+  private readonly slots: Slot[] = [];
+  private readonly gallery: Gallery;
+  private placement: BoardPlacement | null = null;
+  private base: Uint32Array | null = null;
+  private baseKey = '';
+  private baseWorld: WorldSnapshot | null = null;
 
   /** Called when a chip is activated. */
   onOpen: ((project: Project, chip: HTMLElement) => void) | null = null;
 
   constructor(
     private readonly world: GpuSimulation,
-    overlay: Overlay,
+    private readonly overlay: Overlay,
     private readonly registry: ElementRegistry,
-    projects: readonly Project[],
+    private readonly filter: ProjectFilter,
   ) {
-    this.heading = document.createElement('h1');
-    this.heading.className = 'visually-hidden';
-    this.heading.textContent = `${SITE.name}: ${SITE.tagline}`;
-    overlay.add(this.heading);
+    const heading = document.createElement('h1');
+    heading.className = 'visually-hidden';
+    heading.textContent = SITE.name;
+    overlay.add(heading);
 
-    for (const project of projects) {
-      const element = this.createChip(project);
-      overlay.add(element);
-      overlay.registerCollider(element);
-      const type = registry.getByName(project.border)?.type;
-      if (type === undefined) throw new Error(`Project "${project.id}" uses unregistered border "${project.border}"`);
-      this.chips.push({ project, element, type, lit: false });
+    for (let i = 0; i < WIDE.slots.length; i++) {
+      const slot = this.createSlot();
+      slot.element.hidden = true;
+      overlay.add(slot.element);
+      this.slots.push(slot);
     }
 
-    this.contact = this.createContact();
-    overlay.add(this.contact);
-    overlay.registerCollider(this.contact);
+    this.gallery = new Gallery(filter);
+    this.gallery.element.hidden = true;
+    overlay.add(this.gallery.element);
 
-    this.tagBar = document.createElement('div');
-    this.tagBar.className = 'tag-bar';
-    this.tagBar.setAttribute('role', 'group');
-    this.tagBar.setAttribute('aria-label', 'Filter projects by tag');
-    overlay.add(this.tagBar);
-    overlay.registerCollider(this.tagBar);
+    filter.onChange = () => this.refresh();
   }
 
-  private createChip(project: Project): HTMLButtonElement {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'chip';
-    chip.dataset.id = project.id;
-    chip.setAttribute('aria-haspopup', 'dialog');
-    chip.setAttribute('aria-expanded', 'false');
+  private createSlot(): Slot {
+    const element = document.createElement('button');
+    element.type = 'button';
+    element.className = 'chip';
+    element.setAttribute('aria-haspopup', 'dialog');
+    element.setAttribute('aria-expanded', 'false');
 
     const head = document.createElement('span');
     head.className = 'chip-head';
     const icon = document.createElement('span');
     icon.className = 'chip-icon';
-    icon.innerHTML = project.icon;
     const title = document.createElement('span');
     title.className = 'chip-title';
-    title.textContent = project.title;
     head.append(icon, title);
-
     const summary = document.createElement('span');
     summary.className = 'chip-summary';
-    summary.textContent = project.summary;
-
     const tags = document.createElement('span');
     tags.className = 'chip-tags';
-    for (const tag of project.tags) {
-      const word = document.createElement('span');
-      word.textContent = tag;
-      tags.appendChild(word);
-    }
+    element.append(head, summary, tags);
 
-    chip.append(head, summary, tags);
+    const slot: Slot = { element, icon, title, summary, tags, project: null, lit: false };
+    element.addEventListener('click', () => {
+      if (slot.project !== null) this.onOpen?.(slot.project, element);
+    });
+    return slot;
+  }
+
+  /** Fill a slot's text and colors from a project. */
+  private fill(slot: Slot, project: Project): void {
+    slot.project = project;
+    slot.element.dataset.id = project.id;
+    slot.icon.innerHTML = project.icon;
+    slot.title.textContent = project.title;
+    slot.summary.textContent = project.summary;
+    slot.tags.replaceChildren(
+      ...project.tags.map((tag) => {
+        const word = document.createElement('span');
+        word.textContent = tag;
+        return word;
+      }),
+    );
     const [r, g, b] = this.registry.getByName(project.border)?.defaultColor ?? BACKGROUND;
     const mix = (bg: number, c: number): number => Math.round(bg * (1 - CHIP_FILL_MIX) + c * CHIP_FILL_MIX);
-    chip.style.setProperty('--chip-fill', `rgb(${mix(BACKGROUND[0], r)}, ${mix(BACKGROUND[1], g)}, ${mix(BACKGROUND[2], b)})`);
-    chip.addEventListener('click', () => this.onOpen?.(project, chip));
-    return chip;
+    slot.element.style.setProperty('--chip-fill', `rgb(${mix(BACKGROUND[0], r)}, ${mix(BACKGROUND[1], g)}, ${mix(BACKGROUND[2], b)})`);
   }
 
-  private createContact(): HTMLElement {
-    const line = document.createElement('p');
-    line.className = 'contact-line';
-    const add = (node: HTMLElement): void => {
-      line.append(node, ' ');
-    };
-    if (SITE.email !== '') {
-      const email = document.createElement('a');
-      email.href = `mailto:${SITE.email}`;
-      email.textContent = 'Email';
-      email.title = 'Copy the address';
-      email.addEventListener('click', (e) => {
-        e.preventDefault();
-        void navigator.clipboard
-          .writeText(SITE.email)
-          .then(() => {
-            email.textContent = 'Copied';
-            window.setTimeout(() => (email.textContent = 'Email'), 1800);
-          })
-          .catch(() => {
-            window.location.href = `mailto:${SITE.email}`;
-          });
-      });
-      add(email);
-    }
-    for (const [label, href] of [['GitHub', SITE.github], ['Resume', SITE.resume]] as const) {
-      if (href === '') continue;
-      const a = document.createElement('a');
-      a.href = href;
-      a.textContent = label;
-      add(a);
-    }
-    return line;
+  /** Projects per page for the current layout (0 when the board does not fit). */
+  private get pageSize(): number {
+    return this.placement?.chips.length ?? 0;
   }
 
   /**
-   * Position every element on cell edges for the current grid. Returns false when the
-   * chips do not fit (small windows), in which case they are hidden.
+   * Lay the board out for the current grid and window and show the current page. Returns
+   * false when it does not fit (short or very narrow windows), in which case everything is
+   * hidden and the caller shows the plain page.
    */
   place(): boolean {
-    const { tileSize: tile, originY } = this.world;
-    const cells = (px: number): number => Math.max(1, Math.round(px / tile));
-    const rowTop = (row: number): number => originY + row * tile;
-    const rowAtOrBelow = (cssY: number): number => Math.ceil((cssY - originY) / tile - 1e-6);
-
-    const margin = cells(BOARD_MARGIN);
-    const nameRow = rowAtOrBelow(TOP_PX);
-    const availCells = Math.floor(window.innerWidth / tile) - 2 * margin;
-    this.nameRows = fitRows(SITE.name, Math.max(7, cells(NAME_PX)), availCells, MIN_LETTER_ROWS) || MIN_LETTER_ROWS;
-    this.taglineRows = fitRows(SITE.tagline, Math.max(6, cells(TAGLINE_PX)), availCells, MIN_LETTER_ROWS);
-    const taglineRow = nameRow + this.nameRows + cells(8);
-    const taglineSpace = this.taglineRows > 0 ? this.taglineRows + cells(10) : cells(10) - cells(8);
-    const contactRow = taglineRow + taglineSpace;
-
-    const width = Math.max(120, window.innerWidth - 2 * margin * tile);
-    this.contact.style.left = `${margin * tile}px`;
-    this.contact.style.top = `${rowTop(contactRow)}px`;
-    this.contact.style.maxWidth = `${width}px`;
-    const contactRows = Math.ceil(this.contact.offsetHeight / tile);
-
-    const tagRow = contactRow + contactRows + cells(6);
-    this.tagBar.style.left = `${margin * tile}px`;
-    this.tagBar.style.top = `${rowTop(tagRow)}px`;
-    this.tagBar.style.maxWidth = `${width}px`;
-    const tagRows = Math.ceil(this.tagBar.offsetHeight / tile);
-
-    const topRow = tagRow + tagRows + cells(16);
-    this.layout = layoutChips({
-      tile,
-      canvasWidth: window.innerWidth,
+    this.placement = placeBoard({
+      tile: this.world.tileSize,
+      gridWidth: this.world.width,
       gridHeight: this.world.height,
-      topRow,
-      count: this.chips.length,
+      windowWidth: window.innerWidth,
+      windowHeight: window.innerHeight,
+      headerHeight: SETTINGS.HEADER_HEIGHT,
     });
-    for (const [i, chip] of this.chips.entries()) {
-      const box = this.layout?.chips[i];
-      chip.element.hidden = box === undefined;
-      if (box === undefined || this.layout === null) continue;
-      const s = chip.element.style;
-      s.left = `${box.gx * tile}px`;
-      s.top = `${rowTop(box.gy)}px`;
-      s.width = `${box.gw * tile}px`;
-      s.height = `${box.gh * tile}px`;
-      s.setProperty('--chip-scale', String(this.layout.scale));
+    const placement = this.placement;
+    if (placement === null) {
+      for (const slot of this.slots) this.hideSlot(slot);
+      this.setGalleryShown(false);
+      return false;
     }
-    return this.layout !== null;
-  }
 
-  /** Write the name lettering and every chip's ring into the grid (after a grid reset). */
-  stamp(): void {
-    if (this.layout === null || (window as unknown as { __NOSTAMP?: boolean }).__NOSTAMP) return;
-    this.stampLettering();
-    for (const chip of this.chips) this.stampRing(chip);
-  }
-
-  private stampLettering(): void {
     const { tileSize: tile, originY } = this.world;
-    const cells = (px: number): number => Math.max(1, Math.round(px / tile));
-    const margin = cells(BOARD_MARGIN);
-    const nameRow = Math.ceil((TOP_PX - originY) / tile - 1e-6);
-    const random = seededRandom(hashString(SITE.name));
-    const name = textMask(SITE.name, this.nameRows);
-    this.world.stampCells(margin, nameRow, name.width, name.height, letterCells(name, random));
-    if (this.taglineRows === 0) return;
-    const tagline = textMask(SITE.tagline, this.taglineRows);
-    this.world.stampCells(
-      margin,
-      nameRow + this.nameRows + cells(8),
-      tagline.width,
-      tagline.height,
-      letterCells(tagline, random),
-    );
+    const boxStyle = (element: HTMLElement, box: CellBox): void => {
+      element.style.left = `${box.gx * tile}px`;
+      element.style.top = `${originY + box.gy * tile}px`;
+      element.style.width = `${box.gw * tile}px`;
+      element.style.height = `${box.gh * tile}px`;
+    };
+    placement.chips.forEach((box, i) => boxStyle(this.slots[i].element, box));
+    boxStyle(this.gallery.element, placement.gallery);
+    this.gallery.setCompact(placement.mode === 'narrow');
+    this.setGalleryShown(true);
+    this.gallery.render(this.pageSize);
+
+    const items = this.filter.pageItems(this.pageSize);
+    this.slots.forEach((slot, i) => {
+      const project = i < placement.chips.length ? (items[i] ?? null) : null;
+      slot.lit = this.filter.active;
+      if (project === null) this.hideSlot(slot);
+      else this.showSlot(slot, project);
+    });
+    return true;
   }
 
-  private stampRing(chip: Chip): void {
-    const index = this.chips.indexOf(chip);
-    const box = this.layout?.chips[index];
-    if (box === undefined || this.layout === null) return;
-    const t = this.layout.ring;
+  private showSlot(slot: Slot, project: Project): void {
+    this.fill(slot, project);
+    slot.element.hidden = false;
+    this.overlay.registerCollider(slot.element);
+  }
+
+  private hideSlot(slot: Slot): void {
+    slot.project = null;
+    slot.element.hidden = true;
+    this.overlay.unregisterCollider(slot.element);
+  }
+
+  private setGalleryShown(shown: boolean): void {
+    this.gallery.element.hidden = !shown;
+    if (shown) this.overlay.registerCollider(this.gallery.element);
+    else this.overlay.unregisterCollider(this.gallery.element);
+  }
+
+  /** The world the slots' empty rock is restored from; null when the grid starts empty. */
+  setBase(world: WorldSnapshot | null): void {
+    this.baseWorld = world;
+    this.baseKey = '';
+  }
+
+  /** Cells of the default world on the current grid, cached until the grid or tile size changes. */
+  private baseCells(): Uint32Array | null {
+    if (this.baseWorld === null) return null;
+    const key = `${this.world.width}x${this.world.height}@${this.world.tileSize}`;
+    if (key !== this.baseKey || this.base === null) {
+      this.base = fitWorld(this.baseWorld, this.world.width, this.world.height, this.world.tileSize);
+      this.baseKey = key;
+    }
+    return this.base;
+  }
+
+  /** Write every slot's ring or empty rock into the grid (after a grid reset). */
+  stamp(): void {
+    for (let i = 0; i < this.pageSize; i++) this.stampSlot(i);
+  }
+
+  /** Ring around a shown chip (the interior is cleared), or the world's own cells for an empty slot. */
+  private stampSlot(index: number): void {
+    const placement = this.placement;
+    const box = placement?.chips[index];
+    if (placement === null || box === undefined) return;
+    const slot = this.slots[index];
+    const t = placement.ring;
+    const x = box.gx - t;
+    const y = box.gy - t;
     const w = box.gw + 2 * t;
     const h = box.gh + 2 * t;
-    const random = seededRandom(hashString(chip.project.id));
-    this.world.stampCells(box.gx - t, box.gy - t, w, h, ringCells(w, h, t, chip.type, chip.lit, random));
+    if (slot.project === null) {
+      this.world.stampCells(x, y, w, h, this.restoreCells(x, y, w, h));
+      return;
+    }
+    const type = this.registry.getByName(slot.project.border)?.type;
+    if (type === undefined) throw new Error(`Project "${slot.project.id}" uses unregistered border "${slot.project.border}"`);
+    const random = seededRandom(hashString(slot.project.id));
+    this.world.stampCells(x, y, w, h, ringCells(w, h, t, type, slot.lit, random));
+  }
+
+  private restoreCells(x: number, y: number, w: number, h: number): Uint32Array {
+    const words = new Uint32Array(w * h);
+    const base = this.baseCells();
+    if (base === null) return words;
+    for (let row = 0; row < h; row++) {
+      const gy = y + row;
+      if (gy < 0 || gy >= this.world.height) continue;
+      for (let col = 0; col < w; col++) {
+        const gx = x + col;
+        if (gx >= 0 && gx < this.world.width) words[row * w + col] = base[gy * this.world.width + gx];
+      }
+    }
+    return words;
   }
 
   /**
-   * Light the rings of the projects in `lit` (null = none) and restore the others. With
-   * `restamp` false only the state changes, for use before `stamp` writes the whole board.
+   * Show the page the filter now selects: update the chips that changed, restamp only their
+   * slots, and redraw the gallery. Called on every search, tag or page change.
    */
-  setLit(lit: ReadonlySet<string> | null, restamp = true): void {
-    for (const chip of this.chips) {
-      const next = lit?.has(chip.project.id) ?? false;
-      if (next === chip.lit) continue;
-      chip.lit = next;
-      if (restamp) this.stampRing(chip);
+  private refresh(): void {
+    const placement = this.placement;
+    if (placement === null) return;
+    this.gallery.render(this.pageSize);
+    const items = this.filter.pageItems(this.pageSize);
+    const lit = this.filter.active;
+    for (const [i, slot] of this.slots.entries()) {
+      if (i >= placement.chips.length) continue;
+      const project = items[i] ?? null;
+      if (project === slot.project && lit === slot.lit) continue;
+      slot.lit = lit;
+      if (project === null) this.hideSlot(slot);
+      else this.showSlot(slot, project);
+      this.stampSlot(i);
     }
   }
 
-  /** The chip element for a project id, if the board has one. */
+  /** The chip element for a project id, if it is on the current page. */
   chipFor(id: string): HTMLElement | null {
-    return this.chips.find((c) => c.project.id === id)?.element ?? null;
+    return this.slots.find((s) => s.project?.id === id)?.element ?? null;
   }
 
   /** Material colors of a project's ring, used for the preview window frame. */

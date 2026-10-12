@@ -1,5 +1,6 @@
 import { Grid, T } from '../world-kit.ts';
-import { POCKETS, shaft } from './underground.ts';
+import { BLOCK } from '../../src/worlds/board-slots.ts';
+import { POCKETS, finishBoard, boardHall, galleryCorridor, lined, pipeLattice, shaft } from './underground.ts';
 
 const W = 640;
 const H = 348;
@@ -199,15 +200,39 @@ export function buildFarmstead(): Grid {
     g.air(c.x, c.y, c.w, c.h);
   }
   for (const c of CHAMBERS) g.at(c.x, c.y, () => c.draw(g));
-  // shafts: the silo bore down to the boiler hall's hood, the field drain and the well down to the cistern
-  shaft(g, 243, 142, 6, 212);
-  shaft(g, 368, 174, 5, 246);
+  // pipes: the heat pipe from the boiler pan to the machine hall, in the rock between the two
+  g.rect(207, 304, 30, 3, T.STEEL);
+  // shafts: the silo bore and a duct west to the boiler hood, the field drain along the rock to the well, the well down to the cistern
+  lined(g, [[191, 190, 58, 5]]);
+  lined(g, [[368, 190, 53, 5]]);
+  shaft(g, 243, 142, 6, 195);
+  shaft(g, 368, 174, 5, 196);
   shaft(g, 418, 160, 4, 246);
   shaft(g, 618, 142, 3, 242);
-  for (let i = 0; i < 90; i++) g.setIfAir(243 + Math.floor(g.rand() * 6), 150 + Math.floor(g.rand() * 60), T.STEAM);
+  for (let i = 0; i < 70; i++) g.setIfAir(243 + Math.floor(g.rand() * 6), 150 + Math.floor(g.rand() * 40), T.STEAM);
+  for (let i = 0; i < 40; i++) g.setIfAir(195 + Math.floor(g.rand() * 50), 190 + Math.floor(g.rand() * 4), T.STEAM);
   for (let i = 0; i < 40; i++) g.setIfAir(241 + Math.floor(g.rand() * 10), 86 + Math.floor(g.rand() * 56), T.STEAM);
   for (let i = 0; i < 40; i++) g.setIfAir(618 + Math.floor(g.rand() * 3), 150 + Math.floor(g.rand() * 90), T.METHANE);
+  boardWeave(g);
+  finishBoard(g, 'farmstead');
   return g;
+}
+
+/** Roots from the orchard soil, mine drifts with timber braces between the chips, ore in the rock above them, the gallery corridor. */
+function boardWeave(g: Grid): void {
+  for (let x = BLOCK.x + 6; x < BLOCK.x + BLOCK.w; x += 9) {
+    let rx = x + Math.floor(g.rand() * 5);
+    const depth = 176 + Math.floor(g.rand() * 12);
+    for (let y = 170; y < depth; y++) {
+      if (g.rand() < 0.3) rx += g.rand() < 0.5 ? -1 : 1;
+      if (g.typeAt(rx, y) === T.STONE || g.typeAt(rx, y) === T.DIRT) g.set(rx, y, T.WOOD);
+    }
+  }
+  for (const [x, y] of [[262, 182], [300, 184], [340, 181], [384, 184]]) g.ellipse(x, y, 4, 2.5, T.STEEL);
+  boardHall(g);
+  pipeLattice(g, 196, T.STONE, T.AIR);
+  for (const x of [BLOCK.x + 56, BLOCK.x + 120]) for (let y = 206; y < 270; y += 14) g.rect(x + 1, y, 4, 1, T.WOOD);
+  galleryCorridor(g);
 }
 
 /** Crop rows on mud ridges, a drain pit at the low end, a well and a scarecrow. */
@@ -329,45 +354,37 @@ export interface Room {
   draw: (g: Grid) => void;
 }
 
-/** Boiler hall: a spring-fed pan over torches boils water; steam rises up the silo shaft. */
+/** Boiler hall (pocket 2): a spring-fed pan over torches boils water; steam rises through a duct to the silo's bore. */
 function boilerHall(g: Grid): void {
   const floor = 137;
-  // steam pipe through the hall, shaft through the rock above
-  g.rect(85, 0, 10, 82, T.STEEL);
   // furnace plinth, firebox and torches
-  g.bricks(74, floor - 25, 32, 26, T.STONE, 8, 3);
-  g.air(78, floor - 29, 25, 17);
-  for (const x of [80, 87, 94]) g.rect(x, floor - 12, 3, 1, T.TORCH);
+  g.bricks(26, floor - 25, 32, 26, T.STONE, 8, 3);
+  g.air(30, floor - 29, 25, 17);
+  for (const x of [32, 39, 46]) g.rect(x, floor - 12, 3, 1, T.TORCH);
   // pan: steel plate with water on top, spillway on the left
-  g.rect(74, 104, 32, 4, T.STEEL);
-  g.rect(74, 101, 4, 4, T.STEEL);
-  for (let i = 0; i < 24; i++) g.set(80 + Math.floor(g.rand() * 22), 104 + Math.floor(g.rand() * 3), T.HOT_STEEL, { age: Math.floor(g.rand() * 60) });
-  g.rect(103, 94, 3, 14, T.STEEL);
-  g.rect(78, 101, 25, 3, T.WATER);
-  // hood and feed pipe
-  g.poly([[72, 95], [107, 95], [95, 80], [84, 80]], T.STEEL);
-  g.poly([[76, 94], [103, 94], [93, 82], [86, 82]], T.AIR);
-  g.rect(85, 76, 10, 6, T.STEEL);
-  g.rect(87, -42, 6, 124, T.AIR);
-  g.rect(79, 2, 5, 3, T.STEEL);
-  g.pipe([[81, 5], [81, 98]], 3, 1, T.STEEL);
-  g.rect(80, 4, 3, 1, T.SPRING);
-  // sump basin for the spillway
-  g.vessel(46, 106, 28, floor - 105, 2, T.STONE, T.WATER, 4);
-  // flywheel with a crank, a coal bunker, chains from the vault
-  g.gear(22, 92, 24, 18, T.STEEL, 8);
-  g.gear(22, 92, 8, 8, T.STEEL, 4);
-  g.line(22, 92, 40, 118, T.STEEL, 2);
-  g.rect(36, 112, 18, 3, T.STEEL);
-  g.rect(36, 112, 3, 25, T.STEEL);
-  g.poly([[2, floor], [30, floor], [24, floor - 14], [8, floor - 14]], T.CHARCOAL);
-  g.bricks(0, floor - 16, 36, 3, T.STONE, 6, 3);
+  g.rect(26, 104, 32, 4, T.STEEL);
+  g.rect(26, 101, 4, 4, T.STEEL);
+  for (let i = 0; i < 24; i++) g.set(32 + Math.floor(g.rand() * 22), 104 + Math.floor(g.rand() * 3), T.HOT_STEEL, { age: Math.floor(g.rand() * 60) });
+  g.rect(55, 94, 3, 14, T.STEEL);
+  g.rect(30, 101, 25, 3, T.WATER);
+  // hood, neck and the duct up through the rock, and the feed pipe
+  g.poly([[24, 95], [59, 95], [47, 80], [36, 80]], T.STEEL);
+  g.poly([[28, 94], [55, 94], [45, 82], [38, 82]], T.AIR);
+  g.rect(37, 76, 10, 6, T.STEEL);
+  g.rect(39, -10, 6, 92, T.AIR);
+  g.rect(31, 2, 5, 3, T.STEEL);
+  g.pipe([[33, 5], [33, 98]], 3, 1, T.STEEL);
+  g.rect(32, 4, 3, 1, T.SPRING);
+  // sump basin for the spillway, a small flywheel, a heap of coal
+  g.vessel(0, 106, 26, floor - 105, 2, T.STONE, T.WATER, 4);
+  g.gear(12, 80, 10, 10, T.STEEL, 6);
+  g.gear(12, 80, 4, 6, T.STEEL, 4);
+  g.poly([[60, floor], [69, floor], [66, floor - 7], [62, floor - 7]], T.CHARCOAL);
   for (const x of [10, 24, 54, 66]) {
     for (let y = 0; y < 20; y += 3) g.rect(x, y, 1, 2, T.STEEL);
   }
   g.scatter(0, 0, 70, 6, T.MOLD, 0.05, T.AIR);
-  g.scatter(40, floor - 3, 30, 3, T.RUBBLE, 0.2, T.AIR);
-  for (let i = 0; i < 80; i++) g.setIfAir(87 + Math.floor(g.rand() * 6), -Math.floor(g.rand() * 44), T.STEAM);
+  g.scatter(36, floor - 3, 30, 3, T.RUBBLE, 0.2, T.AIR);
 }
 
 /** Ice house with hay between the blocks, jars on shelves, roots from the orchard, and a rotting crate gallery. */
@@ -417,65 +434,50 @@ function cellar(g: Grid): void {
   for (let i = 0; i < 20; i++) g.setIfAir(96 + Math.floor(g.rand() * 28), Math.floor(g.rand() * 8), T.METHANE);
 }
 
-/** Flooded cistern: pillars in deep water, a spring gargoyle, the field drain and the well drop in. */
+/** Flooded cistern (pocket 4): pillars in deep water; the field drain and the well drop in through the open left bay. */
 function cistern(g: Grid): void {
   const floor = 92;
-  g.rect(0, 30, 102, floor - 29, T.WATER);
-  for (const x of [18, 36, 74, 90]) g.bricks(x, 0, 6, floor + 1, T.STONE, 6, 3);
-  for (const x of [18, 36, 74, 90]) g.rect(x, 30, 6, floor - 29, T.STONE);
-  g.rect(6, 0, 4, 4, T.STONE);
-  // arches of the vault
-  for (let i = 0; i < 3; i++) {
-    const cx = [27, 55, 82][i];
-    g.ring(cx, 0, 13, 3, T.STONE);
-  }
-  // gargoyle spout on a ledge and its waterfall
-  g.bricks(92, 6, 10, 6, T.STONE, 5, 3);
-  g.set(91, 9, T.SPRING);
-  g.set(91, 8, T.SPRING);
-  g.set(91, 10, T.SPRING);
-  g.rect(92, 6, 1, 2, T.AIR);
+  g.rect(0, 30, 62, floor - 29, T.WATER);
+  for (const x of [18, 40]) g.bricks(x, 0, 6, floor + 1, T.STONE, 6, 3);
+  for (const x of [18, 40]) g.rect(x, 30, 6, floor - 29, T.STONE);
+  for (const cx of [31, 53]) g.ring(cx, 0, 10, 3, T.STONE);
   // treasure chest and an anchor on the bed
-  g.rect(40, floor - 6, 12, 6, T.WOOD);
-  g.rect(40, floor - 4, 12, 1, T.STEEL);
-  g.rect(45, floor - 8, 2, 2, T.STEEL);
-  g.line(60, floor - 14, 60, floor, T.STEEL, 1);
-  g.line(55, floor - 12, 65, floor - 12, T.STEEL, 1);
-  g.line(55, floor - 2, 60, floor, T.STEEL, 1);
-  g.line(65, floor - 2, 60, floor, T.STEEL, 1);
-  g.scatter(24, floor - 2, 12, 3, T.ASH, 0.6, T.WATER);
+  g.rect(24, floor - 6, 12, 6, T.WOOD);
+  g.rect(24, floor - 4, 12, 1, T.STEEL);
+  g.rect(29, floor - 8, 2, 2, T.STEEL);
+  g.line(52, floor - 14, 52, floor, T.STEEL, 1);
+  g.line(47, floor - 12, 57, floor - 12, T.STEEL, 1);
+  g.line(47, floor - 2, 52, floor, T.STEEL, 1);
+  g.line(57, floor - 2, 52, floor, T.STEEL, 1);
+  g.scatter(2, floor - 2, 14, 3, T.ASH, 0.6, T.WATER);
   // moss on the pillars above the water
   g.scatter(18, 20, 6, 10, T.MOLD, 0.3, T.STONE);
-  g.scatter(74, 20, 6, 10, T.MOLD, 0.3, T.STONE);
+  g.scatter(40, 20, 6, 10, T.MOLD, 0.3, T.STONE);
 }
 
-/** Machine floor: gears driven by a heat pipe from the boiler, a bomb press line, mold and rubble. */
-function machineFloor(g: Grid): void {
-  const floor = 127;
-  // heat pipe from the boiler pan through the wall, along the floor and up to the gears
-  g.rect(-10, 94, 52, 3, T.STEEL);
-  g.rect(40, 94, 3, 33, T.STEEL);
-  g.rect(40, floor - 2, 36, 3, T.STEEL);
-  g.rect(72, floor - 40, 3, 40, T.STEEL);
+/** Machine hall (pocket 3, under the chips): gears driven by a heat pipe from the boiler pan, a bomb press line, mold and rubble. */
+function machineHall(g: Grid): void {
+  const floor = 40;
+  // heat pipe in from the boiler hall through the rock, down to the floor and along it
+  g.rect(0, 8, 46, 3, T.STEEL);
+  g.rect(44, 8, 3, 30, T.STEEL);
+  g.rect(44, floor - 3, 22, 3, T.STEEL);
   // gear train hung off the pipe
-  g.gear(22, 70, 16, 12, T.STEEL, 6);
-  g.gear(52, 54, 12, 10, T.STEEL, 4);
-  g.gear(60, 82, 9, 8, T.STEEL, 4);
-  g.rect(22, 70, 1, 24, T.STEEL);
-  g.rect(52, 54, 1, 3, T.STEEL);
+  g.gear(24, 24, 12, 10, T.STEEL, 6);
+  g.gear(60, 18, 9, 8, T.STEEL, 4);
   // bomb press line on a stone conveyor, well away from the steel
-  g.rect(4, floor - 14, 36, 3, T.STONE);
-  for (let i = 0; i < 4; i++) g.rect(6 + i * 9, floor - 18, 5, 4, T.BOMB);
-  g.rect(4, floor - 11, 3, 12, T.STONE);
-  g.rect(37, floor - 11, 3, 12, T.STONE);
+  g.rect(92, floor - 14, 36, 3, T.STONE);
+  for (let i = 0; i < 4; i++) g.rect(94 + i * 9, floor - 18, 5, 4, T.BOMB);
+  g.rect(92, floor - 11, 3, 12, T.STONE);
+  g.rect(125, floor - 11, 3, 12, T.STONE);
   // mold-eaten catwalk, rubble and ash
-  g.rect(46, 34, 28, 2, T.WOOD);
-  g.rect(46, 36, 2, 20, T.WOOD);
-  g.scatter(46, 30, 28, 6, T.MOLD, 0.2, T.WOOD);
-  g.poly([[0, floor], [18, floor], [12, floor - 8], [4, floor - 12], [0, floor - 12]], T.RUBBLE);
-  g.poly([[50, floor - 4], [70, floor - 4], [66, floor - 10], [54, floor - 10]], T.RUBBLE);
-  g.scatter(0, floor - 1, 76, 2, T.ASH, 0.2, T.AIR);
-  for (let i = 0; i < 14; i++) g.setIfAir(8 + Math.floor(g.rand() * 56), Math.floor(g.rand() * 6), T.METHANE);
+  g.rect(136, 10, 28, 2, T.WOOD);
+  g.rect(136, 12, 2, 20, T.WOOD);
+  g.scatter(136, 6, 28, 6, T.MOLD, 0.2, T.WOOD);
+  g.poly([[0, floor], [14, floor], [10, floor - 6], [4, floor - 9], [0, floor - 9]], T.RUBBLE);
+  g.poly([[140, floor - 3], [162, floor - 3], [158, floor - 8], [144, floor - 8]], T.RUBBLE);
+  g.scatter(0, floor - 1, 168, 2, T.ASH, 0.15, T.AIR);
+  for (let i = 0; i < 12; i++) g.setIfAir(100 + Math.floor(g.rand() * 56), Math.floor(g.rand() * 4), T.METHANE);
 }
 
 /** Acid vat in a stone tank slowly eating its own wall, a mud gutter, a steel catwalk and a ladder. */
@@ -559,15 +561,15 @@ function bunker(g: Grid): void {
 }
 
 export const ROOMS: Record<string, Room> = {
-  boilerHall: { w: 106, h: 138, pad: 44, draw: boilerHall },
+  boilerHall: { w: 70, h: 138, pad: 10, draw: boilerHall },
   cellar: { w: 126, h: 133, draw: cellar },
-  cistern: { w: 102, h: 93, draw: cistern },
-  machineFloor: { w: 76, h: 128, draw: machineFloor },
+  cistern: { w: 62, h: 93, draw: cistern },
+  machineHall: { w: 168, h: 41, draw: machineHall },
   vatRoom: { w: 70, h: 113, draw: vatRoom },
   bunker: { w: 64, h: 98, pad: 100, draw: bunker },
 };
 
 const CHAMBERS = POCKETS.map((p, i) => ({
   ...p,
-  draw: [cellar, boilerHall, machineFloor, cistern, vatRoom, bunker][i],
+  draw: [cellar, boilerHall, machineHall, cistern, vatRoom, bunker][i],
 }));

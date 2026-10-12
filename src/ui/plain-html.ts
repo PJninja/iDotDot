@@ -65,7 +65,7 @@ export function renderPlainHtml(projects: readonly Project[], site: typeof SITE,
   return (
     '<header class="plain-header">' +
     (options.notice ? `<p class="plain-notice">${escapeHtml(options.notice)}</p>` : '') +
-    `<h1>${escapeHtml(site.name)}</h1><p>${escapeHtml(site.tagline)}</p>` +
+    `<h1>${escapeHtml(site.name)}</h1>` +
     (contact ? `<p class="plain-links">${contact}</p>` : '') +
     '</header><main>' +
     projects.map((p) => renderProject(p, options.media)).join('') +

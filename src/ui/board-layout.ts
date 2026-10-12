@@ -1,76 +1,90 @@
-/** Geometry of the chip board, in grid cells. Pure, so it can be checked without a browser. */
-export interface ChipBox {
-  /** Interior (the collider); the ring sits `ring` cells outside it. */
+import { worldPlacement } from '../engine/world-file';
+import {
+  MIN_CANVAS_HEIGHT,
+  NARROW,
+  NARROW_MIN_WIDTH,
+  RING_CELLS,
+  WIDE,
+  WIDE_MIN_WIDTH,
+  WORLD_CELLS,
+  footprint,
+  type BoardGeometry,
+  type CellRect,
+} from '../worlds/board-slots';
+
+/** A rectangle of grid cells. */
+export interface CellBox {
   gx: number;
   gy: number;
   gw: number;
   gh: number;
 }
 
-export interface BoardLayout {
-  chips: ChipBox[];
+/** Shortest gallery, in CSS px: one line of 13px text with room for its underline. */
+const GALLERY_MIN_PX = 24;
+
+export type BoardMode = 'wide' | 'narrow';
+
+export interface BoardPlacement {
+  mode: BoardMode;
+  /** Chip interiors (the colliders); the ring sits `ring` cells outside each. */
+  chips: CellBox[];
+  /** Interior of the gallery corridor. */
+  gallery: CellBox;
   /** Ring thickness in cells. */
   ring: number;
-  /** Shrink factor applied to the ideal chip size, used to scale chip text. */
-  scale: number;
 }
 
-export interface BoardLayoutInput {
+export interface PlacementInput {
   /** CSS px per cell. */
   tile: number;
-  /** Visible canvas width in CSS px. */
-  canvasWidth: number;
-  /** Grid size in cells; the grid is anchored to the canvas bottom. */
+  gridWidth: number;
   gridHeight: number;
-  /** First grid row chips may occupy. */
-  topRow: number;
-  count: number;
+  /** Window size in CSS px. */
+  windowWidth: number;
+  windowHeight: number;
+  /** Height of the header above the canvas in CSS px. */
+  headerHeight: number;
 }
 
-const IDEAL_WIDTH = 200;
-const IDEAL_HEIGHT = 108;
-const MIN_SCALE = 0.8;
-const SCALE_STEP = 0.05;
-
-/** Margin, in CSS px, kept around the board and between rings. */
-export const BOARD_MARGIN = 24;
-const RING_PX = 8;
-const GAP_PX = 20;
-
 /**
- * Place `count` chips in a left-aligned grid of whole cells. Chips shrink from their ideal
- * size down to MIN_SCALE until every row fits above the bottom margin; null means they do
- * not fit at all (small windows), and the caller shows the plain page instead.
+ * Place the board for the current window: the wide block (six slots) from `WIDE_MIN_WIDTH`,
+ * the narrow column (two slots) below it. Slots are world cells mapped through the same
+ * bottom-center anchor as the default world, so a chip stays on the same patch of rock at
+ * every window size. Null when the canvas is shorter than `MIN_CANVAS_HEIGHT`, narrower than
+ * the narrow layout, or the board would fall outside the visible grid; the caller then
+ * shows the plain page.
  */
-export function layoutChips(input: BoardLayoutInput): BoardLayout | null {
-  const { tile, count } = input;
-  const cells = (px: number): number => Math.max(1, Math.round(px / tile));
-  const ring = cells(RING_PX);
-  const margin = cells(BOARD_MARGIN);
-  const gap = Math.max(cells(GAP_PX), 2);
-  const availWidth = Math.floor(input.canvasWidth / tile) - 2 * margin;
-  const availHeight = input.gridHeight - margin - input.topRow;
-  if (count === 0) return { chips: [], ring, scale: 1 };
+export function placeBoard(input: PlacementInput): BoardPlacement | null {
+  if (input.windowHeight - input.headerHeight < MIN_CANVAS_HEIGHT) return null;
+  if (input.windowWidth < NARROW_MIN_WIDTH) return null;
+  const mode: BoardMode = input.windowWidth >= WIDE_MIN_WIDTH ? 'wide' : 'narrow';
+  const geometry: BoardGeometry = mode === 'wide' ? WIDE : NARROW;
 
-  for (let scale = 1; scale >= MIN_SCALE - 1e-9; scale -= SCALE_STEP) {
-    const gw = cells(IDEAL_WIDTH * scale);
-    const gh = cells(IDEAL_HEIGHT * scale);
-    const footW = gw + 2 * ring;
-    const footH = gh + 2 * ring;
-    if (footW > availWidth) continue;
-    const cols = Math.min(count, Math.max(1, Math.floor((availWidth + gap) / (footW + gap))));
-    const rows = Math.ceil(count / cols);
-    if (rows * footH + (rows - 1) * gap > availHeight) continue;
-    const chips: ChipBox[] = [];
-    for (let i = 0; i < count; i++) {
-      chips.push({
-        gx: margin + ring + (i % cols) * (footW + gap),
-        gy: input.topRow + ring + Math.floor(i / cols) * (footH + gap),
-        gw,
-        gh,
-      });
-    }
-    return { chips, ring, scale };
+  const { tile, gridWidth, gridHeight } = input;
+  const at = worldPlacement(WORLD_CELLS, gridWidth, gridHeight, tile);
+  const ring = Math.max(1, Math.round(RING_CELLS * at.scale));
+  // Round inward so a mapped box never covers a cell the authored box did not.
+  const map = (r: CellRect): CellBox => {
+    const x0 = Math.ceil(r.x * at.scale) + at.dx;
+    const y0 = Math.ceil(r.y * at.scale) + at.dy;
+    return {
+      gx: x0,
+      gy: y0,
+      gw: Math.floor((r.x + r.w) * at.scale) + at.dx - x0,
+      gh: Math.floor((r.y + r.h) * at.scale) + at.dy - y0,
+    };
+  };
+
+  const chips = geometry.slots.map(map);
+  const gallery = map(geometry.gallery);
+  // Large tiles make the corridor shorter than one line of text; grow it down into the lining.
+  gallery.gh = Math.max(gallery.gh, Math.ceil(GALLERY_MIN_PX / tile));
+  const visibleColumns = Math.floor(input.windowWidth / tile);
+  const boxes = [...geometry.slots.map((s) => footprint(s)), geometry.gallery].map(map);
+  for (const box of boxes) {
+    const inside = box.gx >= 0 && box.gy >= 0 && box.gx + box.gw <= Math.min(gridWidth, visibleColumns) && box.gy + box.gh <= gridHeight;
+    if (!inside || box.gw < 1 || box.gh < 1) return null;
   }
-  return null;
+  return { mode, chips, gallery, ring };
 }

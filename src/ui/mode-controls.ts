@@ -10,6 +10,9 @@ type Mode = Preferences['mode'];
  */
 export class ModeControls {
   private readonly buttons = new Map<Mode, HTMLButtonElement>();
+  /** The Reset world link, which the contact menu is inserted before. */
+  readonly resetLink = document.createElement('button');
+  readonly links = document.createElement('div');
 
   /** Called when the visitor switches mode. */
   onModeChange: ((mode: Mode) => void) | null = null;
@@ -21,7 +24,7 @@ export class ModeControls {
     const actions = document.querySelector('#header .header-actions');
     if (nav === null || actions === null) throw new Error('#header nav not found');
 
-    const links = document.createElement('div');
+    const links = this.links;
     links.className = 'header-links';
 
     const group = document.createElement('div');
@@ -38,7 +41,7 @@ export class ModeControls {
       group.appendChild(button);
     }
 
-    const reset = document.createElement('button');
+    const reset = this.resetLink;
     reset.type = 'button';
     reset.className = 'header-link';
     reset.textContent = 'Reset world';

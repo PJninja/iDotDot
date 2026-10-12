@@ -532,34 +532,6 @@ html[data-mode='portfolio'] .world-message {
   background: currentColor;
 }
 
-.contact-line {
-  position: absolute;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 18px;
-  font-size: 14px;
-  line-height: 20px;
-}
-
-.contact-line a {
-  color: #e8e8f0;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
-.tag-bar {
-  position: absolute;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.tag-bar[hidden] {
-  display: none;
-}
-
 .tag-word,
 .tag-clear {
   padding: 0;
@@ -586,6 +558,150 @@ html[data-mode='portfolio'] .world-message {
 
 .tag-clear[hidden] {
   display: none;
+}
+
+/* The corridor under the chips: search, tag words and pager on one line. */
+.gallery {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 20px;
+  color: #9a9ab0;
+  white-space: nowrap;
+}
+
+.gallery[hidden],
+.gallery-pager[hidden],
+.gallery-empty[hidden] {
+  display: none;
+}
+
+.gallery-search {
+  flex: none;
+  width: 120px;
+  padding: 2px 0 3px;
+  font: inherit;
+  color: #e8e8f0;
+  background: linear-gradient(#5a5a78, #5a5a78) bottom / 100% 2px no-repeat;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.gallery-search:focus {
+  background-image: linear-gradient(#f4c44a, #f4c44a);
+}
+
+.gallery-search::placeholder {
+  color: #9a9ab0;
+  opacity: 1;
+}
+
+.gallery-tags {
+  display: flex;
+  flex: 1;
+  gap: 14px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.gallery.is-compact .gallery-tags {
+  display: none;
+}
+
+.gallery-empty {
+  flex: 1;
+}
+
+.gallery-pager {
+  display: flex;
+  flex: none;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.gallery-step {
+  padding: 0;
+  font: inherit;
+  color: #e8e8f0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.gallery-step:disabled {
+  color: #5a5a78;
+  cursor: default;
+}
+
+.gallery-step:focus-visible,
+.contact-item:focus-visible {
+  outline: 2px solid #e8e8f0;
+  outline-offset: 3px;
+}
+
+/* Contact word in the header and the list of links under it. */
+.contact-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.contact-button::after {
+  display: inline-block;
+  width: 9px;
+  height: 5px;
+  margin-left: 7px;
+  vertical-align: middle;
+  content: '';
+  background: currentColor;
+  clip-path: polygon(
+    0 0, 100% 0, 100% 20%, 89% 20%, 89% 40%, 78% 40%, 78% 60%, 67% 60%, 67% 80%, 56% 80%, 56% 100%,
+    44% 100%, 44% 80%, 33% 80%, 33% 60%, 22% 60%, 22% 40%, 11% 40%, 11% 20%, 0 20%
+  );
+}
+
+.contact-button[aria-expanded='true'] {
+  color: #e8e8f0;
+}
+
+.contact-panel {
+  --block: 4px;
+  position: absolute;
+  top: calc(100% + 14px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 132px;
+  padding: 8px 0;
+  background: #20203a;
+  clip-path: polygon(
+    var(--block) 0, calc(100% - var(--block)) 0, calc(100% - var(--block)) var(--block), 100% var(--block),
+    100% calc(100% - var(--block)), calc(100% - var(--block)) calc(100% - var(--block)),
+    calc(100% - var(--block)) 100%, var(--block) 100%, var(--block) calc(100% - var(--block)),
+    0 calc(100% - var(--block)), 0 var(--block), var(--block) var(--block)
+  );
+}
+
+.contact-panel[hidden] {
+  display: none;
+}
+
+.contact-item {
+  padding: 6px 18px;
+  font-size: 14px;
+  color: #e8e8f0;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.contact-item:hover {
+  color: #f4c44a;
 }
 
 .first-hint {
@@ -798,7 +914,6 @@ html[data-mode='portfolio'] .world-message {
 .tag-clear:focus-visible,
 .mode-word:focus-visible,
 .header-link:focus-visible,
-.contact-line a:focus-visible,
 .win-links a:focus-visible {
   outline: 2px solid #e8e8f0;
   outline-offset: 3px;
