@@ -1,4 +1,6 @@
 import { defineConfig } from 'vite';
+import { plainViewPlugin } from './tools/vite-plain-view.ts';
 
-// Minimal config — Vite defaults are sufficient for this project.
-export default defineConfig({});
+export default defineConfig({
+  plugins: [plainViewPlugin()],
+});

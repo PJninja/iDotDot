@@ -2,6 +2,7 @@ import { SETTINGS } from './settings';
 import { ColliderManager } from './engine/collider';
 import { GpuSimulation, type Brush } from './engine/gpu/gpu-simulation';
 import { createElementRegistry } from './elements';
+import { loadProjects } from './projects';
 import { initHeader } from './ui/header';
 import { Overlay } from './ui/overlay';
 import { ElementPicker } from './ui/picker';
@@ -10,9 +11,32 @@ import { PerfHud } from './ui/perf-hud';
 import { loadPreferences, savePreferences } from './ui/preferences';
 import { WorldMenu } from './ui/world-menu';
 import { pickDefaultWorld } from './worlds';
-import { showGpuErrorDialog } from './ui/gpu-error-dialog';
+import { MESSAGE_NO_WEBGPU, showGpuErrorDialog } from './ui/gpu-error-dialog';
+import { Board } from './ui/board';
+import { TagFilter } from './ui/tag-filter';
+import { ProjectWindow } from './ui/project-window';
+import { ProjectRoute } from './ui/project-route';
+import { ModeControls } from './ui/mode-controls';
+import { PlainView } from './ui/plain-view';
+import { showFirstHint } from './ui/first-hint';
+
+const NOTICE_GPU_FAILED = 'The GPU could not be started, so the simulation cannot run.';
+const NOTICE_TOO_SMALL = 'This window is too small to show every project beside the simulation.';
 
 async function main(): Promise<void> {
+  const projects = loadProjects();
+  const plain = new PlainView(projects);
+  const prefs = loadPreferences();
+
+  if (new URLSearchParams(window.location.search).get('view') === 'plain') {
+    plain.show({ simulationHref: navigator.gpu ? window.location.pathname : undefined });
+    return;
+  }
+  if (!navigator.gpu) {
+    plain.show({ notice: MESSAGE_NO_WEBGPU });
+    return;
+  }
+
   initHeader();
 
   const canvas = document.getElementById('sandbox');
@@ -24,11 +48,6 @@ async function main(): Promise<void> {
   // re-measured after each rebuild); the grid's state resets on resize.
   const colliders = new ColliderManager();
   const registry = createElementRegistry();
-  const prefs = loadPreferences();
-  if (!navigator.gpu) {
-    showGpuErrorDialog('navigator.gpu is unavailable');
-    return;
-  }
   let world: GpuSimulation;
   try {
     world = await GpuSimulation.create(
@@ -40,18 +59,57 @@ async function main(): Promise<void> {
       prefs.tileSize,
     );
   } catch (err) {
-    showGpuErrorDialog(err instanceof Error ? err.message : 'device creation failed');
+    console.error('[gpu]', err);
+    plain.show({ notice: NOTICE_GPU_FAILED });
     return;
   }
   (window as unknown as { __world: GpuSimulation }).__world = world; // DEBUG-TEMP
   const overlay = new Overlay('overlay', colliders, world);
+
+  // --- Portfolio board ---------------------------------------------------------
+  const board = new Board(world, overlay, registry, projects);
+  const filter = new TagFilter(board.tagBar, projects);
+  filter.onChange = (matching) => board.setLit(matching);
+  board.setLit(filter.matching(), false);
+  const projectWindow = new ProjectWindow(
+    (project) => board.borderElement(project),
+    () => world.tileSize,
+  );
+  board.onOpen = (project, chip) => projectWindow.openPreview(project, chip);
+  const route = new ProjectRoute(projectWindow, projects, (id) => board.chipFor(id));
 
   // Every world rebuild (start, resize, tile size) clears the grid, then restores this visit's default world.
   const defaultWorld = await pickDefaultWorld();
   const loadDefaultWorld = (): void => {
     if (defaultWorld !== null) world.loadWorld(defaultWorld);
   };
-  loadDefaultWorld();
+
+  // The simulation yields to the plain page when the chips cannot fit the window.
+  let plainForSize = false;
+  const applyFit = (fits: boolean): void => {
+    if (!fits) {
+      projectWindow.close(true);
+      plain.show({ notice: NOTICE_TOO_SMALL });
+      if (!plainForSize) world.stop();
+      plainForSize = true;
+    } else if (plainForSize) {
+      world.start();
+      plainForSize = false;
+    }
+  };
+
+  /** Re-lay the board, then restore the default world and stamp the tiles that belong to the board. */
+  const rebuildWorld = (): void => {
+    // The overlay has no size while the plain page covers it, so lay it out as the simulation would.
+    if (plainForSize) plain.hide();
+    const fits = board.place();
+    overlay.refreshColliders();
+    loadDefaultWorld();
+    if (fits) board.stamp();
+    applyFit(fits);
+  };
+  rebuildWorld();
+  route.sync();
 
   // Header pickers. The brush picker is created first so its button sits
   // to the left of the element picker in the header actions block.
@@ -89,7 +147,7 @@ async function main(): Promise<void> {
 
   const isUiTarget = (e: PointerEvent): boolean =>
     e.target instanceof Element &&
-    e.target.closest('#header, #overlay, .perf-hud') !== null;
+    e.target.closest('#header, #overlay, .perf-hud, .project-scrim, .gpu-error-backdrop') !== null;
 
   const pointerGrid = (): [number, number] =>
     world.cellAt(pointerX, pointerY - SETTINGS.HEADER_HEIGHT);
@@ -106,10 +164,20 @@ async function main(): Promise<void> {
   perfHud.onTileSizeChange = (cssPx) => {
     world.setTileSize(cssPx);
     savePreferences({ tileSize: cssPx });
-    overlay.refreshColliders();
-    loadDefaultWorld();
+    rebuildWorld();
     [lastGX, lastGY] = pointerGrid();
   };
+
+  const resizeWorld = (): void => {
+    world.resize(window.innerWidth, window.innerHeight - SETTINGS.HEADER_HEIGHT);
+    rebuildWorld();
+    [lastGX, lastGY] = pointerGrid();
+  };
+
+  const modeControls = new ModeControls(prefs.mode);
+  modeControls.onModeChange = (mode) => savePreferences({ mode });
+  modeControls.onReset = resizeWorld;
+  if (!prefs.hintSeen) showFirstHint(() => savePreferences({ hintSeen: true }));
 
   // --- Frame hook: paint (if held) -------------------------------------------
   // One stamp per sim step, not per frame, so the paint rate is the same at any
@@ -161,14 +229,11 @@ async function main(): Promise<void> {
     resizePending = true;
     requestAnimationFrame(() => {
       resizePending = false;
-      world.resize(window.innerWidth, window.innerHeight - SETTINGS.HEADER_HEIGHT);
-      overlay.refreshColliders();
-      loadDefaultWorld();
-      [lastGX, lastGY] = pointerGrid();
+      resizeWorld();
     });
   });
 
-  world.start();
+  if (!plainForSize) world.start();
 }
 
 void main();
