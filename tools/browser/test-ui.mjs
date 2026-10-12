@@ -69,12 +69,14 @@ const stop = await ensureDevServer(ORIGIN);
 try {
   // Board layout: device-dependent (screen size, pixel ratio -> fractional tile sizes), and where
   // the ring/collider alignment and the lettering width have broken before.
+  // Pixel ratios that divide the 4 px tile evenly (1x, 1.25x, 1.5x, 2x, 3x) behave like 1x. Browser
+  // zoom (110%, 90%, ...) and some phones (Pixel-class 2.625x) give a fractional tile size instead.
   const screens = [
     ['desktop 1280x720, 20 projects', '?n=20', { width: 1280, height: 720 }, true],
     ['large 1920x1080, 20 projects', '?n=20', { width: 1920, height: 1080 }, true],
-    ['phone 390x844 at 3x, 3 projects', '?n=3', { width: 390, height: 844, deviceScaleFactor: 3 }, true],
+    ['browser zoom 110% (fractional tile size)', '?n=12', { width: 1280, height: 720, deviceScaleFactor: 1.1 }, true],
+    ['Pixel-class phone 412x915 at 2.625x', '?n=3', { width: 412, height: 915, deviceScaleFactor: 2.625 }, true],
     ['phone 390x844, too many projects', '?n=10', { width: 390, height: 844 }, false],
-    ['laptop at 2.2x (fractional tile size)', '?n=12', { width: 1280, height: 720, deviceScaleFactor: 2.2 }, true],
   ];
   for (const [label, query, options, fits] of screens) {
     await group(`layout: ${label}`, `${HARNESS}${query}`, async (page, t) => {
