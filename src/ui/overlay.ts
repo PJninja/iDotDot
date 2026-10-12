@@ -1,8 +1,8 @@
 import { SETTINGS } from '../settings';
 import type { ColliderManager, Rect } from '../engine/collider';
 
-/** Tolerance, in cells, for floating-point error when an element edge sits on a cell edge. */
-const EDGE_EPSILON = 1e-4;
+/** Browsers snap element edges to 1/64 px; an edge within this many px of a cell edge counts as on it. */
+const EDGE_TOLERANCE_PX = 0.05;
 
 /** Live CSS-pixel-to-grid mapping (GpuSimulation); both change on resize. */
 interface GridMapping {
@@ -76,14 +76,15 @@ export class Overlay {
     const rect = element.getBoundingClientRect();
     const { tileSize, originY } = this.grid;
     const top = rect.top - SETTINGS.HEADER_HEIGHT - originY;
-    // Elements placed exactly on cell edges can measure a hair off; the epsilon keeps them from spilling into the next cell.
-    const x = Math.floor(rect.left / tileSize + EDGE_EPSILON);
-    const y = Math.floor(top / tileSize + EDGE_EPSILON);
+    // Elements placed exactly on cell edges can measure a hair off; the tolerance keeps them from spilling into the next cell.
+    const epsilon = EDGE_TOLERANCE_PX / tileSize;
+    const x = Math.floor(rect.left / tileSize + epsilon);
+    const y = Math.floor(top / tileSize + epsilon);
     return {
       x,
       y,
-      w: Math.max(1, Math.ceil(rect.right / tileSize - EDGE_EPSILON) - x),
-      h: Math.max(1, Math.ceil((top + rect.height) / tileSize - EDGE_EPSILON) - y),
+      w: Math.max(1, Math.ceil(rect.right / tileSize - epsilon) - x),
+      h: Math.max(1, Math.ceil((top + rect.height) / tileSize - epsilon) - y),
     };
   }
 }

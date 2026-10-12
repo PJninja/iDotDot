@@ -103,5 +103,5 @@ overlay.refreshColliders();
 if (fits) board.stamp();
 draw();
 route.sync();
-(window as unknown as Record<string, unknown>).__h = { fits, board, win, filter, draw, colliders, stamped, projects };
+(window as unknown as Record<string, unknown>).__h = { fits, board, win, filter, draw, colliders, stamped, projects, gridWidth: width };
 document.title = `harness fits=${fits}`;

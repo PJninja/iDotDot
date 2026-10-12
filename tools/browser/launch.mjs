@@ -104,7 +104,7 @@ const isDeviceLoss = (text) => /Instance reference no longer exists|device lost/
  * `log` collects console errors and page errors; `log.deviceLost` is true if the GPU process was
  * killed. Options: width, height, css (a stylesheet added before the page's own scripts run;
  * defaults to FAST_COMPOSITING_CSS), initScript (a function run before the page's scripts),
- * flags (extra Chromium flags), gpu (false = skip the WebGPU flags, for pages that never touch
+ * flags (extra Chromium flags), deviceScaleFactor (the pixel ratio, default 1), gpu (false = skip the WebGPU flags, for pages that never touch
  * the GPU). The browser is always closed.
  */
 export async function withPage(url, run, options = {}) {
@@ -116,7 +116,10 @@ export async function withPage(url, run, options = {}) {
   const startedAt = Date.now();
   const log = { errors: [], pageErrors: [], failedRequests: [], deviceLost: false, elapsedMs: () => Date.now() - startedAt };
   try {
-    const page = await browser.newPage({ viewport: { width: options.width ?? 1280, height: options.height ?? 720 } });
+    const page = await browser.newPage({
+      viewport: { width: options.width ?? 1280, height: options.height ?? 720 },
+      deviceScaleFactor: options.deviceScaleFactor ?? 1,
+    });
     page.on('console', (m) => {
       if (m.type() !== 'error' && m.type() !== 'warning') return;
       if (isDeviceLoss(m.text())) log.deviceLost = true;
