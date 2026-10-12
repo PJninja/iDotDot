@@ -86,7 +86,7 @@ export class Gallery {
     this.next.onclick = () => filter.setPage(page + 1);
   }
 
-  /** Narrow windows drop the tag words and keep the search and pager. */
+  /** Layouts without room for the tag words drop them and keep the search and pager. */
   setCompact(compact: boolean): void {
     this.element.classList.toggle('is-compact', compact);
   }

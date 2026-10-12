@@ -444,8 +444,8 @@ html[data-mode='portfolio'] .world-message {
 }
 
 .chip:focus-visible {
-  outline: 2px solid #e8e8f0;
-  outline-offset: 3px;
+  outline: calc(2px * var(--s)) solid #e8e8f0;
+  outline-offset: calc(3px * var(--s));
 }
 
 .chip-head {
@@ -500,7 +500,7 @@ html[data-mode='portfolio'] .world-message {
 .chip-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 1px 16px;
+  gap: calc(1px * var(--s)) calc(16px * var(--s));
   margin-top: auto;
   overflow: hidden;
   font-size: calc(10px * var(--s));
@@ -515,10 +515,10 @@ html[data-mode='portfolio'] .world-message {
 .chip-tags span + span::before {
   position: absolute;
   top: 50%;
-  left: -9px;
-  width: 3px;
-  height: 3px;
-  margin-top: -1px;
+  left: calc(-9px * var(--s));
+  width: calc(3px * var(--s));
+  height: calc(3px * var(--s));
+  margin-top: calc(-1px * var(--s));
   content: '';
   background: currentColor;
 }
@@ -562,13 +562,14 @@ html[data-mode='portfolio'] .world-message {
 
 /* The corridor under the chips: search, tag words and pager on one line. */
 .gallery {
+  --g: var(--gallery-scale, 1);
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: calc(18px * var(--g));
   overflow: hidden;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: calc(13px * var(--g));
+  line-height: calc(20px * var(--g));
   color: #9a9ab0;
   white-space: nowrap;
 }
@@ -581,7 +582,7 @@ html[data-mode='portfolio'] .world-message {
 
 .gallery-search {
   flex: none;
-  width: 120px;
+  width: calc(120px * var(--g));
   padding: 2px 0 3px;
   font: inherit;
   color: #e8e8f0;
@@ -605,7 +606,7 @@ html[data-mode='portfolio'] .world-message {
 .gallery-tags {
   display: flex;
   flex: 1;
-  gap: 14px;
+  gap: calc(14px * var(--g));
   min-width: 0;
   overflow: hidden;
 }
@@ -621,7 +622,7 @@ html[data-mode='portfolio'] .world-message {
 .gallery-pager {
   display: flex;
   flex: none;
-  gap: 10px;
+  gap: calc(10px * var(--g));
   margin-left: auto;
 }
 

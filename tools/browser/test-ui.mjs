@@ -124,25 +124,36 @@ function geometryChecks() {
 const stop = await ensureDevServer(ORIGIN);
 try {
   // Board layout: device-dependent (screen size, pixel ratio -> fractional tile sizes), and where
-  // the chip/collider/ring alignment has broken before. Wide windows (760 px and up) show six
-  // slots, narrow ones two, and a canvas shorter than 600 px falls back to the plain page.
+  // the chip/collider/ring alignment has broken before. Windows 920 px and wider show four big
+  // chips, 420 px and wider one column of two big chips, narrower ones two small chips, and a
+  // canvas shorter than 600 px falls back to the plain page.
   // Pixel ratios that divide the 4 px tile evenly (1.25x, 1.5x, 2x, 3x) behave like 1x; browser zoom
   // (110%, 90%, ...) and some phones (Pixel-class 2.625x) give a fractional tile size instead.
   // Only combinations that can occur are listed.
   const screens = [
-    ['desktop 1280x720', '?n=12', { width: 1280, height: 720 }, 6],
-    ['large 1920x1080', '?n=12', { width: 1920, height: 1080 }, 6],
-    ['browser zoom 110% (fractional tile size)', '?n=12', { width: 1280, height: 720, deviceScaleFactor: 1.1 }, 6],
-    ['Pixel-class phone 412x915 at 2.625x', '?n=12', { width: 412, height: 915, deviceScaleFactor: 2.625 }, 2],
-    ['window too short for the board', '?n=12', { width: 1280, height: 500 }, 0],
+    ['desktop 1280x720', '?n=12', { width: 1280, height: 720 }, 4, 400],
+    ['large 1920x1080', '?n=12', { width: 1920, height: 1080 }, 4, 400],
+    ['browser zoom 110% (fractional tile size)', '?n=12', { width: 1280, height: 720, deviceScaleFactor: 1.1 }, 4, 400],
+    ['tablet 700x900 (one column of big chips)', '?n=12', { width: 700, height: 900 }, 2, 400],
+    ['Pixel-class phone 412x915 at 2.625x (small chips)', '?n=12', { width: 412, height: 915, deviceScaleFactor: 2.625 }, 2, 200],
+    ['window too short for the board', '?n=12', { width: 1280, height: 500 }, 0, 0],
     // The tile size dropdown (1, 2, 4, 8, 16 px); 4 px is the default and is covered above.
-    ...[1, 2, 8, 16].map((tile) => [`${tile} px tiles`, `?n=12&tile=${tile}`, { width: 1280, height: 720 }, 6]),
+    ...[1, 2, 8, 16].map((tile) => [`${tile} px tiles`, `?n=12&tile=${tile}`, { width: 1280, height: 720 }, 4, 400]),
   ];
-  for (const [label, query, options, chips] of screens) {
+  for (const [label, query, options, chips, chipWidth] of screens) {
     group(`layout: ${label}`, `${HARNESS}${query}`, async (page, t) => {
       const s = await boardState(page);
       t(chips === 0 ? 'falls back to the plain page' : `shows ${chips} chips`, chips === 0 ? !s.fits : s.fits && s.chips === chips, `${s.chips} chips`);
       if (chips === 0) return;
+      const width = await page.evaluate(() => document.querySelector('.chip:not([hidden])').getBoundingClientRect().width);
+      t(`a chip is about ${chipWidth} CSS px wide`, Math.abs(width - chipWidth) <= 0.08 * chipWidth, `${width} px`);
+      const clipped = await page.evaluate(() => [...document.querySelectorAll('.chip:not([hidden])')].filter((c) => {
+        const box = c.getBoundingClientRect();
+        const tags = c.querySelector('.chip-tags');
+        const tagBox = tags.getBoundingClientRect();
+        return tags.scrollHeight > tags.clientHeight + 1 || tagBox.bottom > box.bottom - 1 || tagBox.height < 5;
+      }).length);
+      t('every chip shows its tags in full', clipped === 0, `${clipped} chips clip them`);
       t('each chip is a collider with exactly its cell box, and none overlap', s.exact && s.overlaps === 0, `${s.overlaps} overlaps`);
       t('a tile ring fits exactly around every chip', s.ringed);
       t('the chips and the gallery stay inside the window', s.inWindow);
@@ -210,7 +221,7 @@ try {
     await page.click('.gallery-step[aria-label="Next page"]');
     const second = await boardState(page);
     t('Next shows the following projects and keeps rings and colliders exact',
-      first.chips === 6 && second.chips === 6 && second.ids.every((id) => !first.ids.includes(id)) && second.exact && second.ringed && (await page.evaluate(() => location.search)).includes('page=2'),
+      first.chips === 4 && second.chips === 4 && second.ids.every((id) => !first.ids.includes(id)) && second.exact && second.ringed && (await page.evaluate(() => location.search)).includes('page=2'),
       `page 2 ids: ${second.ids.join(', ')}`);
   });
 

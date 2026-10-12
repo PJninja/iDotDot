@@ -1,8 +1,10 @@
 import { Grid, T } from '../world-kit.ts';
 import {
   BLOCK,
+  COMPACT,
   KEEP_OUT_CELLS,
   NARROW,
+  ROW_STRIP,
   WIDE,
   corridor,
   footprint,
@@ -22,16 +24,17 @@ export interface Pocket {
 }
 
 /**
- * The six underground pockets shared by all worlds. The portfolio board sits in the rock at
- * columns 229 to 410 (`BLOCK`), so pocket 2 stands left of it, pocket 3 is a low hall under
- * its gallery corridor and pocket 4 stands right of it. Pockets 1, 5 and 6 are untouched.
+ * The five underground pockets shared by all worlds. The portfolio board sits in the rock at
+ * columns 211 to 429 (`BLOCK`) and runs from row 202 down to the floor with its gallery, so
+ * no room fits under it: pocket 2 stands left of its hall and pocket 4 right of it, both
+ * narrow. Pockets 1 and 6 keep their boxes; pocket 5 sits 8 columns further east than it
+ * used to, to make room for pocket 4.
  */
 export const POCKETS: Pocket[] = [
   { x: 14, y: 205, w: 126, h: 133 },
-  { x: 152, y: 200, w: 70, h: 138 },
-  { x: 236, y: 296, w: 168, h: 41 },
-  { x: 416, y: 245, w: 62, h: 92 },
-  { x: 486, y: 225, w: 70, h: 113 },
+  { x: 152, y: 200, w: 52, h: 138 },
+  { x: 436, y: 245, w: 52, h: 92 },
+  { x: 494, y: 225, w: 70, h: 113 },
   { x: 570, y: 240, w: 64, h: 98 },
 ];
 
@@ -84,16 +87,6 @@ export function shaft(g: Grid, x: number, y0: number, w: number, y1: number): vo
 /** Cells of air between the block and the walls of its hall. */
 const HALL_MARGIN = 2;
 
-/** Row range of the chip rows and the gap between them, and the free strips between chips (6 cells and 4 rows wide). */
-export const BOARD_GAPS = {
-  /** Free columns of the two gaps between chip columns (cells at least 3 from either ring). */
-  columns: [BLOCK.x + 56, BLOCK.x + 120] as const,
-  columnWidth: 6,
-  /** Free rows between the two chip rows. */
-  rowY: BLOCK.y + 33,
-  rowHeight: 4,
-};
-
 /**
  * The gallery corridor under the chips: a brick-lined gallery whose air interior is where the
  * search, tag words and pager are drawn, with a steel rail along its floor. `rail` leaves
@@ -121,24 +114,15 @@ export function boardHall(g: Grid): void {
 }
 
 /**
- * A pipe lattice around the chips: one horizontal run in the gap between the chip rows
- * (wall to wall of the hall) and a vertical run in each gap between columns, from `top`
- * through the hall's ceiling to its floor. Pipes stay in the strips that are 3 or more cells
- * from every ring, so no hull touches the keep-out zone. `hull` and `bore` give the pipe's
- * material and what is inside it (air by default).
+ * A pipe along the strip between the two chip rows, wall to wall of the hall. The strip is
+ * clear of every ring in all three layouts, so no hull touches a keep-out zone. `hull` and
+ * `bore` give the pipe's material and what is inside it (air by default). There are no
+ * vertical pipes between the columns: the narrow and compact layouts put a chip across that gap.
  */
-export function pipeLattice(g: Grid, top: number, hull: number = T.STEEL, bore: number = T.AIR): void {
-  const { columns, columnWidth, rowY, rowHeight } = BOARD_GAPS;
-  const bottom = BLOCK.y + BLOCK.h + HALL_MARGIN;
-  const run = (x: number, y: number, w: number, h: number): void => {
-    g.rect(x, y, w, h, hull);
-    if (w >= h) g.rect(x, y + 1, w, h - 2, bore);
-    else g.rect(x + 1, y, w - 2, h, bore);
-  };
-  for (const x of columns) run(x, top, columnWidth, bottom - top);
-  run(BLOCK.x - HALL_MARGIN, rowY, BLOCK.w + 2 * HALL_MARGIN, rowHeight);
-  // joints where the runs cross, so the bores connect
-  for (const x of columns) g.rect(x + 1, rowY, columnWidth - 2, rowHeight, bore);
+export function pipeLattice(g: Grid, hull: number = T.STEEL, bore: number = T.AIR): void {
+  const x = BLOCK.x - HALL_MARGIN;
+  g.rect(x, ROW_STRIP.y, BLOCK.w + 2 * HALL_MARGIN, ROW_STRIP.h, hull);
+  g.rect(x, ROW_STRIP.y + 1, BLOCK.w + 2 * HALL_MARGIN, ROW_STRIP.h - 2, bore);
 }
 
 /** Cells a scene must not put within `KEEP_OUT_CELLS` of a ring: anything that acts on its own. */
@@ -159,11 +143,7 @@ export function finishBoard(g: Grid, world: string): void {
  * acts on its own, when a gallery interior cell is not air, or when a slot's footprint
  * leaves the grid. Run after a world is built.
  */
-/**
- * Flood the air connected to (x, y); a cell outside `bounds` means the cavity leaks into the
- * rest of the world. The hall's pipe bores may reach up to the surface rows, so its bounds
- * reach up into the rock above the block, never the sky.
- */
+/** Flood the air connected to (x, y); a cell outside `bounds` means the cavity leaks into the rest of the world. */
 function leaks(g: Grid, label: string, x: number, y: number, bounds: CellRect): string[] {
   const seen = new Set<number>();
   const stack: [number, number][] = [[x, y]];
@@ -196,7 +176,7 @@ function checkBoard(g: Grid, world: string): void {
       }
     }
   };
-  for (const [name, geometry] of [['wide', WIDE], ['narrow', NARROW]] as const) {
+  for (const [name, geometry] of [['wide', WIDE], ['narrow', NARROW], ['compact', COMPACT]] as const) {
     geometry.slots.forEach((slot, i) => scan(footprint(slot), `${name} slot ${i}`));
     const { x, y, w, h } = geometry.gallery;
     for (let j = 0; j < h; j++) {
@@ -204,7 +184,7 @@ function checkBoard(g: Grid, world: string): void {
     }
   }
   const hall = { x: BLOCK.x - HALL_MARGIN, y: BLOCK.y - HALL_MARGIN, w: BLOCK.w + 2 * HALL_MARGIN, h: BLOCK.h + 2 * HALL_MARGIN };
-  problems.push(...leaks(g, 'hall', BLOCK.x + 5, BLOCK.y + 5, { x: hall.x, y: 170, w: hall.w, h: hall.y + hall.h - 170 }));
+  problems.push(...leaks(g, 'hall', BLOCK.x + 5, BLOCK.y + 5, hall));
   problems.push(...leaks(g, 'gallery', WIDE.gallery.x + 2, WIDE.gallery.y + 2, WIDE.gallery));
   if (problems.length > 0) {
     const shown = problems.slice(0, 12).join('\n  ');
