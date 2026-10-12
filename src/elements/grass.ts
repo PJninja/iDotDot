@@ -30,6 +30,10 @@ export class Grass extends Element {
   static SPARK_IGNITE_CHANCE = 0.3;
   /** Chance per step that grass touching hot steel catches. */
   static HOT_STEEL_IGNITE_CHANCE = 0.05;
+  /** Chance per step that grass touching an arc catches. */
+  static ARC_IGNITE_CHANCE = 0.05;
+  /** Chance per step that grass touching live steel catches. */
+  static LIVE_STEEL_IGNITE_CHANCE = 0.01;
 
   readonly slideChance = Grass.SLIDE_CHANCE;
   readonly flammable = true;
@@ -41,6 +45,8 @@ export class Grass extends Element {
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.EMBER_IGNITE_CHANCE },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.SPARK_IGNITE_CHANCE },
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.HOT_STEEL_IGNITE_CHANCE },
+    { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.ARC_IGNITE_CHANCE },
+    { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.LIVE_STEEL_IGNITE_CHANCE },
   ];
 
   static GRASS_VARIANT_COUNT = 4;

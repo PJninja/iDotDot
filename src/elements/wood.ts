@@ -26,6 +26,10 @@ export class Wood extends Element {
   static SPARK_IGNITE_CHANCE = 0.1;
   /** Chance per step that wood touching hot steel catches. */
   static HOT_STEEL_IGNITE_CHANCE = 0.004;
+  /** Chance per step that wood touching an arc catches (arcs are brief). */
+  static ARC_IGNITE_CHANCE = 0.03;
+  /** Chance per step that wood touching live steel catches (a live tile lasts about 32 steps). */
+  static LIVE_STEEL_IGNITE_CHANCE = 0.004;
   /** Chance per step that wood touching mold rots into mold. */
   static MOLD_CHANCE = 0.0012;
   readonly flammable = true;
@@ -35,6 +39,8 @@ export class Wood extends Element {
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.EMBER_IGNITE_CHANCE },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.SPARK_IGNITE_CHANCE },
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.HOT_STEEL_IGNITE_CHANCE },
+    { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.ARC_IGNITE_CHANCE },
+    { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.LIVE_STEEL_IGNITE_CHANCE },
     { with: SETTINGS.MOLD_TYPE, becomes: SETTINGS.MOLD_TYPE, chance: Wood.MOLD_CHANCE },
   ];
 

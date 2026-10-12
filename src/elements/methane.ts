@@ -35,6 +35,10 @@ export class Methane extends Element {
   static SPARK_IGNITE_CHANCE = 0.7;
   /** Chance per step that a tile touching hot steel catches fire. */
   static HOT_STEEL_IGNITE_CHANCE = 0.05;
+  /** Chance per step that a tile touching an arc catches fire. */
+  static ARC_IGNITE_CHANCE = 0.3;
+  /** Chance per step that a tile touching live steel catches fire. */
+  static LIVE_STEEL_IGNITE_CHANCE = 0.1;
 
   /** Number of shades in the haze ramp. */
   static DENSITY_LEVELS = 16;
@@ -55,6 +59,8 @@ export class Methane extends Element {
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.EMBER_IGNITE_CHANCE },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.SPARK_IGNITE_CHANCE },
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.HOT_STEEL_IGNITE_CHANCE },
+    { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.ARC_IGNITE_CHANCE },
+    { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.LIVE_STEEL_IGNITE_CHANCE },
   ];
 
   private readonly ramp: [number, number, number][];

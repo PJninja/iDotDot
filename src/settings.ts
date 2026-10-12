@@ -43,6 +43,15 @@ export const SETTINGS = {
   RUBBLE_TYPE: 25,
   SPRING_TYPE: 26,
   TORCH_TYPE: 27,
+  LIVE_STEEL_TYPE: 28,
+  SPENT_STEEL_TYPE: 29,
+  ARC_TYPE: 30,
+  GENERATOR_TYPE: 31,
+  SHOCKED_WATER_TYPE: 32,
+  NUMB_WATER_TYPE: 33,
+  FUSE_TYPE: 34,
+  LIVE_FUSE_TYPE: 35,
+  RUBBER_TYPE: 36,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

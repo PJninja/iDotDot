@@ -57,11 +57,17 @@ export class Water extends Element {
   static HOT_STEEL_BOIL_CHANCE = 0.15;
   /** Chance per step that water touching ice freezes (a frost front creeps through a pool). */
   static FREEZE_CHANCE = 0.006;
+  /** Chance per step that water touching live steel, a live fuse, an arc or shocked water is shocked (how fast a pulse crosses a pool). */
+  static CONDUCT_CHANCE = 0.35;
   readonly blastResistance = 0.75;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.STEAM_TYPE, chance: Water.BOIL_CHANCE },
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.STEAM_TYPE, chance: Water.HOT_STEEL_BOIL_CHANCE },
     { with: SETTINGS.ICE_TYPE, becomes: SETTINGS.ICE_TYPE, chance: Water.FREEZE_CHANCE },
+    { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.SHOCKED_WATER_TYPE, chance: Water.CONDUCT_CHANCE },
+    { with: SETTINGS.LIVE_FUSE_TYPE, becomes: SETTINGS.SHOCKED_WATER_TYPE, chance: Water.CONDUCT_CHANCE },
+    { with: SETTINGS.SHOCKED_WATER_TYPE, becomes: SETTINGS.SHOCKED_WATER_TYPE, chance: Water.CONDUCT_CHANCE },
+    { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.SHOCKED_WATER_TYPE, chance: Water.CONDUCT_CHANCE },
   ];
 
   getColor(_value: number, _variant: number): [number, number, number] {

@@ -26,6 +26,10 @@ export class Charcoal extends Element {
   static SPARK_IGNITE_CHANCE = 0.05;
   /** Chance per step that charcoal touching hot steel catches. */
   static HOT_STEEL_IGNITE_CHANCE = 0.003;
+  /** Chance per step that charcoal touching an arc catches. */
+  static ARC_IGNITE_CHANCE = 0.03;
+  /** Chance per step that charcoal touching live steel catches. */
+  static LIVE_STEEL_IGNITE_CHANCE = 0.004;
 
   readonly slideChance = Charcoal.SLIDE_CHANCE;
   readonly flammable = true;
@@ -35,6 +39,8 @@ export class Charcoal extends Element {
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Charcoal.EMBER_IGNITE_CHANCE },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Charcoal.SPARK_IGNITE_CHANCE },
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Charcoal.HOT_STEEL_IGNITE_CHANCE },
+    { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Charcoal.ARC_IGNITE_CHANCE },
+    { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Charcoal.LIVE_STEEL_IGNITE_CHANCE },
   ];
 
   static CHARCOAL_VARIANT_COUNT = 4;

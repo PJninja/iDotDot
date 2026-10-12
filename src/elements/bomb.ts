@@ -30,6 +30,10 @@ export class Bomb extends Element {
 
   /** Chance per step that a bomb touching hot steel explodes. */
   static HOT_STEEL_CHANCE = 0.02;
+  /** Chance per step that a bomb touching an arc explodes. */
+  static ARC_CHANCE = 0.3;
+  /** Chance per step that a bomb touching live steel explodes (a wire is a fast detonator). */
+  static LIVE_STEEL_CHANCE = 0.1;
 
   readonly flammable = true;
   readonly reactions: readonly Reaction[] = [
@@ -38,6 +42,8 @@ export class Bomb extends Element {
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.EMBER_CHANCE },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.SPARK_CHANCE },
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.HOT_STEEL_CHANCE },
+    { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.ARC_CHANCE },
+    { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.LIVE_STEEL_CHANCE },
   ];
 
   private readonly variantColors: [number, number, number][];
