@@ -1,6 +1,6 @@
 # Electricity: Live Steel, Arcs, Generators, Shocked Water
 
-Status: proposal, nothing implemented. Every number below is a starting point to be tuned in a running sim.
+Status: proposal, nothing implemented. Every number below is a starting point to be tuned in a running sim. Revised after the browser test suite landed on `v2-webgpu` (`7546741`, see Testing below).
 Scope: 9 new elements (4 pickable, 5 hidden), reaction rules on Steel, Water, Wood, Grass, Charcoal, Bomb and Methane, and **no shader changes**. Everything uses mechanisms that already exist: one-sided reactions, aging with `agedInto`, the emitter (`emitType`), and static aging solids (as `Explosion` is).
 
 Decisions already made:
@@ -153,24 +153,45 @@ All data and registration. No `COMPUTE_WGSL`, `RENDER_WGSL`, buffer or `TypeInfo
 3. Edit existing elements' reaction tables: Steel, Water, Wood, Grass, Charcoal, Bomb, Methane.
 4. Reaction budget: about 63 rules exist now and the limit is `MAX_REACTIONS` = 128. This adds roughly 25 (Steel 5, Water 4, Fuse 4, Wood/Grass/Charcoal/Bomb/Methane 2 each for Arc and Live steel, Live steel/Arc/Live fuse ignition, Rubber 4), so it fits, but count after writing.
 5. Registry rule: the registry rejects two elements with consuming rules where one consumes the other. None of these rules set `consumes`.
-6. `AGENTS.md`: add a Steel / electricity entry to the Architecture section and the file map.
+6. `AGENTS.md`: add a Steel / electricity entry to the Architecture section, the file map and the `plans/` line, and a row in the commands table for any new test script.
 7. `tools/worlds/underground.ts` `finishBoard`: the list of things that act on their own around the chips should include Generator, and the hidden electric types if the check lists types by id. The shipped worlds do not contain any of these, so it should only matter if a world is regenerated with them.
 8. `src/ui/tile-art.ts` and any picker previews: check how pickable elements get their art.
+9. `new-element.bat` is a Windows script. On Linux (including the cloud sandbox) the type constant in `SETTINGS`, the element file and the `index.ts` import and registration are written by hand, following `torch.ts` and `explosion.ts`.
 
 ## Risks and things to verify in the sim
 
 - Pulse speed and length: `PULSE_CHANCE`, live lifetime and spent lifetime interact. Live must outlast the time a neighbor needs to catch; spent must outlast live plus the neighbor delay, or the pulse bounces.
-- Does an idle sim stay idle once a generator is removed? Aging tiles keep their chunks awake only while they exist.
+- Does an idle sim stay idle once a generator is removed? Aging tiles keep their chunks awake only while they exist. `__world.perf.idle` and `session.mjs status` show it.
 - Pools: how the frozen-tile flash looks, and whether tiles above a pulse get stuck for too long.
 - Overload rate: see above. Check also that Hot steel appearing inside live wire does not break the pulse in confusing ways on thick plates.
 - Thick steel: spread chance applies per neighbor, so a 7-wide bar conducts noticeably faster than a 1-wide wire. That matches heat, but it could surprise.
 - Painted Live steel: the picker hides these, but world files saved from a session that contained them store the ids. Ids are stable, so loading such a file works.
 
+## Testing
+
+The suite that landed (`tools/browser/`, documented in `AGENTS.md` under "Testing in headless Chromium") is deliberately small. Its rule: tests cover only critical paths, and a new check must be shown to fail by breaking the code once. It tests the portfolio layout and boot, not element behavior; simulation behavior is checked by hand with the warm session. Checked on the merged tree before this revision: `npx tsc --noEmit` clean, `npm run test:ui` 51 of 51, `npm run test:gpu` 10 of 10.
+
+What this means for electricity:
+
+- **Run `test:ui` and `test:gpu` after each phase.** No electricity code touches layout, but registering elements runs `writeUniforms` and registry validation (including the `MAX_REACTIONS` and `MAX_OUTCOMES` limits), and a failure there stops the app from booting, which `test:gpu` reports as a missing world or a lost device. The UI harness builds an `ElementPicker` from the registry, so the pickable additions (Generator, Fuse, Rubber) appear in it.
+- **Behavior is checked with the warm session**, which is the only way the repo tests simulation state:
+  1. `node tools/browser/session.mjs start`, then build a scene with `session.mjs eval`. `__world.paintStroke(x, y, x, y, { shape, radius, density, type })` paints any registered id, hidden ones included (not yet confirmed for hidden ids; painting skips collider cells, so stay clear of the chips). `__world.stampCells(x, y, w, h, words)` writes a whole wire at once; a word is `type | value << 8 | variant << 16 | age << 24`.
+  2. Advance with `readgrid.mjs --session --steps N`, which runs N steps, stops and prints the tile count per element name. `live-steel`, `spent-steel` and `arc` counts over a few reads show a pulse starting, traveling and ending. `--png` draws the grid; it picks the color row from the age byte for types with an `ageRate`, so the aging electric types render correctly.
+  3. For the front position, run `eval` with `readGrid()` and find the largest x holding the live type.
+  4. Keep the sim stopped between commands (a read after running queues behind unfinished frames).
+- **Step rate decides how long a check takes, and I have two numbers that disagree.** `AGENTS.md` says the software GPU runs at a few steps per second on a full grid. On a 320 x 133 grid with the farmstead world I measured 358 steps in 6 s (about 60 per second), mostly asleep. A 60-cell wire at the planned 0.2 cells/step needs about 300 steps to carry a pulse end to end. Measure on the actual test scene first (phase 1); if a pulse test finishes in about 10 s it could be one `test:gpu` check, and if not it stays a manual protocol.
+- **A possible `test:gpu` check**, only if phase 1 shows it is fast and reliable: stamp a steel wire, light one end, run a fixed number of steps, and assert that the live tile count rose and then returned to zero with the wire fully steel again (the pulse crossed and no tile stayed live or spent). It covers the first thing that would break silently: a refractory stage shorter than live steel makes the pulse bounce forever. The suite's rule applies: break the spent steel age rate once and confirm the check fails before keeping it.
+- **Not tested by the suite and left to review**: colors, ramps, crackle density, and the shocked-water flash. These need a look at `readgrid.mjs --png` frames.
+- **Start-up caveat seen while preparing this revision**: `session.mjs start` timed out in `settleSim` (30 s) in two runs here, although the page loaded and later `eval` and `status` calls worked. If it happens again, stop the session and check `status` before trusting a read.
+
 ## Phases
 
-1. Steel conduction: Live steel, Spent steel, Steel rules, a Generator, temporary Arc. Tune speed on a long wire. Check idle.
+0. Measure: build the wire scene in a session, record the step rate, and settle the idle check for a pulse-free world.
+1. Steel conduction: Live steel, Spent steel, Steel rules, a Generator, temporary Arc. Tune speed on a long wire. Check idle. Decide whether the wire-pulse `test:gpu` check is worth keeping.
 2. Arc ignition: rules on Wood, Grass, Charcoal, Bomb, Methane. Test a wire to a bomb and a wire in a methane pocket.
 3. Overload: add the Hot steel outcome and tune.
 4. Water: Shocked and Numb water, Water rules, pool tests.
 5. Switch parts: Fuse, Live fuse, Rubber.
 6. Docs: update `AGENTS.md`, mark this plan implemented with deviations.
+
+Each phase ends with `npx tsc --noEmit`, `npm run build`, `npm run test:ui` and `npm run test:gpu`.
