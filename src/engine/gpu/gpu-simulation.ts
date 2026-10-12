@@ -499,6 +499,25 @@ export class GpuSimulation {
     this.wake();
   }
 
+  /**
+   * Overwrite a rectangle of cells with packed tiles (row-major, `w * h` words), clipped to
+   * the grid. Written to both grid buffers like loadWorld so sleeping chunks stay in sync,
+   * and every chunk is woken. Unconditional: whatever was in those cells is replaced.
+   */
+  stampCells(x: number, y: number, w: number, h: number, words: Uint32Array): void {
+    if (this.gridBufs === null || words.length !== w * h) return;
+    const x0 = Math.max(0, x);
+    const x1 = Math.min(this.width, x + w);
+    if (x0 >= x1) return;
+    for (let row = Math.max(0, y); row < Math.min(this.height, y + h); row++) {
+      const start = (row - y) * w + (x0 - x);
+      const slice = words.subarray(start, start + (x1 - x0));
+      for (const buf of this.gridBufs) this.device.queue.writeBuffer(buf, (row * this.width + x0) * 4, slice);
+    }
+    this.wakeAllPending = true;
+    this.wake();
+  }
+
   start(): void {
     if (this.running) return;
     this.running = true;

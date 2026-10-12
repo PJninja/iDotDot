@@ -10,6 +10,10 @@ export interface Preferences {
   brushShape: BrushShape;
   brushRadius: number;
   brushDensity: number;
+  /** Portfolio hides the toolbox; play shows it. */
+  mode: 'portfolio' | 'play';
+  /** Whether the first-visit painting hint has been shown. */
+  hintSeen: boolean;
 }
 
 const STORAGE_KEY = 'idotdot.preferences';
@@ -19,6 +23,8 @@ const DEFAULTS: Preferences = {
   brushShape: 'circle',
   brushRadius: 4,
   brushDensity: 1,
+  mode: 'portfolio',
+  hintSeen: false,
 };
 
 const isNumberIn = (value: unknown, min: number, max: number): value is number =>
@@ -35,6 +41,8 @@ export function loadPreferences(): Preferences {
     if (s.brushShape === 'circle' || s.brushShape === 'square') prefs.brushShape = s.brushShape;
     if (isNumberIn(s.brushRadius, BRUSH_MIN_RADIUS, BRUSH_MAX_RADIUS)) prefs.brushRadius = Math.round(s.brushRadius);
     if (isNumberIn(s.brushDensity, BRUSH_MIN_DENSITY, BRUSH_MAX_DENSITY)) prefs.brushDensity = s.brushDensity;
+    if (s.mode === 'portfolio' || s.mode === 'play') prefs.mode = s.mode;
+    if (typeof s.hintSeen === 'boolean') prefs.hintSeen = s.hintSeen;
   } catch {
     // Storage blocked or the entry is corrupt: use the defaults.
   }

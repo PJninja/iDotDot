@@ -240,6 +240,11 @@ export class ElementRegistry {
     return this.elements[type] ?? null;
   }
 
+  /** The registered element with this `name`, or null. */
+  getByName(name: string): Element | null {
+    return this.list().find((e) => e.name === name) ?? null;
+  }
+
   /** All registered elements, ordered by type ID. */
   list(): Element[] {
     return this.elements.filter((e): e is Element => e !== null);

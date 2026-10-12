@@ -2,7 +2,7 @@
 
 Goal: list 10-20 projects as cards that live inside the falling-sands world instead of on top of it. A card opens a centered preview window above the sim and then a detail view with text and screenshots.
 
-This file is intent. `AGENTS.md` and the code are the current state. The plan itself is written to be easy to scan; the guidelines below apply to what the plan builds (site UI and copy), not to how the plan is written.
+This file is intent. `AGENTS.md` and the code are the current state. Status: implemented, with the deviations listed under "As built" at the end. The plan itself is written to be easy to scan; the guidelines below apply to what the plan builds (site UI and copy), not to how the plan is written.
 
 ## Decisions already made
 
@@ -203,3 +203,15 @@ Every project has the same shape so the detail view renders it the same way: a f
 8. Name and contact line.
 9. Mode toggle, Reset world and first-visit hint.
 10. Real content, icons and screenshots, then tuning of materials and spacing.
+
+## As built
+
+Differences from the plan above:
+
+- **Ring and lettering writes use `GpuSimulation.stampCells`, not a new shader path.** It overwrites a rectangle of cells in both grid buffers with one `writeBuffer` per row, which has no per-frame stamp cap and needs no WGSL. The plan's `stampFrame` / `clearFrame` are `Board` methods built on it; a ring restamp rewrites the whole ring box, interior included, which is solid and empty.
+- **The name lettering is generated at runtime**, from a canvas text mask at the current tile size (stone core, steel edge, wood accents), not authored into the default worlds. It therefore works at every tile size and needs no new `.idw` content.
+- **Name, tagline and contact come from `src/site.ts`.** The email and resume links are empty (and so left out) until filled in; GitHub points at the repository owner's profile.
+- **Chip size** is 200 x 108 CSS px at 100% (the plan said around 160 x 100) so three tags fit; chips shrink to 0.8 before the board gives up.
+- **A window too small for the chips shows the plain page** and stops the simulation until it grows (phones with more than a handful of projects, large tile sizes with many).
+- **`og:image` and a canonical URL are not set**: both need the deployed address and a screenshot.
+- Three placeholder projects (one real entry for this site) stand in until real content, icons and screenshots are added.

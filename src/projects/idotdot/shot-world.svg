@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#1a1a2e"/>
+  <g shape-rendering="crispEdges">
+    <rect x="0" y="470" width="960" height="70" fill="#76746f"/>
+    <rect x="120" y="410" width="260" height="60" fill="#c2a26a"/>
+    <rect x="160" y="370" width="180" height="40" fill="#c2a26a"/>
+    <rect x="210" y="340" width="80" height="30" fill="#c2a26a"/>
+    <rect x="560" y="430" width="240" height="40" fill="#3f78b8"/>
+    <rect x="600" y="300" width="20" height="130" fill="#7a5230"/>
+    <rect x="600" y="300" width="90" height="20" fill="#7a5230"/>
+    <rect x="640" y="230" width="14" height="30" fill="#e8913a"/>
+    <rect x="636" y="200" width="22" height="34" fill="#f4c44a"/>
+  </g>
+  <text x="48" y="64" fill="#e8e8f0" font-family="system-ui, sans-serif" font-size="28">Placeholder image: replace with a screenshot of the world</text>
+</svg>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#1a1a2e"/>
+  <g shape-rendering="crispEdges">
+    <rect x="0" y="480" width="960" height="60" fill="#76746f"/>
+    <rect x="300" y="360" width="360" height="120" fill="#7a5230"/>
+    <rect x="320" y="300" width="40" height="60" fill="#e8913a"/>
+    <rect x="400" y="250" width="40" height="110" fill="#f4c44a"/>
+    <rect x="480" y="310" width="40" height="50" fill="#e8913a"/>
+    <rect x="560" y="280" width="40" height="80" fill="#c2452e"/>
+    <rect x="390" y="150" width="60" height="90" fill="#6b6b78"/>
+  </g>
+  <text x="48" y="64" fill="#e8e8f0" font-family="system-ui, sans-serif" font-size="28">Placeholder image: replace with a screenshot of fire spreading</text>
+</svg>

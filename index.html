@@ -4,12 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PJ.iDotDot</title>
+    <meta name="description" content="Portfolio of Anthony Liparulo: software projects on a live falling-sands world." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="PJ.iDotDot" />
+    <meta property="og:description" content="Portfolio of Anthony Liparulo: software projects on a live falling-sands world." />
+    <meta name="twitter:card" content="summary" />
     <link rel="stylesheet" href="/src/styles/main.css" />
+    <noscript>
+      <style>
+        html, body { overflow: auto; height: auto; user-select: text; touch-action: auto; }
+        #plain-view { display: block; }
+        #header, #sandbox { display: none; }
+      </style>
+    </noscript>
   </head>
   <body>
     <header id="header"><nav><div class="header-actions"></div></nav></header>
     <div id="overlay"></div>
     <canvas id="sandbox"></canvas>
+    <div id="plain-view"><!--plain-view--></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
