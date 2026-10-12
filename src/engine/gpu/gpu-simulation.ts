@@ -1,3 +1,4 @@
+import { computeGridGeometry } from '../grid-geometry';
 import { SETTINGS } from '../../settings';
 import type { ColliderManager } from '../collider';
 import { MAX_OUTCOMES, MAX_REACTIONS, type ElementRegistry } from '../element';
@@ -398,25 +399,22 @@ export class GpuSimulation {
     this.cssWidth = cssWidth;
     this.cssHeight = cssHeight;
 
-    const dpr = window.devicePixelRatio || 1;
-    // At least one pixel and one cell: a hidden or collapsed window can report a zero or negative size.
-    this.canvas.width = Math.max(1, Math.round(cssWidth * dpr));
-    this.canvas.height = Math.max(1, Math.round(cssHeight * dpr));
-    this.canvas.style.width = `${Math.max(0, cssWidth)}px`;
-    this.canvas.style.height = `${Math.max(0, cssHeight)}px`;
-
-    // Tiles are a whole number of device pixels so every tile renders the same size.
-    this.tilePx = Math.max(
-      1,
-      Math.round(this.requestedTileSize * dpr),
-      Math.ceil(Math.max(this.canvas.width, this.canvas.height) / SETTINGS.MAX_SIM_DIMENSION),
+    const geometry = computeGridGeometry(
+      cssWidth,
+      cssHeight,
+      window.devicePixelRatio || 1,
+      this.requestedTileSize,
+      SETTINGS.MAX_SIM_DIMENSION,
     );
-    this.tileSize = this.tilePx / dpr;
-    // The grid covers the whole canvas; it is anchored to the bottom so the floor
-    // row sits on the canvas edge, and the top row may be partly hidden.
-    this.width = Math.ceil(this.canvas.width / this.tilePx);
-    this.height = Math.ceil(this.canvas.height / this.tilePx);
-    this.originY = (this.canvas.height - this.height * this.tilePx) / dpr;
+    this.canvas.width = geometry.deviceWidth;
+    this.canvas.height = geometry.deviceHeight;
+    this.canvas.style.width = `${geometry.cssWidth}px`;
+    this.canvas.style.height = `${geometry.cssHeight}px`;
+    this.tilePx = geometry.tilePx;
+    this.tileSize = geometry.tileSize;
+    this.width = geometry.width;
+    this.height = geometry.height;
+    this.originY = geometry.originY;
 
     const cells = this.width * this.height;
     const bytes = cells * 4;

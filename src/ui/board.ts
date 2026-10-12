@@ -1,12 +1,13 @@
+import type { Rect } from '../engine/collider';
 import type { ElementRegistry } from '../engine/element';
 import type { GpuSimulation } from '../engine/gpu/gpu-simulation';
 import { fitWorld, type WorldSnapshot } from '../engine/world-file';
 import type { Project } from '../projects/project';
 import { SITE } from '../site';
-import { SETTINGS } from '../settings';
 import { WIDE } from '../worlds/board-slots';
 import { placeBoard, type BoardPlacement, type CellBox } from './board-layout';
 import { Gallery } from './gallery';
+import { headerHeight } from './frame';
 import type { Overlay } from './overlay';
 import type { ProjectFilter } from './project-filter';
 import { hashString, ringCells, seededRandom } from './tile-art';
@@ -132,7 +133,7 @@ export class Board {
       gridHeight: this.world.height,
       windowWidth: window.innerWidth,
       windowHeight: window.innerHeight,
-      headerHeight: SETTINGS.HEADER_HEIGHT,
+      headerHeight: headerHeight(),
     });
     const placement = this.placement;
     if (placement === null) {
@@ -167,7 +168,13 @@ export class Board {
   private showSlot(slot: Slot, project: Project): void {
     this.fill(slot, project);
     slot.element.hidden = false;
-    this.overlay.registerCollider(slot.element);
+    const index = this.slots.indexOf(slot);
+    this.overlay.registerCollider(slot.element, () => this.cellRect(this.placement?.chips[index]));
+  }
+
+  /** A cell box as a collider rect: laid out in whole cells, so it is exact and never measured from the DOM. */
+  private cellRect(box: CellBox | undefined): Rect | null {
+    return box === undefined ? null : { x: box.gx, y: box.gy, w: box.gw, h: box.gh };
   }
 
   private hideSlot(slot: Slot): void {
@@ -178,7 +185,7 @@ export class Board {
 
   private setGalleryShown(shown: boolean): void {
     this.gallery.element.hidden = !shown;
-    if (shown) this.overlay.registerCollider(this.gallery.element);
+    if (shown) this.overlay.registerCollider(this.gallery.element, () => this.cellRect(this.placement?.gallery));
     else this.overlay.unregisterCollider(this.gallery.element);
   }
 
