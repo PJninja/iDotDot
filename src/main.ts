@@ -5,6 +5,7 @@ import { createElementRegistry } from './elements';
 import { loadProjects } from './projects';
 import { initHeader } from './ui/header';
 import { Overlay } from './ui/overlay';
+import { applyHeaderHeight, headerHeight } from './ui/frame';
 import { ElementPicker } from './ui/picker';
 import { BrushPicker } from './ui/brush-picker';
 import { PerfHud } from './ui/perf-hud';
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
   }
 
   initHeader();
+  applyHeaderHeight();
 
   const canvas = document.getElementById('sandbox');
   if (!(canvas instanceof HTMLCanvasElement)) {
@@ -55,7 +57,7 @@ async function main(): Promise<void> {
       colliders,
       registry,
       window.innerWidth,
-      window.innerHeight - SETTINGS.HEADER_HEIGHT,
+      window.innerHeight - headerHeight(),
       prefs.tileSize,
     );
   } catch (err) {
@@ -150,7 +152,7 @@ async function main(): Promise<void> {
     e.target.closest('#header, #overlay, .perf-hud, .project-scrim, .gpu-error-backdrop') !== null;
 
   const pointerGrid = (): [number, number] =>
-    world.cellAt(pointerX, pointerY - SETTINGS.HEADER_HEIGHT);
+    world.cellAt(pointerX, pointerY - headerHeight());
 
   world.onDeviceLost = (reason) => {
     world.stop();
@@ -169,7 +171,8 @@ async function main(): Promise<void> {
   };
 
   const resizeWorld = (): void => {
-    world.resize(window.innerWidth, window.innerHeight - SETTINGS.HEADER_HEIGHT);
+    applyHeaderHeight();
+    world.resize(window.innerWidth, window.innerHeight - headerHeight());
     rebuildWorld();
     [lastGX, lastGY] = pointerGrid();
   };
@@ -203,7 +206,7 @@ async function main(): Promise<void> {
   // --- Input events ----------------------------------------------------------
   window.addEventListener('pointerdown', (e) => {
     if (isUiTarget(e)) return;
-    if (e.clientY < SETTINGS.HEADER_HEIGHT) return;
+    if (e.clientY < headerHeight()) return;
     painting = true;
     tapPending = true;
     pointerX = e.clientX;

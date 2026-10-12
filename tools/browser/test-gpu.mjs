@@ -1,8 +1,9 @@
 // The few things only a real GPU run can show, and that differ by device or break easily:
 // the app boots and the sim steps, the board's tiles reach the GPU grid after the default world
-// loads (the order that rebuildWorld depends on), and painting changes the world.
+// loads (the order that rebuildWorld depends on), painting changes the world, and at fractional
+// pixel ratios the canvas and the chips sit on whole device pixels.
 //   npm run test:gpu
-// Needs software WebGPU (see smoke.mjs); one fresh page, so about 15 s. Exits 1 on any failure.
+// Needs software WebGPU (see smoke.mjs); about 10 s. Exits 1 on any failure.
 import { readGridSummary, settleSim } from './grid.mjs';
 import { ensureDevServer, HIDE_UI_CSS, withPage } from './launch.mjs';
 
@@ -13,25 +14,25 @@ const check = (name, pass, detail = '') => {
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? ` (${detail})` : ''}`);
 };
 
-const stop = await ensureDevServer(ORIGIN);
-try {
+/** The boot, ring and painting checks, on one fresh page at 1x. */
+async function simChecks() {
   await withPage(`${ORIGIN}/?world=farmstead`, async (page, log) => {
     await settleSim(page);
     const loaded = (await readGridSummary(page)).summary;
     check('the app boots to a world with tiles in it', loaded.tiles > 1000, `${loaded.tiles} tiles`);
 
-    // Each chip's ring must be in the real grid: tiles just outside its box, none on its edge cells.
+    // Each chip's ring must be in the real grid: a tile just outside its box on every side.
     const rings = await page.evaluate(async () => {
       const world = window.__world;
       const grid = await world.readGrid();
       const at = (x, y) => (x < 0 || y < 0 || x >= world.width || y >= world.height ? 0 : grid[y * world.width + x] & 0xff);
-      const eps = 0.05 / world.tileSize;
+      const canvasTop = document.getElementById('sandbox').getBoundingClientRect().top;
       return [...document.querySelectorAll('.chip:not([hidden])')].map((chip) => {
         const r = chip.getBoundingClientRect();
-        const x = Math.floor(r.left / world.tileSize + eps);
-        const y = Math.floor((r.top - 48 - world.originY) / world.tileSize + eps);
-        const w = Math.ceil(r.right / world.tileSize - eps) - x;
-        const h = Math.ceil((r.bottom - 48 - world.originY) / world.tileSize - eps) - y;
+        const x = Math.round(r.left / world.tileSize);
+        const y = Math.round((r.top - canvasTop - world.originY) / world.tileSize);
+        const w = Math.round(r.width / world.tileSize);
+        const h = Math.round(r.height / world.tileSize);
         const mx = x + (w >> 1), my = y + (h >> 1);
         return { id: chip.dataset.id, ringed: [at(x - 1, my), at(x + w, my), at(mx, y - 1), at(mx, y + h)].every((t) => t !== 0) };
       });
@@ -66,6 +67,44 @@ try {
     check('no errors, no lost device', log.errors.every((e) => /Failed to load resource.*404/.test(e)) && log.pageErrors.length === 0 && !log.deviceLost,
       [...log.pageErrors, log.deviceLost ? 'device lost' : ''].filter(Boolean).join(' | '));
   }, { css: HIDE_UI_CSS });
+}
+
+/**
+ * At pixel ratios that give a fractional tile size (browser zoom 110%, a Pixel-class phone at
+ * 2.625x), the real canvas must cover exactly its backing pixels, start on a device pixel, and
+ * every chip must sit on a whole number of tiles. Needs only the DOM, so it is quick.
+ */
+async function pixelChecks() {
+  for (const [dpr, width, height, label] of [[1.1, 1280, 720, 'browser zoom 110%'], [2.625, 412, 915, 'Pixel-class phone 2.625x']]) {
+    await withPage(`${ORIGIN}/?world=farmstead`, async (page) => {
+      // Chips exist as soon as the board is built; they are placed (style.width set) by the first rebuild.
+      await page.waitForFunction(() => window.__world?.width > 0 && document.querySelector('.chip')?.style.width, null, { timeout: 20000 });
+      const r = await page.evaluate(() => {
+        const d = devicePixelRatio;
+        const canvas = document.getElementById('sandbox');
+        const box = canvas.getBoundingClientRect();
+        const tilePx = Math.round(window.__world.tileSize * d);
+        const off = (v) => Math.abs(v - Math.round(v));
+        const chips = [...document.querySelectorAll('.chip:not([hidden])')].map((chip) => {
+          const b = chip.getBoundingClientRect();
+          return Math.max(off(((b.left - box.left) * d) / tilePx), off(((b.top - box.top) * d - (canvas.height - window.__world.height * tilePx)) / tilePx), off((b.width * d) / tilePx), off((b.height * d) / tilePx));
+        });
+        return {
+          stretchW: Math.abs(box.width * d - canvas.width), stretchH: Math.abs(box.height * d - canvas.height),
+          topOffEdge: off(box.top * d), chipOffTiles: Math.max(0, ...chips), tilePx,
+        };
+      });
+      const tol = 0.05;
+      check(`${label}: the canvas covers exactly its backing pixels`, r.stretchW < tol && r.stretchH < tol, `off by ${r.stretchW.toFixed(3)} x ${r.stretchH.toFixed(3)} px`);
+      check(`${label}: the canvas starts on a device pixel`, r.topOffEdge < tol, `${r.topOffEdge.toFixed(3)} px off`);
+      check(`${label}: every chip sits on whole tiles`, r.chipOffTiles * r.tilePx < tol * 2, `worst ${(r.chipOffTiles * r.tilePx).toFixed(3)} device px off`);
+    }, { css: HIDE_UI_CSS, deviceScaleFactor: dpr, width, height });
+  }
+}
+
+const stop = await ensureDevServer(ORIGIN);
+try {
+  await Promise.all([simChecks(), pixelChecks()]);
 } catch (error) {
   check('ran to completion', false, String(error).slice(0, 200));
 } finally {

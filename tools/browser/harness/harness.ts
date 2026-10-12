@@ -5,6 +5,8 @@
  * cell), `colliders` (outline the colliders). Exposes `window.__h` for tests/test-ui.mjs.
  */
 import { SETTINGS } from '../../../src/settings';
+import { computeGridGeometry } from '../../../src/engine/grid-geometry';
+import { applyHeaderHeight } from '../../../src/ui/frame';
 import { ColliderManager } from '../../../src/engine/collider';
 import { createElementRegistry } from '../../../src/elements';
 import { loadProjects } from '../../../src/projects';
@@ -38,20 +40,13 @@ if (n > projects.length) {
 initHeader();
 const canvas = document.getElementById('sandbox') as HTMLCanvasElement;
 const dpr = window.devicePixelRatio || 1;
-const cssW = window.innerWidth;
-const cssH = window.innerHeight - SETTINGS.HEADER_HEIGHT;
-canvas.width = cssW * dpr;
-canvas.height = cssH * dpr;
-canvas.style.width = `${cssW}px`;
-canvas.style.height = `${cssH}px`;
+const geometry = computeGridGeometry(window.innerWidth, window.innerHeight - applyHeaderHeight(), dpr, tile, SETTINGS.MAX_SIM_DIMENSION);
+const { tilePx, tileSize, width, height, originY } = geometry;
+canvas.width = geometry.deviceWidth;
+canvas.height = geometry.deviceHeight;
+canvas.style.width = `${geometry.cssWidth}px`;
+canvas.style.height = `${geometry.cssHeight}px`;
 const ctx = canvas.getContext('2d')!;
-ctx.scale(dpr, dpr);
-
-const tilePx = Math.max(1, Math.round(tile * dpr));
-const tileSize = tilePx / dpr;
-const width = Math.ceil(canvas.width / tilePx);
-const height = Math.ceil(canvas.height / tilePx);
-const originY = (canvas.height - height * tilePx) / dpr;
 const colliders = new ColliderManager();
 const stamped: { x: number; y: number; w: number; h: number; words: Uint32Array }[] = [];
 
@@ -68,7 +63,7 @@ const fake = {
 
 function draw(): void {
   ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(0, 0, cssW, cssH);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (const s of stamped) {
     for (let j = 0; j < s.h; j++) {
       for (let i = 0; i < s.w; i++) {
@@ -77,13 +72,13 @@ function draw(): void {
         const el = registry.get(word & 0xff);
         const [r, g, b] = el?.getColor(0, (word >> 16) & 0xff) ?? [255, 0, 255];
         ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.fillRect((s.x + i) * tileSize, originY + (s.y + j) * tileSize, tileSize, tileSize);
+        ctx.fillRect((s.x + i) * tilePx, canvas.height - (height - s.y - j) * tilePx, tilePx, tilePx);
       }
     }
   }
   if (params.has('colliders')) {
     ctx.strokeStyle = 'rgba(255,0,0,0.9)';
-    colliders.forEachRect((r) => ctx.strokeRect(r.x * tileSize + 0.5, originY + r.y * tileSize + 0.5, r.w * tileSize - 1, r.h * tileSize - 1));
+    colliders.forEachRect((r) => ctx.strokeRect(r.x * tilePx + 0.5, canvas.height - (height - r.y) * tilePx + 0.5, r.w * tilePx - 1, r.h * tilePx - 1));
   }
 }
 

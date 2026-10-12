@@ -1,4 +1,5 @@
 import type { ElementRegistry } from '../engine/element';
+import type { Rect } from '../engine/collider';
 import type { GpuSimulation } from '../engine/gpu/gpu-simulation';
 import type { Project } from '../projects/project';
 import { SITE } from '../site';
@@ -35,6 +36,12 @@ export class Board {
   private nameRows = 0;
   private taglineRows = 0;
 
+  /** Exact grid rect of a chip's interior, or null while the chips are hidden. */
+  private chipRect(index: number): Rect | null {
+    const box = this.layout?.chips[index];
+    return box === undefined ? null : { x: box.gx, y: box.gy, w: box.gw, h: box.gh };
+  }
+
   /** Called when a chip is activated. */
   onOpen: ((project: Project, chip: HTMLElement) => void) | null = null;
 
@@ -52,7 +59,8 @@ export class Board {
     for (const project of projects) {
       const element = this.createChip(project);
       overlay.add(element);
-      overlay.registerCollider(element);
+      const index = this.chips.length;
+      overlay.registerCollider(element, () => this.chipRect(index));
       const type = registry.getByName(project.border)?.type;
       if (type === undefined) throw new Error(`Project "${project.id}" uses unregistered border "${project.border}"`);
       this.chips.push({ project, element, type, lit: false });
@@ -199,7 +207,7 @@ export class Board {
 
   /** Write the name lettering and every chip's ring into the grid (after a grid reset). */
   stamp(): void {
-    if (this.layout === null || (window as unknown as { __NOSTAMP?: boolean }).__NOSTAMP) return;
+    if (this.layout === null) return;
     this.stampLettering();
     for (const chip of this.chips) this.stampRing(chip);
   }

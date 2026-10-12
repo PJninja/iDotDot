@@ -5,6 +5,7 @@
 //   npm run test:ui          (or: node tools/browser/test-ui.mjs [name filter])
 // The board runs in a harness page against a fake world (tools/browser/harness); takes seconds.
 // Exits 1 if any check fails.
+import { computeGridGeometry, snapToDevicePixels } from '../../src/engine/grid-geometry.ts';
 import { ensureDevServer, withPage } from './launch.mjs';
 
 const ORIGIN = 'http://localhost:5173';
@@ -80,6 +81,37 @@ const boardState = (page) =>
     const lettersRight = Math.max(0, ...[...tiles.keys()].map((k) => Number(k.split(',')[0])));
     return { fits: h.fits, overlaps, ringed, torches, lettersRight, gridCells: h.gridWidth };
   });
+
+/**
+ * Pixel geometry, checked as arithmetic (no browser): at every pixel ratio that occurs, the canvas
+ * covers whole device pixels, starts on a pixel edge under the snapped header, and is not stretched.
+ */
+function geometryChecks() {
+  if (filter && !'pixel geometry'.includes(filter)) return;
+  const ratios = [0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.5, 1.75, 2, 2.625, 3];
+  const windows = [[1280, 720], [1366, 768], [1920, 1080], [412, 915], [390, 844]];
+  const bad = { stretched: [], offEdge: [], fractionalTile: [], overflow: [] };
+  const whole = (v) => Math.abs(v - Math.round(v)) < 1e-9;
+  for (const dpr of ratios) {
+    for (const [w, h] of windows) {
+      const header = snapToDevicePixels(48, dpr);
+      const g = computeGridGeometry(w, h - header, dpr, 4, 2048);
+      const label = `${dpr}x ${w}x${h}`;
+      if (Math.abs(g.cssWidth * dpr - g.deviceWidth) > 1e-9 || Math.abs(g.cssHeight * dpr - g.deviceHeight) > 1e-9) bad.stretched.push(label);
+      if (!whole(header * dpr)) bad.offEdge.push(label);
+      if (!Number.isInteger(g.tilePx) || !whole(g.tileSize * dpr)) bad.fractionalTile.push(label);
+      if (g.deviceWidth > w * dpr + 1e-6 || Math.round(header * dpr) + g.deviceHeight > h * dpr + 1e-6) bad.overflow.push(label);
+    }
+  }
+  const report = (name, list) => {
+    results.push(list.length === 0);
+    console.log(`${list.length === 0 ? 'PASS' : 'FAIL'}  pixel geometry: ${name}${list.length ? ` (${list.slice(0, 4).join('; ')})` : ''}`);
+  };
+  report('the canvas is whole device pixels on screen, never stretched', bad.stretched);
+  report('the canvas starts on a device pixel edge below the header', bad.offEdge);
+  report('a tile is a whole number of device pixels', bad.fractionalTile);
+  report('the canvas stays inside the window', bad.overflow);
+}
 
 const stop = await ensureDevServer(ORIGIN);
 try {
@@ -160,6 +192,7 @@ try {
     const notice = await page.evaluate(() => document.querySelector('.plain-notice')?.textContent);
     t('a browser without WebGPU gets the plain page with the reason', notice === 'WebGPU is not available in this browser, so the simulation cannot run.', notice);
   }, { initScript: () => Object.defineProperty(navigator, 'gpu', { value: undefined }) });
+  geometryChecks();
   await runAll();
 } finally {
   stop();

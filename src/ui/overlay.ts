@@ -1,8 +1,5 @@
-import { SETTINGS } from '../settings';
 import type { ColliderManager, Rect } from '../engine/collider';
-
-/** Browsers snap element edges to 1/64 px; an edge within this many px of a cell edge counts as on it. */
-const EDGE_TOLERANCE_PX = 0.05;
+import { headerHeight } from './frame';
 
 /** Live CSS-pixel-to-grid mapping (GpuSimulation); both change on resize. */
 interface GridMapping {
@@ -20,6 +17,8 @@ export class Overlay {
   readonly root: HTMLElement;
   /** Registered collider elements and the grid rect each currently occupies. */
   private readonly colliderRects = new Map<HTMLElement, Rect>();
+  /** Elements whose grid rect is known exactly, so it is taken from there instead of measured. */
+  private readonly knownRects = new Map<HTMLElement, () => Rect | null>();
   private readonly resizeObserver = new ResizeObserver(() => this.refreshColliders());
 
   constructor(
@@ -40,11 +39,13 @@ export class Overlay {
   /**
    * Make the simulation treat an element as solid. Its DOM rect is converted
    * to a grid-space collider and kept up to date: it is re-measured when the
-   * element resizes and on refreshColliders (call after window resizes).
+   * element resizes and on refreshColliders (call after window resizes). An element laid out in
+   * whole cells passes `knownRect`, which supplies its exact grid rect (or null when it has none,
+   * for example while hidden) so the browser's sub-pixel rounding never enters into it.
    */
-  registerCollider(element: HTMLElement): void {
-    if ((window as unknown as { __NOCOLLIDE?: boolean }).__NOCOLLIDE) return;
+  registerCollider(element: HTMLElement, knownRect?: () => Rect | null): void {
     if (this.colliderRects.has(element)) return;
+    if (knownRect) this.knownRects.set(element, knownRect);
     const rect = this.measure(element);
     this.colliderRects.set(element, rect);
     this.colliders.add(rect);
@@ -57,6 +58,7 @@ export class Overlay {
     if (rect === undefined) return;
     this.colliders.remove(rect);
     this.colliderRects.delete(element);
+    this.knownRects.delete(element);
     this.resizeObserver.unobserve(element);
   }
 
@@ -73,18 +75,18 @@ export class Overlay {
 
   /** Grid-space rect covering every cell the element touches. */
   private measure(element: HTMLElement): Rect {
+    const known = this.knownRects.get(element)?.();
+    if (known) return { ...known };
     const rect = element.getBoundingClientRect();
     const { tileSize, originY } = this.grid;
-    const top = rect.top - SETTINGS.HEADER_HEIGHT - originY;
-    // Elements placed exactly on cell edges can measure a hair off; the tolerance keeps them from spilling into the next cell.
-    const epsilon = EDGE_TOLERANCE_PX / tileSize;
-    const x = Math.floor(rect.left / tileSize + epsilon);
-    const y = Math.floor(top / tileSize + epsilon);
+    const top = rect.top - headerHeight() - originY;
+    const x = Math.floor(rect.left / tileSize);
+    const y = Math.floor(top / tileSize);
     return {
       x,
       y,
-      w: Math.max(1, Math.ceil(rect.right / tileSize - epsilon) - x),
-      h: Math.max(1, Math.ceil((top + rect.height) / tileSize - epsilon) - y),
+      w: Math.max(1, Math.ceil(rect.right / tileSize) - x),
+      h: Math.max(1, Math.ceil((top + rect.height) / tileSize) - y),
     };
   }
 }
