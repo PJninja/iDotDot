@@ -7,6 +7,7 @@ import {
   NARROW,
   NARROW_MIN_WIDTH,
   RING_CELLS,
+  TALL_CANVAS_HEIGHT,
   WIDE,
   WIDE_MIN_WIDTH,
   WORLD_CELLS,
@@ -68,7 +69,8 @@ export interface PlacementInput {
 export function placeBoard(input: PlacementInput): BoardPlacement | null {
   if (input.windowHeight - input.headerHeight < MIN_CANVAS_HEIGHT) return null;
   if (input.windowWidth < COMPACT_MIN_WIDTH) return null;
-  const mode: BoardMode = input.windowWidth >= WIDE_MIN_WIDTH ? 'wide' : input.windowWidth >= NARROW_MIN_WIDTH ? 'narrow' : 'compact';
+  const tall = input.windowHeight - input.headerHeight >= TALL_CANVAS_HEIGHT;
+  const mode: BoardMode = !tall || input.windowWidth < NARROW_MIN_WIDTH ? 'compact' : input.windowWidth >= WIDE_MIN_WIDTH ? 'wide' : 'narrow';
   const world = input.world ?? WORLD_CELLS;
   const mobileWorld = isMobileWorld(world);
   if (mobileWorld && mode !== 'compact') return null;

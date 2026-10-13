@@ -6,7 +6,7 @@ import { SETTINGS } from '../settings';
 /**
  * Grass (type 16) - a falling tile with high friction, so it lies in steep, clumpy
  * piles. It spreads over mud (Mud turns into grass beside it, see Mud.GRASS_GROW_CHANCE),
- * slowly rots into methane while touching water, rots into mold touching mold, and burns very easily: flames, embers, sparks
+ * slowly turns back into mud while touching water and no air, rots into mold touching mold, and burns very easily: flames, embers, sparks
  * and hot steel turn it into an ember.
  */
 export class Grass extends Element {
@@ -20,8 +20,8 @@ export class Grass extends Element {
 
   /** Chance per step that grass touching mold rots into mold. */
   static MOLD_CHANCE = 0.008;
-  /** Chance per step that grass touching water rots away (into methane). */
-  static ROT_CHANCE = 0.002;
+  /** Chance per step that grass touching water (and no air) turns back into mud. */
+  static SOAK_CHANCE = 0.002;
   /** Chance per step that grass touching a flame catches and turns into an ember. */
   static FLAME_IGNITE_CHANCE = 0.08;
   /** Chance per step that grass touching an ember catches. */
@@ -39,7 +39,6 @@ export class Grass extends Element {
   readonly flammable = true;
   readonly blastResistance = 0.1;
   readonly reactions: readonly Reaction[] = [
-    { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.METHANE_TYPE, chance: Grass.ROT_CHANCE },
     { with: SETTINGS.MOLD_TYPE, becomes: SETTINGS.MOLD_TYPE, chance: Grass.MOLD_CHANCE },
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.FLAME_IGNITE_CHANCE },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.EMBER_IGNITE_CHANCE },
@@ -48,6 +47,10 @@ export class Grass extends Element {
     { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.ARC_IGNITE_CHANCE },
     { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.LIVE_STEEL_IGNITE_CHANCE },
     { with: SETTINGS.LIVE_COPPER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.LIVE_STEEL_IGNITE_CHANCE },
+    // Grass touching air stays grass (a sure no-op hit ends the rule scan), so only grass that is
+    // touching water and no air turns into mud; reeds and shore grass above the waterline survive.
+    { with: SETTINGS.AIR_TYPE, becomes: SETTINGS.GRASS_TYPE, chance: 1 },
+    { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.MUD_TYPE, chance: Grass.SOAK_CHANCE },
   ];
 
   static GRASS_VARIANT_COUNT = 4;

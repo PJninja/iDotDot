@@ -38,7 +38,7 @@ const ARC_RECEPTIVE = new Set<number>([...STEEL_FAMILY, ...COPPER_FAMILY, ...WAT
 /** Live steel and generators throw arcs into empty cells beside them; copper never does. */
 const isEmitter = (t: number): boolean => STEEL_FAMILY.has(t) || t === T.GENERATOR;
 /** Live steel and live copper light these on contact, and arcs light them too. */
-const FLAMMABLE = new Set<number>([T.WOOD, T.GRASS, T.CHARCOAL, T.BOMB, T.METHANE]);
+const FLAMMABLE = new Set<number>([T.WOOD, T.BARK, T.LEAVES, T.GRASS, T.CHARCOAL, T.BOMB, T.METHANE]);
 const EXPLOSIVE = new Set<number>([T.BOMB, T.METHANE]);
 
 /**
@@ -55,9 +55,9 @@ const BLAST_CLEARANCE = 22;
 const BLAST = { reach: 200, hop: 10, diagonal: 14, solid: 15, absorb: 20 };
 /** Element.blastResistance of every type that has one (the rest have 0). */
 const BLAST_RESISTANCE = new Map<number, number>([
-  [T.ACID, 0.75], [T.ASH, 0.05], [T.CHARCOAL, 0.2], [T.COOLING_STEEL, 0.98], [T.COPPER, 0.95], [T.DIRT, 0.35],
+  [T.ACID, 0.75], [T.ASH, 0.05], [T.BARK, 0.35], [T.CHARCOAL, 0.2], [T.CHARRED_BARK, 0.15], [T.COOLING_STEEL, 0.98], [T.COPPER, 0.95], [T.DIRT, 0.35],
   [T.EMBER, 0.3], [T.FUSE, 0.3], [T.GENERATOR, 0.5], [T.GRASS, 0.1], [T.HOT_STEEL, 0.98], [T.ICE, 0.2],
-  [T.LIVE_COPPER, 0.95], [T.LIVE_FUSE, 0.3], [T.LIVE_STEEL, 0.98], [T.MOLD, 0.1], [T.MUD, 0.5], [T.NUMB_WATER, 0.75],
+  [T.LEAVES, 0.05], [T.LIVE_COPPER, 0.95], [T.LIVE_FUSE, 0.3], [T.LIVE_STEEL, 0.98], [T.MOLD, 0.1], [T.MUD, 0.5], [T.NUMB_WATER, 0.75],
   [T.RUBBER, 0.3], [T.RUBBLE, 0.4], [T.SAND, 0.2], [T.SHOCKED_WATER, 0.75], [T.SPENT_COPPER, 0.95], [T.SPENT_STEEL, 0.98],
   [T.SPRING, 0.9], [T.STEEL, 0.98], [T.STONE, 0.9], [T.TORCH, 0.3], [T.WATER, 0.75], [T.WET_SAND, 0.5], [T.WOOD, 0.3],
 ]);

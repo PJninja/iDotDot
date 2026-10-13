@@ -32,7 +32,7 @@ async function runGroup({ name, url, body, options }) {
       await page.waitForTimeout(400);
       await body(page, report);
       if (log.pageErrors.length > 0) report('no uncaught page errors', false, log.pageErrors.join(' | ').slice(0, 200));
-    }, { gpu: false, ...options });
+    }, { gpu: false, width: 1280, height: 800, ...options });
   } catch (error) {
     report('ran to completion', false, String(error).slice(0, 200));
   }
@@ -124,21 +124,22 @@ function geometryChecks() {
 const stop = await ensureDevServer(ORIGIN);
 try {
   // Board layout: device-dependent (screen size, pixel ratio -> fractional tile sizes), and where
-  // the chip/collider/ring alignment has broken before. Windows 920 px and wider show four big
-  // chips, 420 px and wider one column of two big chips, narrower ones two small chips, and a
-  // canvas shorter than 600 px falls back to the plain page.
+  // the chip/collider/ring alignment has broken before. Windows 1120 px and wider show four big
+  // chips, 540 px and wider one column of two big chips (both need a canvas 728 px tall), narrower
+  // or shorter ones two small chips, and a canvas shorter than 600 px falls back to the plain page.
   // Pixel ratios that divide the 4 px tile evenly (1.25x, 1.5x, 2x, 3x) behave like 1x; browser zoom
   // (110%, 90%, ...) and some phones (Pixel-class 2.625x) give a fractional tile size instead.
   // Only combinations that can occur are listed.
   const screens = [
-    ['desktop 1280x720', '?n=12', { width: 1280, height: 720 }, 4, 400],
-    ['large 1920x1080', '?n=12', { width: 1920, height: 1080 }, 4, 400],
-    ['browser zoom 110% (fractional tile size)', '?n=12', { width: 1280, height: 720, deviceScaleFactor: 1.1 }, 4, 400],
-    ['tablet 700x900 (one column of big chips)', '?n=12', { width: 700, height: 900 }, 2, 400],
+    ['desktop 1280x800', '?n=12', { width: 1280, height: 800 }, 4, 520],
+    ['large 1920x1080', '?n=12', { width: 1920, height: 1080 }, 4, 520],
+    ['browser zoom 110% (fractional tile size)', '?n=12', { width: 1280, height: 800, deviceScaleFactor: 1.1 }, 4, 520],
+    ['tablet 700x900 (one column of big chips)', '?n=12', { width: 700, height: 900 }, 2, 520],
+    ['short laptop 1280x720 (small chips)', '?n=12', { width: 1280, height: 720 }, 2, 200],
     ['Pixel-class phone 412x915 at 2.625x (small chips)', '?n=12', { width: 412, height: 915, deviceScaleFactor: 2.625 }, 2, 200],
     ['window too short for the board', '?n=12', { width: 1280, height: 500 }, 0, 0],
     // The tile size dropdown (1, 2, 4, 8, 16 px); 4 px is the default and is covered above.
-    ...[1, 2, 8, 16].map((tile) => [`${tile} px tiles`, `?n=12&tile=${tile}`, { width: 1280, height: 720 }, 4, 400]),
+    ...[1, 2, 8, 16].map((tile) => [`${tile} px tiles`, `?n=12&tile=${tile}`, { width: 1280, height: 800 }, 4, 520]),
   ];
   for (const [label, query, options, chips, chipWidth] of screens) {
     group(`layout: ${label}`, `${HARNESS}${query}`, async (page, t) => {

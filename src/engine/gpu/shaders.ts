@@ -10,6 +10,7 @@
 import { MAX_OUTCOMES, MAX_REACTIONS } from '../element';
 import { Explosion } from '../../elements/explosion';
 import { Flame } from '../../elements/flame';
+import { Leaves } from '../../elements/leaves';
 import { Methane } from '../../elements/methane';
 import { ShockedWater } from '../../elements/shocked-water';
 import { Smoke } from '../../elements/smoke';
@@ -162,6 +163,14 @@ const VEIN_WIDTH : f32 = ${ShockedWater.VEIN_WIDTH};
 const VEIN_SCALE : f32 = ${ShockedWater.VEIN_SCALE}.0;
 const VEIN_FLICKER_HZ : f32 = ${ShockedWater.FLICKER_HZ}.0;
 const NUMB_GLOW : f32 = ${ShockedWater.NUMB_GLOW};
+const LEAVES : u32 = ${SETTINGS.LEAVES_TYPE}u;
+const RUSTLE_AMOUNT : f32 = ${Leaves.RUSTLE_AMOUNT};
+const RUSTLE_CALM : f32 = ${Leaves.RUSTLE_CALM};
+const GUST_SCALE : f32 = ${Leaves.GUST_SCALE}.0;
+const GUST_SPEED : f32 = ${Leaves.GUST_SPEED}.0;
+const FLUTTER_HZ : f32 = ${Leaves.FLUTTER_HZ};
+const LEAF_UNDERSIDE : vec3f = ${wgslColor(Leaves.UNDERSIDE_COLOR)};
+const UNDERSIDE_AMOUNT : f32 = ${Leaves.UNDERSIDE_AMOUNT};
 const WISP_AMOUNT : f32 = ${Smoke.WISP_AMOUNT};
 const WISP_SCALE : f32 = ${Smoke.WISP_SCALE}.0;
 const WISP_RISE : f32 = ${Smoke.RISE_SPEED * SETTINGS.SIM_HZ};
@@ -174,7 +183,7 @@ fn hash2(c : vec2u) -> f32 {
 }
 
 fn valueNoise(p : vec2f) -> f32 {
-  let c = vec2u(floor(p));
+  let c = bitcast<vec2u>(vec2i(floor(p)));
   let t = smoothstep(vec2f(0.0), vec2f(1.0), p - floor(p));
   let top = mix(hash2(c), hash2(c + vec2u(1u, 0u)), t.x);
   let bottom = mix(hash2(c + vec2u(0u, 1u)), hash2(c + vec2u(1u, 1u)), t.x);
@@ -188,6 +197,15 @@ fn veins(g : vec2f) -> vec2f {
   let q = g / VEIN_SCALE + vec2f(hash2(vec2u(u32(frame), 7u)), hash2(vec2u(u32(frame), 13u))) * 64.0;
   let d = abs(0.6 * valueNoise(q) + 0.4 * valueNoise(q * 2.3 + 5.0) - 0.5);
   return vec2f(1.0 - smoothstep(0.0, VEIN_WIDTH, d), 1.0 - smoothstep(0.0, VEIN_WIDTH * 4.0, d));
+}
+
+// Leaves rustling, per tile: broad gusts drift across the canopy and each leaf flutters
+// within them. Returns the shade shift (-1..1) and how far the leaf shows its underside (0..1).
+fn rustle(cell : vec2f) -> vec2f {
+  let strength = mix(RUSTLE_CALM, 1.0, min(abs(u.wind), 1.0));
+  let gust = valueNoise(vec2f(cell.x - u.time * GUST_SPEED, cell.y + 0.3 * cell.x) / GUST_SCALE) * strength;
+  let flutter = valueNoise(cell * 0.9 + vec2f(u.time * FLUTTER_HZ, 31.0));
+  return vec2f(gust * (2.0 * flutter - 1.0), smoothstep(0.7, 0.95, flutter * gust));
 }
 
 // Three octaves of noise scrolling upward at the smoke's rise speed (0..1).
@@ -224,6 +242,11 @@ fn fs(@builtin(position) pos : vec4f) -> @location(0) vec4f {
   if (t != 0u && u.types[t].haze == HAZE_NONE) {
     let row = select((p >> 16u) & 0xFFu, p >> 24u, u.types[t].ageRate > 0.0);
     color = textureLoad(colorTex, vec2u(t, row), 0);
+  }
+  if (t == LEAVES) {
+    let r = rustle(vec2f(f32(gx), f32(gy)));
+    let rgb = color.rgb * (1.0 + RUSTLE_AMOUNT * r.x);
+    color = vec4f(mix(rgb, LEAF_UNDERSIDE, UNDERSIDE_AMOUNT * r.y), 1.0);
   }
 
   let water = haze[i].y;

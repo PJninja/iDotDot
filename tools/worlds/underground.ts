@@ -34,7 +34,7 @@ export const MOBILE_LAYOUT: BoardLayout = { block: MOBILE_BLOCK, gallery: MOBILE
 
 /** Row of the first ground cell on the flat plateaus; every world is "above ground" up to here. */
 export const SURFACE = 158;
-/** Last open row of every underground pocket. */
+/** Last open row of every underground pocket. The world runs 42 rows further down, under the board's gallery. */
 export const POCKET_FLOOR = 337;
 
 export interface Pocket {
@@ -46,15 +46,15 @@ export interface Pocket {
 
 /**
  * The five underground pockets shared by all worlds. The portfolio board sits in the rock at
- * columns 211 to 429 (`BLOCK`) and runs from row 202 down to the floor with its gallery, so
+ * columns 184 to 456 (`BLOCK`) and runs from row 202 down to the floor with its gallery, so
  * no room fits under it: pocket 2 stands left of its hall and pocket 4 right of it, both
- * narrow. Pockets 1 and 6 keep their boxes; pocket 5 sits 8 columns further east than it
- * used to, to make room for pocket 4.
+ * 33 and 31 cells wide, so the 30% larger chips fit between them. Pockets 1, 5 and 6 keep
+ * their boxes.
  */
 export const POCKETS: Pocket[] = [
   { x: 14, y: 205, w: 126, h: 133 },
-  { x: 152, y: 200, w: 52, h: 138 },
-  { x: 436, y: 245, w: 52, h: 92 },
+  { x: 146, y: 200, w: 33, h: 138 },
+  { x: 460, y: 245, w: 31, h: 92 },
   { x: 494, y: 225, w: 70, h: 113 },
   { x: 570, y: 240, w: 64, h: 98 },
 ];
@@ -63,13 +63,13 @@ export const POCKETS: Pocket[] = [
 export function fillGround(g: Grid, surface: (x: number) => number, grassUntil = 640): void {
   for (let x = 0; x < 640; x++) {
     const top = surface(x);
-    for (let y = top; y < 348; y++) g.set(x, y, y < top + 12 ? T.DIRT : T.STONE);
+    for (let y = top; y < g.height; y++) g.set(x, y, y < top + 12 ? T.DIRT : T.STONE);
     g.set(x, top, x < grassUntil ? T.GRASS : T.DIRT);
     g.set(x, top + 1, x < grassUntil ? T.GRASS : T.DIRT);
   }
   for (let i = 0; i < 60; i++) {
     const type = [T.RUBBLE, T.DIRT, T.SAND, T.MUD][Math.floor(g.rand() * 4)];
-    g.ellipse(Math.floor(g.rand() * 640), 175 + Math.floor(g.rand() * 165), 3 + g.rand() * 6, 2 + g.rand() * 3, type);
+    g.ellipse(Math.floor(g.rand() * 640), 175 + Math.floor(g.rand() * (g.height - 183)), 3 + g.rand() * 6, 2 + g.rand() * 3, type);
   }
 }
 
@@ -106,7 +106,7 @@ export function shaft(g: Grid, x: number, y0: number, w: number, y1: number): vo
 }
 
 /** Cells of air between the block and the walls of its hall. */
-const HALL_MARGIN = 2;
+const HALL_MARGIN = 1;
 
 /**
  * The gallery corridor under the chips: a brick-lined gallery whose air interior is where the

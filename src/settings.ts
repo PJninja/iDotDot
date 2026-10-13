@@ -55,6 +55,9 @@ export const SETTINGS = {
   COPPER_TYPE: 37,
   LIVE_COPPER_TYPE: 38,
   SPENT_COPPER_TYPE: 39,
+  BARK_TYPE: 40,
+  CHARRED_BARK_TYPE: 41,
+  LEAVES_TYPE: 42,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

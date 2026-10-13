@@ -278,64 +278,64 @@ function forge(g: Grid): void {
   });
 }
 
-/** Cold cellar (pocket 2): a snowman by the heater, an ice basin under a dripping spring, a shelf of books. */
+/** Cold cellar (pocket 2, 33 wide): a snowman by the heater, an ice basin under a dripping spring, a shelf of books. */
 function coldCellar(g: Grid): void {
   const floor = 137;
   // spring in the bore of a supply pipe, dripping onto a stepped ice mound
-  g.pipe([[14, 0], [14, 50]], 3, 1, T.STEEL);
-  g.rect(12, 50, 5, 2, T.STEEL);
-  g.rect(13, 50, 3, 4, T.AIR);
-  for (const x of [13, 14, 15]) g.set(x, 48, T.SPRING);
-  for (const [dx, len] of [[-3, 4], [4, 5], [5, 3]]) g.rect(14 + dx, 52, 1, len, T.ICE);
+  g.pipe([[7, 0], [7, 50]], 3, 1, T.STEEL);
+  g.rect(5, 50, 5, 2, T.STEEL);
+  g.rect(6, 50, 3, 4, T.AIR);
+  for (const x of [6, 7, 8]) g.set(x, 48, T.SPRING);
+  for (const [dx, len] of [[-3, 4], [0, 5], [1, 3]]) g.rect(7 + dx, 52, 1, len, T.ICE);
   g.rect(0, floor - 12, 2, 13, T.STONE);
-  g.rect(20, floor - 12, 2, 13, T.STONE);
-  g.rect(2, floor - 4, 18, 5, T.ICE);
-  for (let r = 0; r < 4; r++) g.rect(2 + r * 3, floor - 13 - r * 8, 16 - r * 3, 8, T.ICE);
+  g.rect(12, floor - 12, 2, 13, T.STONE);
+  g.rect(2, floor - 4, 10, 5, T.ICE);
+  for (let r = 0; r < 3; r++) g.rect(2 + r * 2, floor - 13 - r * 8, 10 - r * 4, 8, T.ICE);
   // snowman
-  const sx = 31;
-  g.disc(sx, floor - 10, 9, T.ICE);
-  g.disc(sx, floor - 26, 7, T.ICE);
-  g.disc(sx, floor - 38, 5, T.ICE);
-  for (const [dx, dy] of [[-2, -40], [2, -40], [0, -27], [0, -23], [0, -14]]) g.set(sx + dx, floor + dy, T.CHARCOAL);
-  for (const [dx, dy] of [[-3, -36], [-2, -35], [-1, -34], [0, -34], [1, -34], [2, -35], [3, -36]]) g.set(sx + dx, floor + dy, T.CHARCOAL);
-  g.rect(sx, floor - 38, 4, 1, T.WOOD);
-  g.line(sx - 7, floor - 27, sx - 10, floor - 31, T.STONE, 1);
-  g.line(sx + 7, floor - 27, sx + 10, floor - 31, T.STONE, 1);
-  g.rect(sx - 4, floor - 46, 9, 2, T.STEEL);
-  g.rect(sx - 3, floor - 50, 7, 4, T.STEEL);
-  g.rect(sx - 5, floor - 33, 11, 2, T.MOLD);
+  const sx = 21;
+  g.disc(sx, floor - 7, 6, T.ICE);
+  g.disc(sx, floor - 19, 5, T.ICE);
+  g.disc(sx, floor - 28, 4, T.ICE);
+  for (const [dx, dy] of [[-2, -30], [2, -30], [0, -20], [0, -17], [0, -10]]) g.set(sx + dx, floor + dy, T.CHARCOAL);
+  for (const [dx, dy] of [[-2, -27], [-1, -26], [0, -26], [1, -26], [2, -27]]) g.set(sx + dx, floor + dy, T.CHARCOAL);
+  g.rect(sx, floor - 28, 4, 1, T.WOOD);
+  g.line(sx - 5, floor - 20, sx - 8, floor - 24, T.STONE, 1);
+  g.line(sx + 5, floor - 20, sx + 7, floor - 24, T.STONE, 1);
+  g.rect(sx - 3, floor - 36, 7, 2, T.STEEL);
+  g.rect(sx - 2, floor - 39, 5, 3, T.STEEL);
+  g.rect(sx - 4, floor - 25, 9, 2, T.MOLD);
   // heater a few cells from the snowman
-  g.rect(43, floor - 24, 9, 2, T.STEEL);
-  g.rect(46, floor - 22, 2, 23, T.STEEL);
-  g.rect(44, floor - 25, 2, 1, T.TORCH);
-  g.rect(48, floor - 25, 2, 1, T.TORCH);
+  g.rect(29, floor - 24, 4, 2, T.STEEL);
+  g.rect(30, floor - 22, 2, 23, T.STEEL);
+  g.rect(29, floor - 25, 1, 1, T.TORCH);
+  g.rect(32, floor - 25, 1, 1, T.TORCH);
   // shelf of books
-  g.bricks(26, 64, 24, 3, T.STONE, 8, 3);
-  g.bricks(28, 67, 3, 6, T.STONE, 3, 3);
-  g.bricks(45, 67, 3, 6, T.STONE, 3, 3);
+  g.bricks(10, 64, 22, 3, T.STONE, 8, 3);
+  g.bricks(12, 67, 3, 6, T.STONE, 3, 3);
+  g.bricks(27, 67, 3, 6, T.STONE, 3, 3);
   const spines = [T.STONE, T.STEEL, T.ICE, T.STEEL, T.STONE, T.ICE, T.STONE];
-  spines.forEach((type, i) => g.rect(28 + i * 3, 64 - 8 - ((i * 7) % 5), 3, 8 + ((i * 7) % 5), type));
-  for (let x = 20; x < 52; x += 5) g.rect(x, 0, 1, 2 + Math.floor(g.rand() * 8), T.ICE);
+  spines.forEach((type, i) => g.rect(12 + i * 3, 64 - 8 - ((i * 7) % 5), 3, 8 + ((i * 7) % 5), type));
+  for (let x = 14; x < 33; x += 5) g.rect(x, 0, 1, 2 + Math.floor(g.rand() * 8), T.ICE);
 }
 
-/** Cistern (pocket 4): the greenhouse drain falls in; ice grows on a raft, a chest and an anchor lie on the bed. */
+/** Cistern (pocket 4, 31 wide): the greenhouse drain falls in; ice grows on a raft, a chest and an anchor lie on the bed. */
 function cistern(g: Grid): void {
   const floor = 92;
-  g.rect(0, 30, 52, floor - 29, T.WATER);
-  for (const x of [18, 40]) g.bricks(x, 0, 6, floor + 1, T.STONE, 6, 3);
-  for (const x of [18, 40]) g.rect(x, 30, 6, floor - 29, T.STONE);
-  for (const cx of [28, 46]) g.ring(cx, 0, 10, 3, T.STONE);
-  for (const x of [6, 28, 36, 48]) g.rect(x, 3, 1, 3 + Math.floor(g.rand() * 8), T.ICE);
-  g.rect(26, floor - 6, 12, 6, T.WOOD);
-  g.rect(26, floor - 4, 12, 1, T.STEEL);
-  g.rect(31, floor - 8, 2, 2, T.STEEL);
-  g.line(8, floor - 14, 8, floor, T.STEEL, 1);
-  g.line(3, floor - 12, 13, floor - 12, T.STEEL, 1);
-  g.line(3, floor - 2, 8, floor, T.STEEL, 1);
-  g.line(13, floor - 2, 8, floor, T.STEEL, 1);
-  g.scatter(38, floor - 2, 14, 3, T.ASH, 0.6, T.WATER);
-  g.scatter(18, 20, 6, 10, T.MOLD, 0.3, T.STONE);
-  g.scatter(40, 20, 6, 10, T.MOLD, 0.3, T.STONE);
+  g.rect(0, 30, 31, floor - 29, T.WATER);
+  for (const x of [9, 18]) g.bricks(x, 0, 5, floor + 1, T.STONE, 5, 3);
+  for (const x of [9, 18]) g.rect(x, 30, 5, floor - 29, T.STONE);
+  for (const cx of [14, 23]) g.ring(cx, 0, 8, 3, T.STONE);
+  for (const x of [4, 15, 24, 28]) g.rect(x, 3, 1, 3 + Math.floor(g.rand() * 8), T.ICE);
+  g.rect(23, floor - 6, 8, 6, T.WOOD);
+  g.rect(23, floor - 4, 8, 1, T.STEEL);
+  g.rect(26, floor - 8, 2, 2, T.STEEL);
+  g.line(4, floor - 14, 4, floor, T.STEEL, 1);
+  g.line(0, floor - 12, 8, floor - 12, T.STEEL, 1);
+  g.line(0, floor - 2, 4, floor, T.STEEL, 1);
+  g.line(8, floor - 2, 4, floor, T.STEEL, 1);
+  g.scatter(14, floor - 2, 4, 3, T.ASH, 0.6, T.WATER);
+  g.scatter(9, 20, 5, 10, T.MOLD, 0.3, T.STONE);
+  g.scatter(18, 20, 5, 10, T.MOLD, 0.3, T.STONE);
 }
 
 /** Waste pit (pocket 5): a glass tank of spent acid dissolving a skull, leaking drums over a mud bed. */
@@ -522,9 +522,9 @@ export function buildAlchemistLab(): Grid {
   pipeLattice(g);
 
   // shafts: the greenhouse drain to the cistern, the forge flue and the gas cellar vent to the surface
-  lined(g, [[416, 176, 26, 4]]);
+  lined(g, [[416, 176, 50, 4]]);
   shaft(g, 416, SURFACE, 4, 177);
-  shaft(g, 438, 176, 4, 245);
+  shaft(g, 462, 176, 4, 245);
   shaft(g, 14 + 28, 118 + 3, 8, 205 + 23 + 40);
   shaft(g, 570 + 8, SURFACE - 14, 4, 240);
   for (let i = 0; i < 24; i++) g.setIfAir(578 + Math.floor(g.rand() * 4), SURFACE + Math.floor(g.rand() * 80), T.METHANE);

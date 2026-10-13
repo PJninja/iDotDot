@@ -1,5 +1,5 @@
 /**
- * Where the portfolio board sits in every default world, in world cells (640 x 348 at 4 px).
+ * Where the portfolio board sits in every default world, in world cells (640 x 380 at 4 px).
  * Shared by the runtime board and by the scene scripts in tools/, which build the
  * underground around these boxes. Pure and import-free so Node can load it.
  *
@@ -26,11 +26,11 @@ export interface BoardGeometry {
   galleryScale: number;
 }
 
-/** Authoring size of the default worlds: 1440p at 4 px tiles. */
-export const WORLD_CELLS = { width: 640, height: 348, tileCss: 4 } as const;
+/** Authoring size of the default worlds: 1440p wide at 4 px tiles, 32 rows taller than the screen shows at 1440p so the board fits above the floor. */
+export const WORLD_CELLS = { width: 640, height: 380, tileCss: 4 } as const;
 
-/** Big chip interior; the compact chip is half of it on each side. */
-export const CHIP_CELLS = { w: 100, h: 54 } as const;
+/** Big chip interior (520 x 280 CSS px at 4 px tiles); the compact chip is about a third of its area. */
+export const CHIP_CELLS = { w: 130, h: 70 } as const;
 export const COMPACT_CHIP_CELLS = { w: 50, h: 27 } as const;
 export const RING_CELLS = 2;
 /** Cells around a ring that scenery keeps inert: no fire, water, acid, heat, steel, ice or wood. */
@@ -38,14 +38,15 @@ export const KEEP_OUT_CELLS = 2;
 /** Cells of brick lining around the gallery interior. */
 export const GALLERY_LINING = 2;
 
+/** Text scale of the big chips (2 was the 400 x 216 px chip; 2.6 grows it by 30%). */
+const BIG_CHIP_SCALE = 2.6;
 const COLUMNS = 2;
 const ROWS = 2;
-const COLUMN_GAP = 10;
+const COLUMN_GAP = 4;
 const ROW_GAP = 8;
 const FOOT_W = CHIP_CELLS.w + 2 * RING_CELLS;
 const FOOT_H = CHIP_CELLS.h + 2 * RING_CELLS;
 const COMPACT_FOOT_H = COMPACT_CHIP_CELLS.h + 2 * RING_CELLS;
-const FOOT_W_COMPACT = COMPACT_CHIP_CELLS.w + 2 * RING_CELLS;
 
 /** Left edge and top of the whole block (the wide layout), ring included. */
 export const BLOCK = {
@@ -76,9 +77,10 @@ function narrowSlot(row: number): CellRect {
   return { x: CENTER - CHIP_CELLS.w / 2, y: BLOCK.y + RING_CELLS + row * (FOOT_H + ROW_GAP), w: CHIP_CELLS.w, h: CHIP_CELLS.h };
 }
 
-/** Small chips stacked around the row strip, so both rows stay clear of it. */
+/** Small chips stacked at the foot of the block, just above the gallery, with the row strip clear above them. */
 function compactSlot(row: number): CellRect {
-  const y = row === 0 ? BLOCK.y + FOOT_H - COMPACT_FOOT_H : BLOCK.y + FOOT_H + ROW_GAP;
+  const bottom = BLOCK.y + BLOCK.h;
+  const y = bottom - (2 - row) * COMPACT_FOOT_H - (1 - row) * ROW_GAP;
   return { x: CENTER - COMPACT_CHIP_CELLS.w / 2, y: y + RING_CELLS, w: COMPACT_CHIP_CELLS.w, h: COMPACT_CHIP_CELLS.h };
 }
 
@@ -86,7 +88,7 @@ function compactSlot(row: number): CellRect {
 export const WIDE: BoardGeometry = {
   slots: Array.from({ length: COLUMNS * ROWS }, (_, i) => slotAt(i % COLUMNS, Math.floor(i / COLUMNS))),
   gallery: { x: BLOCK.x + GALLERY_LINING, y: GALLERY_ROW, w: BLOCK.w - 2 * GALLERY_LINING, h: GALLERY_ROWS },
-  chipScale: 2,
+  chipScale: BIG_CHIP_SCALE,
   galleryScale: 1.5,
 };
 
@@ -94,11 +96,11 @@ export const WIDE: BoardGeometry = {
 export const NARROW: BoardGeometry = {
   slots: [narrowSlot(0), narrowSlot(1)],
   gallery: { x: CENTER - FOOT_W / 2 + GALLERY_LINING, y: GALLERY_ROW, w: FOOT_W - 2 * GALLERY_LINING, h: GALLERY_ROWS },
-  chipScale: 2,
+  chipScale: BIG_CHIP_SCALE,
   galleryScale: 1.5,
 };
 
-/** Windows under `NARROW_MIN_WIDTH` (phones) show one column of two small chips. */
+/** Windows under `NARROW_MIN_WIDTH` (phones) or shorter than `TALL_CANVAS_HEIGHT` show one column of two small chips. */
 export const COMPACT: BoardGeometry = {
   slots: [compactSlot(0), compactSlot(1)],
   gallery: { x: CENTER - 40, y: GALLERY_ROW, w: 80, h: GALLERY_ROWS },
@@ -107,37 +109,43 @@ export const COMPACT: BoardGeometry = {
 };
 
 /**
- * The phone world (`meadow-mobile`): a small world cut to a phone's grid (about 80 to 105
+ * The phone world (`meadow-mobile`): a small world cut to a phone's grid (about 80 to 135
  * columns at 4 px) instead of the middle slice of a 640-wide one. It has its own compact
  * layout, so the same slot sizes sit at different cells: the corridor ends 4 rows above the
  * floor and the block is stacked on it, the same way as in the big worlds.
  */
-export const MOBILE_WORLD_CELLS = { width: 106, height: 232, tileCss: 4 } as const;
+export const MOBILE_WORLD_CELLS = { width: 136, height: 248, tileCss: 4 } as const;
+
+/** Phone chip interior: the compact chip 30% larger (260 x 140 CSS px at 4 px tiles, text scale 1.3). */
+export const MOBILE_CHIP_CELLS = { w: 65, h: 35 } as const;
+export const MOBILE_CHIP_SCALE = 1.3;
+const MOBILE_FOOT_W = MOBILE_CHIP_CELLS.w + 2 * RING_CELLS;
+const MOBILE_FOOT_H = MOBILE_CHIP_CELLS.h + 2 * RING_CELLS;
 
 const MOBILE_CENTER = MOBILE_WORLD_CELLS.width / 2;
 const MOBILE_FLOOR_ROWS = 4;
 const MOBILE_GALLERY_ROW = MOBILE_WORLD_CELLS.height - MOBILE_FLOOR_ROWS - GALLERY_LINING - GALLERY_ROWS;
-const MOBILE_BLOCK_H = 2 * COMPACT_FOOT_H + ROW_GAP;
+const MOBILE_BLOCK_H = 2 * MOBILE_FOOT_H + ROW_GAP;
 
 /** The compact block in the phone world, ring included; the row strip between its chips is `MOBILE_ROW_STRIP`. */
 export const MOBILE_BLOCK: CellRect = {
-  x: MOBILE_CENTER - FOOT_W_COMPACT / 2,
+  x: Math.floor(MOBILE_CENTER - MOBILE_FOOT_W / 2),
   y: MOBILE_GALLERY_ROW - GALLERY_LINING - 4 - MOBILE_BLOCK_H,
-  w: FOOT_W_COMPACT,
+  w: MOBILE_FOOT_W,
   h: MOBILE_BLOCK_H,
 };
-export const MOBILE_ROW_STRIP = { y: MOBILE_BLOCK.y + COMPACT_FOOT_H, h: ROW_GAP } as const;
+export const MOBILE_ROW_STRIP = { y: MOBILE_BLOCK.y + MOBILE_FOOT_H, h: ROW_GAP } as const;
 
-/** One column of two small chips in the phone world. */
+/** One column of two chips in the phone world. */
 export const MOBILE: BoardGeometry = {
   slots: [0, 1].map((row) => ({
-    x: MOBILE_CENTER - COMPACT_CHIP_CELLS.w / 2,
-    y: MOBILE_BLOCK.y + RING_CELLS + row * (COMPACT_FOOT_H + ROW_GAP),
-    w: COMPACT_CHIP_CELLS.w,
-    h: COMPACT_CHIP_CELLS.h,
+    x: MOBILE_BLOCK.x + RING_CELLS,
+    y: MOBILE_BLOCK.y + RING_CELLS + row * (MOBILE_FOOT_H + ROW_GAP),
+    w: MOBILE_CHIP_CELLS.w,
+    h: MOBILE_CHIP_CELLS.h,
   })),
   gallery: { x: MOBILE_CENTER - 40, y: MOBILE_GALLERY_ROW, w: 80, h: GALLERY_ROWS },
-  chipScale: 1,
+  chipScale: MOBILE_CHIP_SCALE,
   galleryScale: 1,
 };
 
@@ -146,11 +154,13 @@ export function isMobileWorld(world: { width: number; height: number }): boolean
   return world.width === MOBILE_WORLD_CELLS.width && world.height === MOBILE_WORLD_CELLS.height;
 }
 
-export const WIDE_MIN_WIDTH = 920;
-export const NARROW_MIN_WIDTH = 420;
+export const WIDE_MIN_WIDTH = 1120;
+export const NARROW_MIN_WIDTH = 540;
 export const COMPACT_MIN_WIDTH = 320;
-/** Shortest canvas (window height minus the header) that shows the whole block. */
+/** Shortest canvas (window height minus the header) that shows the compact layout. */
 export const MIN_CANVAS_HEIGHT = 600;
+/** Shortest canvas that shows the whole wide or narrow block (rows 198 to the floor of a 380-row world). */
+export const TALL_CANVAS_HEIGHT = 728;
 
 /** Slot interior plus its ring. */
 export function footprint(slot: CellRect, ring = RING_CELLS): CellRect {

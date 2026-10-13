@@ -1,4 +1,4 @@
-import { Grid, T, shades } from '../world-kit.ts';
+import { Grid, T, WORLD_HEIGHT, shades } from '../world-kit.ts';
 import { corridor, WIDE } from '../../src/worlds/board-slots.ts';
 import { finishBoard, naturalCavern } from './underground.ts';
 
@@ -9,7 +9,7 @@ import { finishBoard, naturalCavern } from './underground.ts';
  * Everything is natural except one buried chest. Design: plans/meadow.md.
  */
 const W = 640;
-const H = 348;
+const H = WORLD_HEIGHT;
 /** Cells around the cavern that hold nothing that acts on its own. */
 const QUIET = 16;
 
@@ -219,7 +219,7 @@ function warren(g: Grid): void {
 
 /**
  * A small lake on a stone basin. Dirt and sand within their soak radius (4) of water turn wet and
- * drink it, and grass touching water rots, so every cell within 4 of the water becomes stone
+ * drink it, and grass touching water turns into mud, so every cell within 4 of the water becomes stone
  * (the basin and a rocky rim right beside it) or wet sand (the beach); the bed is mud.
  */
 function lake(g: Grid): void {
@@ -333,10 +333,10 @@ export function buildMeadow(): Grid {
     const t = i / 90;
     g.line(14 + i, 236 + 60 * t, 14 + i, 236 + 60 * t + 1 + 4 * Math.sin(Math.PI * t), T.CHARCOAL, 1);
   }
-  fossil(g);
-  chest(g);
+  g.at(-10, 0, () => fossil(g));
+  g.at(8, 0, () => chest(g));
   geode(g);
-  g.ellipse(502, 201, 26, 5, T.WATER);
+  g.ellipse(516, 201, 26, 5, T.WATER);
   buriedLog(g);
   bog(g);
   lake(g);
@@ -348,10 +348,10 @@ export function buildMeadow(): Grid {
   rabbit(g, 296, surface(300), KIT);
   for (let i = 0; i < 50; i++) g.setIfAir(Math.floor(g.rand() * W), 4 + Math.floor(g.rand() * 80), T.ICE);
 
-  const hall = naturalCavern(g);
+  const hall = naturalCavern(g, 4);
   // rubble and sand drifts in the corners of the cavern floor, well clear of the rings
-  for (const [x, w, type] of [[201, 8, T.RUBBLE], [432, 7, T.SAND]] as [number, number, number][]) {
-    for (let i = 0; i < w; i++) for (let k = 0; k <= Math.min(i, w - 1 - i) && k < 3; k++) g.setIfAir(x + i, 343 - k, type);
+  for (const [x, w, type] of [[177, 5, T.RUBBLE], [458, 5, T.SAND]] as [number, number, number][]) {
+    for (let i = 0; i < w; i++) for (let k = 0; k <= Math.min(i, w - 1 - i) && k < 3; k++) g.setIfAir(x + i, 375 - k, type);
   }
   const outer = corridor(WIDE.gallery);
   g.rect(outer.x, outer.y, outer.w, outer.h, T.STONE);

@@ -1,6 +1,6 @@
 # Elements
 
-All 40 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
+All 43 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
 
 ## Properties
 
@@ -59,10 +59,13 @@ How to read the columns:
 | 37 | Copper | static | yes | `#b8683e` |  |  |  |  |  |  | tiles |  |  |  | 0.95 |  |
 | 38 | Live Copper | static | hidden | `#ffe2be` |  |  |  |  |  |  | tiles | 8 | Spent Copper 100% |  | 0.95 |  |
 | 39 | Spent Copper | static | hidden | `#704232` |  |  |  |  |  |  | tiles | 3 | Copper 100% |  | 0.95 |  |
+| 40 | Bark | static | yes | `#684c38` |  |  |  |  |  |  | tiles |  |  |  | 0.35 | flammable |
+| 41 | Charred Bark | static | hidden | `#281e1c` |  |  |  |  |  |  | tiles | 0.4 | Ember 45%, Charcoal 30%, Ash 15%, else gone |  | 0.15 |  |
+| 42 | Leaves | static | yes | `#387a30` |  |  |  |  |  |  | tiles |  |  |  | 0.05 | flammable |
 
 ## Reactions
 
-119 one-sided rules. A tile of the element in the first column that touches a `with` tile (8 neighbors, or within `radius` cells) becomes the result at that chance per step. **Consumes** means the touched tile turns into air at the same time.
+142 one-sided rules. A tile of the element in the first column that touches a `with` tile (8 neighbors, or within `radius` cells) becomes the result at that chance per step. **Consumes** means the touched tile turns into air at the same time.
 
 | Element | Touching | Becomes | Chance | Consumes | Radius |
 | --- | --- | --- | --- | --- | --- |
@@ -95,8 +98,9 @@ How to read the columns:
 | Mud | Ember | Dirt | 3% |  | 2 |
 | Mud | Spark | Dirt | 30% |  |  |
 | Mud | Hot Steel | Dirt | 10% |  |  |
-| Mud | Grass | Grass | 0.2% |  |  |
 | Mud | Acid | Dirt | 10% |  |  |
+| Mud | Water | Mud | 100% |  |  |
+| Mud | Grass | Grass | 0.2% |  |  |
 | Ember | Air | Flame | 1% |  |  |
 | Ember | Air | Spark | 0.05% |  |  |
 | Ember | Water | Air (vanishes) | 30% |  |  |
@@ -117,7 +121,6 @@ How to read the columns:
 | Charcoal | Arc | Ember | 3% |  |  |
 | Charcoal | Live Steel | Ember | 0.4% |  |  |
 | Charcoal | Live Copper | Ember | 0.4% |  |  |
-| Grass | Water | Methane | 0.2% |  |  |
 | Grass | Mold | Mold | 0.8% |  |  |
 | Grass | Flame | Ember | 8% |  |  |
 | Grass | Ember | Ember | 3% |  |  |
@@ -126,6 +129,8 @@ How to read the columns:
 | Grass | Arc | Ember | 5% |  |  |
 | Grass | Live Steel | Ember | 1% |  |  |
 | Grass | Live Copper | Ember | 1% |  |  |
+| Grass | Air | Grass | 100% |  |  |
+| Grass | Water | Mud | 0.2% |  |  |
 | Steel | Flame | Hot Steel | 2% |  |  |
 | Steel | Ember | Hot Steel | 1% |  |  |
 | Steel | Spark | Hot Steel | 10% |  |  |
@@ -147,6 +152,9 @@ How to read the columns:
 | Acid | Live Copper | Smoke | 0.6% | yes |  |
 | Acid | Spent Copper | Smoke | 0.6% | yes |  |
 | Acid | Wood | Smoke | 4% | yes |  |
+| Acid | Bark | Smoke | 4% | yes |  |
+| Acid | Charred Bark | Smoke | 8% | yes |  |
+| Acid | Leaves | Smoke | 15% | yes |  |
 | Acid | Charcoal | Smoke | 8% | yes |  |
 | Acid | Grass | Smoke | 15% | yes |  |
 | Acid | Mold | Smoke | 12% | yes |  |
@@ -185,3 +193,21 @@ How to read the columns:
 | Copper | Shocked Water | Live Copper | 20% |  |  |
 | Copper | Arc | Live Copper | 15% |  |  |
 | Copper | Generator | Live Copper | 0.2% |  |  |
+| Bark | Flame | Charred Bark | 2% |  |  |
+| Bark | Ember | Charred Bark | 0.6% |  |  |
+| Bark | Spark | Charred Bark | 10% |  |  |
+| Bark | Hot Steel | Charred Bark | 0.4% |  |  |
+| Bark | Arc | Charred Bark | 3% |  |  |
+| Bark | Live Steel | Charred Bark | 0.4% |  |  |
+| Bark | Live Copper | Charred Bark | 0.4% |  |  |
+| Bark | Charred Bark | Charred Bark | 0.15% |  |  |
+| Bark | Mold | Mold | 0.06% |  |  |
+| Leaves | Flame | Flame | 6% |  |  |
+| Leaves | Flame | Ash | 1% |  |  |
+| Leaves | Ember | Flame | 3% |  |  |
+| Leaves | Spark | Flame | 30% |  |  |
+| Leaves | Hot Steel | Flame | 5% |  |  |
+| Leaves | Arc | Flame | 5% |  |  |
+| Leaves | Live Steel | Flame | 1% |  |  |
+| Leaves | Live Copper | Flame | 1% |  |  |
+| Leaves | Mold | Mold | 0.4% |  |  |

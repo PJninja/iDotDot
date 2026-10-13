@@ -16,7 +16,7 @@ export const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..
  * presented frame and the device was lost); the last two keep 2D canvas text on the CPU (on the
  * software GPU the first fillText took about 9 s and froze the page).
  */
-export const CHROMIUM_FLAGS = [
+const CONTAINER_FLAGS = [
   '--enable-unsafe-webgpu',
   '--use-angle=swiftshader',
   '--use-vulkan=swiftshader',
@@ -30,6 +30,15 @@ export const CHROMIUM_FLAGS = [
   '--disable-accelerated-2d-canvas',
   '--disable-gpu-rasterization',
 ];
+
+/**
+ * On Windows the real GPU works headless: ANGLE's D3D11 backend gives an adapter (the container
+ * flags give none), and Dawn must compile with FXC because Playwright's headless shell ships
+ * without dxcompiler.dll (requestDevice fails otherwise).
+ */
+const WINDOWS_FLAGS = ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-dawn-features=use_dxc'];
+
+export const CHROMIUM_FLAGS = process.platform === 'win32' ? WINDOWS_FLAGS : CONTAINER_FLAGS;
 
 /**
  * CSS for pages under test. The header's `backdrop-filter` blur is composited in software over the
@@ -82,17 +91,24 @@ export async function ensureDevServer(origin = 'http://localhost:5173') {
   };
   if (await alive()) return Object.assign(() => {}, { startedPid: undefined });
   const url = new URL(origin);
+  const windows = process.platform === 'win32';
+  // npx is a .cmd script on Windows, which only a shell can run; the process group kill is POSIX only.
   const child = spawn('npx', ['vite', '--port', url.port || '5173', '--strictPort'], {
     cwd: REPO_ROOT,
     stdio: 'ignore',
-    detached: true,
+    detached: !windows,
+    shell: windows,
   });
   child.unref();
+  const kill = () => {
+    if (windows) spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    else process.kill(-child.pid);
+  };
   for (let i = 0; i < 50; i++) {
-    if (await alive()) return Object.assign(() => process.kill(-child.pid), { startedPid: child.pid });
+    if (await alive()) return Object.assign(kill, { startedPid: child.pid });
     await new Promise((r) => setTimeout(r, 200));
   }
-  process.kill(-child.pid);
+  kill();
   throw new Error(`Dev server did not start at ${origin}`);
 }
 

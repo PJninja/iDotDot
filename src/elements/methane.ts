@@ -7,7 +7,7 @@ import { SETTINGS } from '../settings';
  * spark or hot steel turns a methane tile into a flame, and those flames light the
  * tiles beside them, so a pocket flashes over in a moment. A rare tile detonates instead
  * (and a detonation restarts the blast at full size), so big pockets explode while a
- * little gas only burns. Released by decaying mold and by grass rotting in water.
+ * little gas only burns. Released by decaying mold.
  *
  * Drawn like steam, as a blurred haze in its own channel (3) colored from this
  * element's ramp. Behavior lives in mainGas / updateGas (engine/gpu/shaders.ts).

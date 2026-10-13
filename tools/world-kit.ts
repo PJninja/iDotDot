@@ -47,21 +47,24 @@ export const T = {
   COPPER: 37,
   LIVE_COPPER: 38,
   SPENT_COPPER: 39,
+  BARK: 40,
+  CHARRED_BARK: 41,
+  LEAVES: 42,
 } as const;
 
-/** Types the picker hides: transient stages of an electric pulse, never placed by a scene. */
+/** Types the picker hides: transient stages of an electric pulse or of fire, never placed by a scene. */
 export const HIDDEN_TYPES: ReadonlySet<number> = new Set([
   T.HOT_STEEL, T.COOLING_STEEL, T.EXPLOSION, T.LIVE_STEEL, T.SPENT_STEEL, T.ARC, T.SHOCKED_WATER, T.NUMB_WATER,
-  T.LIVE_FUSE, T.LIVE_COPPER, T.SPENT_COPPER,
+  T.LIVE_FUSE, T.LIVE_COPPER, T.SPENT_COPPER, T.CHARRED_BARK,
 ]);
 
 export const TYPE_NAMES: Record<number, string> = Object.fromEntries(
   Object.entries(T).map(([name, id]) => [id, name.toLowerCase()]),
 );
 
-/** Authoring size: 1440p at 4 px tiles. Worlds anchor bottom-center and crop on smaller screens. */
+/** Authoring size: 1440p wide at 4 px tiles, 32 rows taller than 1440p. Worlds anchor bottom-center and crop on smaller screens. */
 export const WORLD_WIDTH = 640;
-export const WORLD_HEIGHT = 348;
+export const WORLD_HEIGHT = 380;
 const TILE_CSS = 4;
 
 /** Base color, variant count and variance per type (mirrors the element classes) for previews and shade picking. */
@@ -105,6 +108,9 @@ const LOOKS: Record<number, { color: [number, number, number]; count: number; va
   [T.COPPER]: { color: [184, 104, 62], count: 4, variance: 10 },
   [T.LIVE_COPPER]: { color: [255, 226, 190], count: 1, variance: 0 },
   [T.SPENT_COPPER]: { color: [112, 66, 50], count: 1, variance: 0 },
+  [T.BARK]: { color: [104, 76, 56], count: 4, variance: 14 },
+  [T.CHARRED_BARK]: { color: [40, 30, 28], count: 1, variance: 0 },
+  [T.LEAVES]: { color: [56, 122, 48], count: 8, variance: 22 },
 };
 
 function variantColor(type: number, variant: number): [number, number, number] {

@@ -3,8 +3,10 @@ import { Acid } from './acid';
 import { Arc } from './arc';
 import { Air } from './air';
 import { Ash } from './ash';
+import { Bark } from './bark';
 import { Bomb } from './bomb';
 import { Charcoal } from './charcoal';
+import { CharredBark } from './charred-bark';
 import { CoolingSteel } from './cooling-steel';
 import { Copper } from './copper';
 import { Dirt } from './dirt';
@@ -16,6 +18,7 @@ import { Generator } from './generator';
 import { Grass } from './grass';
 import { HotSteel } from './hot-steel';
 import { Ice } from './ice';
+import { Leaves } from './leaves';
 import { LiveCopper } from './live-copper';
 import { LiveFuse } from './live-fuse';
 import { LiveSteel } from './live-steel';
@@ -86,5 +89,8 @@ export function createElementRegistry(): ElementRegistry {
   registry.register(new Copper());
   registry.register(new LiveCopper());
   registry.register(new SpentCopper());
+  registry.register(new Bark());
+  registry.register(new CharredBark());
+  registry.register(new Leaves());
   return registry;
 }

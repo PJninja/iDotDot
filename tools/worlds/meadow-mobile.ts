@@ -6,21 +6,25 @@ import { MOBILE_LAYOUT, finishBoard, naturalCavern } from './underground.ts';
  * Meadow for phones: the same idea as `meadow` (a thin meadow over rock, the chips in a quiet
  * natural cavern) cut to a phone's grid. A 404 px wide phone shows about 100 columns of the
  * 640-wide world, which left the chips in a mostly empty hall; this world is 106 columns wide
- * and 232 rows tall, with the chips and their gallery in the bottom 90 rows and a landscape
- * above them: sky, a tree, a rabbit, a pond, a sealed burrow, and a geode and a chest in the
+ * and 248 rows tall, with the chips and their gallery in the bottom 110 rows and a landscape
+ * above them: sky, a tree, a rabbit, a pond, and fossils and a chest in the
  * rock. Everything is dry and still within the quiet zone of the cavern.
  */
 const W = MOBILE_WORLD_CELLS.width;
+/** The landscape is drawn 106 columns wide in its own coordinates and centered in the world, which is wider so windows up to the narrow layout's width fill it. */
+const SCENE_W = 106;
+const OFFSET = (W - SCENE_W) / 2;
 const H = MOBILE_WORLD_CELLS.height;
 /** Cells around the cavern that hold nothing that acts on its own. */
 const QUIET = 12;
 /** Row of the pond's surface, flat across the pond and its beaches. */
 const POND_ROW = 88;
 
-const SURFACE_POINTS: [number, number][] = [[0, 76], [14, 84], [30, 89], [52, 89], [58, POND_ROW], [W, POND_ROW]];
+const SURFACE_POINTS: [number, number][] = [[0, 76], [14, 84], [30, 89], [52, 89], [58, POND_ROW], [SCENE_W, POND_ROW]];
 
 /** Row of the first soil cell along x (cosine-eased between control points). */
-function surface(x: number): number {
+function surface(sceneX: number): number {
+  const x = Math.min(Math.max(sceneX, 0), SCENE_W);
   for (let i = 0; i + 1 < SURFACE_POINTS.length; i++) {
     const [x0, y0] = SURFACE_POINTS[i];
     const [x1, y1] = SURFACE_POINTS[i + 1];
@@ -39,8 +43,8 @@ const rockTop = (x: number): number => Math.round(108 + Math.sin(x / 9) + 0.5 * 
 function terrain(g: Grid, bare: (x: number) => boolean): void {
   const stone = shades(T.STONE);
   for (let x = 0; x < W; x++) {
-    const top = surface(x);
-    const rock = rockTop(x);
+    const top = surface(x - OFFSET);
+    const rock = rockTop(x - OFFSET);
     for (let y = top; y < H; y++) {
       if (y < rock) {
         g.set(x, y, T.DIRT);
@@ -49,38 +53,26 @@ function terrain(g: Grid, bare: (x: number) => boolean): void {
       const band = Math.floor((y + 3 * Math.sin(x / 17) + 2 * Math.sin(x / 7)) / 8) % 2;
       g.set(x, y, T.STONE, { variant: stone[band === 0 ? 1 + Math.floor(g.rand() * 3) : Math.floor(g.rand() * 3)] });
     }
-    if (!bare(x)) {
+    if (!bare(x - OFFSET)) {
       g.set(x, top, T.GRASS);
       g.set(x, top + 1, T.GRASS);
     }
   }
 }
 
-/** A tree: trunk, a branch platform, a grass crown that narrows a cell per row, and roots spreading into the soil. */
+/** A tree: a bark trunk with two branches into a round leaf crown (leaves are static, so it needs no support), and bark roots spreading into the soil. */
 function tree(g: Grid, x: number, h: number): void {
   const top = surface(x);
-  g.rect(x - 1, top - h, 3, h + 2, T.WOOD);
-  g.rect(x - 9, top - h - 1, 19, 2, T.WOOD);
-  for (let k = 0; k < 7; k++) g.rect(x - 8 + k, top - h - 2 - k, 17 - 2 * k, 1, T.GRASS);
-  g.line(x, top - h + 5, x - 5, top - h + 1, T.WOOD, 1);
-  g.line(x, top - h + 7, x + 5, top - h + 2, T.WOOD, 1);
+  g.rect(x - 1, top - h, 3, h + 2, T.BARK);
+  g.ellipse(x, top - h - 3, 11, 8, T.LEAVES);
+  g.line(x, top - h + 6, x - 7, top - h - 1, T.BARK, 1);
+  g.line(x, top - h + 8, x + 7, top - h, T.BARK, 1);
+  g.line(x, top - h, x, top - h - 7, T.BARK, 1);
   for (const dir of [-1, -0.5, 0, 0.5, 1]) {
     let rx = x;
     for (let y = top + 2; y < top + 10 + Math.floor(g.rand() * 8); y++) {
       if (g.rand() < 0.6) rx += Math.sign(dir) * (g.rand() < Math.abs(dir) ? 1 : 0);
-      if (g.typeAt(rx, y) === T.DIRT) g.set(rx, y, T.WOOD);
-    }
-  }
-}
-
-/** Fine roots from the meadow down through the soil over the burrow, onto dirt only. */
-function rootNetwork(g: Grid, x0: number, x1: number): void {
-  for (let x = x0; x < x1; x += 6 + Math.floor(g.rand() * 5)) {
-    let rx = x;
-    const depth = surface(x) + 6 + Math.floor(g.rand() * 14);
-    for (let y = surface(x) + 2; y < depth; y++) {
-      if (g.rand() < 0.35) rx += g.rand() < 0.5 ? -1 : 1;
-      if (g.typeAt(rx, y) === T.DIRT) g.set(rx, y, T.WOOD);
+      if (g.typeAt(rx, y) === T.DIRT) g.set(rx, y, T.BARK);
     }
   }
 }
@@ -95,33 +87,40 @@ const RABBIT = [
   '.AAAAAAAAA.',
   'PPPPPPPPPPP',
 ];
-const KIT = ['...WW..', '..AAC..', '.AAAAA.', 'PPPPPPP'];
-const flip = (art: string[]): string[] => art.map((row) => [...row].reverse().join(''));
 
 /** A rabbit standing with its feet on row `floor`: an ash body on a wooden foot plate, wooden ears, a charcoal eye. */
-function rabbit(g: Grid, x: number, floor: number, art: string[], facingLeft = false): void {
-  const rows = facingLeft ? flip(art) : art;
-  g.stamp(x, floor - rows.length, rows, { A: T.ASH, C: T.CHARCOAL, W: T.WOOD, P: T.WOOD });
+function rabbit(g: Grid, x: number, floor: number): void {
+  g.stamp(x, floor - RABBIT.length, RABBIT, { A: T.ASH, C: T.CHARCOAL, W: T.WOOD, P: T.WOOD });
 }
 
-/**
- * A sealed burrow under a two-row root mat: dirt falls, so the ceiling is wood and the bowl
- * floor rises a row per column at both ends, which leaves no dirt face steeper than 45 degrees.
- * A rabbit and a kit sit on its flat floor.
- */
-function burrow(g: Grid, cx: number, top: number, w: number, depth: number): void {
-  const x0 = cx - w / 2;
-  const x1 = x0 + w;
-  const bowl = (x: number): number => Math.max(0, Math.min(depth, x - x0, x1 - x));
-  for (let x = x0 - 1; x <= x1 + 1; x++) g.rect(x, top - 1, 1, 2, T.WOOD);
-  for (let x = x0; x <= x1; x++) g.rect(x, top + 1, 1, bowl(x), T.AIR);
-  for (let x = x0 + 1; x < x1; x++) {
-    const floor = top + bowl(x) + 1;
-    if (g.typeAt(x, floor) === T.DIRT) g.set(x, floor, T.GRASS);
+/** A skeleton of ash set in dark rock: spine, ribs, legs, a tail and a skull, with its head to the right. */
+function skeleton(g: Grid, x: number, y: number): void {
+  const dark = shades(T.STONE)[0];
+  for (let i = 0; i < 8; i++) g.ellipse(x + i * 4.5, y + 2 * Math.sin(i), 6, 6 + 2 * Math.cos(i * 1.7), T.STONE, { variant: dark });
+  const spine = (t: number): [number, number] => [x + 30 * t, Math.round(y - 3 * Math.sin(Math.PI * t))];
+  for (let i = 0; i <= 30; i++) g.set(...spine(i / 30), T.ASH);
+  for (let t = 0.3; t <= 0.7; t += 0.1) {
+    const [sx, sy] = spine(t);
+    g.line(sx, sy + 1, sx - 1, sy + 4 + Math.round(2 * Math.sin(Math.PI * t)), T.ASH, 1);
   }
-  const floor = top + depth + 1;
-  rabbit(g, x0 + 8, floor, RABBIT);
-  rabbit(g, x0 + 22, floor, KIT, true);
+  for (const t of [0.2, 0.8]) {
+    const [sx, sy] = spine(t);
+    g.line(sx, sy + 1, sx + 1, sy + 5, T.ASH, 1);
+    g.line(sx + 1, sy + 5, sx, sy + 9, T.ASH, 1);
+    g.line(sx, sy + 9, sx + 2, sy + 9, T.ASH, 1);
+  }
+  g.line(x, y, x - 6, y + 4, T.ASH, 1);
+  g.line(x + 30, y, x + 34, y - 6, T.ASH, 1);
+  g.ring(x + 36, y - 8, 3, 1, T.ASH);
+  g.line(x + 38, y - 6, x + 41, y - 6, T.ASH, 1);
+}
+
+/** A coiled shell of ash in a disc of dark rock. */
+function ammonite(g: Grid, cx: number, cy: number): void {
+  g.disc(cx, cy, 8, T.STONE, { variant: shades(T.STONE)[0] });
+  g.ring(cx, cy, 5, 1, T.ASH);
+  g.ring(cx, cy, 3, 1, T.ASH);
+  g.set(cx, cy, T.ASH);
 }
 
 /**
@@ -169,32 +168,22 @@ function chest(g: Grid, cx: number, cy: number): void {
   g.scatter(cx - 16, cy + 4, 6, 2, T.RUBBLE, 0.4, T.AIR);
 }
 
-/** A stone shell lined with ice crystals around a hollow. */
-function geode(g: Grid, cx: number, cy: number): void {
-  g.disc(cx, cy, 9, T.STONE, { variant: shades(T.STONE)[0] });
-  g.disc(cx, cy, 7, T.ICE);
-  g.disc(cx, cy, 4, T.AIR);
-  for (let a = 0; a < Math.PI * 2; a += 0.55) {
-    const r = 4 - Math.floor(g.rand() * 2);
-    g.line(cx + Math.cos(a) * 5, cy + Math.sin(a) * 5, cx + Math.cos(a) * r, cy + Math.sin(a) * r, T.ICE, 1);
-  }
-}
-
 export function buildMeadowMobile(): Grid {
   const g = new Grid(4243, W, H);
   terrain(g, (x) => x >= 54 && x <= 102);
-  for (const [x, y, rx, ry] of [[97, 168, 5, 3], [6, 196, 5, 2], [100, 205, 4, 2]]) g.ellipse(x, y, rx, ry, T.SAND);
-  for (let i = 0; i <= 18; i++) g.line(i, 146 + i * 1.5, i, 147 + i * 1.5 + Math.sin((i / 18) * Math.PI) * 2, T.CHARCOAL, 1);
-  geode(g, 34, 120);
-  chest(g, 70, 120);
-  pond(g, 62, 94);
-  tree(g, 24, 22);
-  rootNetwork(g, 20, 62);
-  burrow(g, 40, 102, 36, 7);
-  rabbit(g, 36, surface(40), RABBIT);
+  g.at(OFFSET, 0, () => {
+    for (const [x, y, rx, ry] of [[101, 168, 4, 3], [4, 196, 3, 2], [101, 205, 4, 2]]) g.ellipse(x, y, rx, ry, T.SAND);
+    for (let i = 0; i <= 9; i++) g.line(i, 146 + i * 1.5, i, 147 + i * 1.5 + Math.sin((i / 9) * Math.PI) * 2, T.CHARCOAL, 1);
+    chest(g, 70, 120);
+    pond(g, 62, 94);
+    tree(g, 24, 22);
+    skeleton(g, 14, 118);
+    ammonite(g, 97, 122);
+    rabbit(g, 36, surface(40));
+  });
   for (let i = 0; i < 14; i++) g.setIfAir(Math.floor(g.rand() * W), 20 + Math.floor(g.rand() * 45), T.ICE);
 
-  const hall = naturalCavern(g, 4, 4, 3, MOBILE_LAYOUT);
+  const hall = naturalCavern(g, 3, 4, 3, MOBILE_LAYOUT);
   const outer = corridor(MOBILE.gallery);
   g.rect(outer.x, outer.y, outer.w, outer.h, T.STONE);
   g.air(MOBILE.gallery.x, MOBILE.gallery.y, MOBILE.gallery.w, MOBILE.gallery.h);

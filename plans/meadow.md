@@ -37,7 +37,7 @@ A 1280 px window shows columns 160 to 480, a 1920 px window 80 to 560 and a phon
 ## The surface
 
 - **Meadow:** grass on dirt with a gentle rise at both ends, a few taller grass tufts.
-- **Lake** (about columns 450 to 520, 10 rows deep at the middle): water on a mud bed over a stone basin, with wet-sand beaches. The beach is wet sand and the bed mud because dry sand and dirt next to water soak it up and turn into wet sand or mud, so the lake would shrink and its shore would turn to mud. Grass is kept a few cells back from the water, since grass touching water rots away and releases methane. There is no spring: a spring floods forever unless it has a drain.
+- **Lake** (about columns 450 to 520, 10 rows deep at the middle): water on a mud bed over a stone basin, with wet-sand beaches. The beach is wet sand and the bed mud because dry sand and dirt next to water soak it up and turn into wet sand or mud, so the lake would shrink and its shore would turn to mud. Grass is kept a few cells back from the water, since grass touching water turns back into mud. There is no spring: a spring floods forever unless it has a drain.
 - **Burrow mouths:** three holes in the meadow over the warren, each with a dirt mound beside it.
 - **Rabbits:** small sprites like the farmstead sheep: an ash body resting on a wood plate, wood legs, a charcoal eye. One or two on the meadow, more in the nests below.
 

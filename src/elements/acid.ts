@@ -6,7 +6,7 @@ import { SETTINGS } from '../settings';
  * Acid (type 20) - a heavy liquid that eats through other materials. It flows like water
  * (every liquid shares Water's tuning) but is denser, so it sinks under a pool of water.
  * Each dissolved tile uses up the acid tile that ate it, which turns into a puff of
- * smoke, so a puddle only bores so far. Stone and steel resist, wood and grass go fast,
+ * smoke, so a puddle only bores so far. Stone and steel resist, wood, bark, grass and leaves go fast,
  * and sand, dirt and water are left alone; touching water dilutes the acid away into water.
  * Drawn as tiles (no haze channel).
  */
@@ -46,6 +46,9 @@ export class Acid extends Element {
       [SETTINGS.LIVE_COPPER_TYPE, Acid.STEEL_CHANCE],
       [SETTINGS.SPENT_COPPER_TYPE, Acid.STEEL_CHANCE],
       [SETTINGS.WOOD_TYPE, Acid.WOOD_CHANCE],
+      [SETTINGS.BARK_TYPE, Acid.WOOD_CHANCE],
+      [SETTINGS.CHARRED_BARK_TYPE, Acid.CHARCOAL_CHANCE],
+      [SETTINGS.LEAVES_TYPE, Acid.GRASS_CHANCE],
       [SETTINGS.CHARCOAL_TYPE, Acid.CHARCOAL_CHANCE],
       [SETTINGS.GRASS_TYPE, Acid.GRASS_CHANCE],
       [SETTINGS.MOLD_TYPE, Acid.MOLD_CHANCE],
