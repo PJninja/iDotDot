@@ -1,6 +1,6 @@
 # Elements
 
-All 37 registered elements, generated from the element registry (`src/elements/index.ts`). Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
+All 37 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
 
 ## Properties
 

@@ -12,6 +12,7 @@ The canvas fills the viewport below a fixed 48px header; HTML overlays carry the
 | Dev server | `npm run dev` (or `dev.bat` — kills stale servers, installs deps, opens browser) |
 | Type-check | `npx tsc --noEmit` |
 | Regenerate the default worlds | `npm run worlds` (`node tools/make-worlds.ts [world ...] [--out dir] [--preview dir [--crop x,y,w,h --scale n]]`; needs Node 22.18+, which strips the TypeScript itself) |
+| Regenerate `elements.md` (every element's properties and reactions) | `npm run elements` (`tools/make-elements-doc.mjs`; rerun after changing an element) |
 | Build | `npm run build` (`tsc && vite build`) |
 | UI tests (no GPU, seconds) | `npm run test:ui` |
 | Real-GPU smoke tests (about 10 s) | `npm run test:gpu` |
@@ -209,7 +210,7 @@ src/
                      board.ts, board-layout.ts, gallery.ts, project-filter.ts, contact-menu.ts, tile-art.ts, project-window.ts, project-route.ts, mode-controls.ts, first-hint.ts, plain-html.ts, plain-view.ts
   styles/main.css
 plans/               webgpu-compute-port.md (architecture history), fire.md (proposal), electricity.md (electricity design)
-tools/               make-worlds.ts (builds src/worlds/*.idw), make-rooms.ts, world-kit.ts (drawing kit), worlds/*.ts (scene scripts),
+tools/               make-worlds.ts (builds src/worlds/*.idw), make-elements-doc.mjs (builds elements.md), make-rooms.ts, world-kit.ts (drawing kit), worlds/*.ts (scene scripts),
                      vite-plain-view.ts (build plugin), browser/ (headless Chromium kit: launch.mjs, session.mjs, grid.mjs, smoke.mjs, shot.mjs, readgrid.mjs, test-ui.mjs, harness/)
 dev.bat, new-element.bat   Windows helper scripts (see Commands)
 ```
