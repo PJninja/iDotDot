@@ -44,6 +44,7 @@ export class Bomb extends Element {
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.HOT_STEEL_CHANCE },
     { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.ARC_CHANCE },
     { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.LIVE_STEEL_CHANCE },
+    { with: SETTINGS.LIVE_COPPER_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.LIVE_STEEL_CHANCE },
   ];
 
   private readonly variantColors: [number, number, number][];

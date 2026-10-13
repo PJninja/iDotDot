@@ -47,6 +47,7 @@ export class Grass extends Element {
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.HOT_STEEL_IGNITE_CHANCE },
     { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.ARC_IGNITE_CHANCE },
     { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.LIVE_STEEL_IGNITE_CHANCE },
+    { with: SETTINGS.LIVE_COPPER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Grass.LIVE_STEEL_IGNITE_CHANCE },
   ];
 
   static GRASS_VARIANT_COUNT = 4;

@@ -3,6 +3,8 @@
 Status: implemented (phases 0 to 5; see As built below). The numbers in the design sections are the starting points; the as-built values differ where noted. Revised after the browser test suite landed on `v2-webgpu` (`7546741`, see Testing below).
 Scope: 9 new elements (4 pickable, 5 hidden), reaction rules on Steel, Water, Wood, Grass, Charcoal, Bomb and Methane, and **no shader changes**. Everything uses mechanisms that already exist: one-sided reactions, aging with `agedInto`, the emitter (`emitType`), and static aging solids (as `Explosion` is).
 
+Follow-up: copper wire (a steel-like conductor that never overloads or arcs) and the electric scenes for the shipped worlds are planned in `plans/electricity-in-worlds.md`.
+
 Decisions already made:
 
 - Scope: steel conduction, arcs and a generator, plus water conduction, plus overload and switch/insulator parts.

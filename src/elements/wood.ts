@@ -41,6 +41,7 @@ export class Wood extends Element {
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.HOT_STEEL_IGNITE_CHANCE },
     { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.ARC_IGNITE_CHANCE },
     { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.LIVE_STEEL_IGNITE_CHANCE },
+    { with: SETTINGS.LIVE_COPPER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.LIVE_STEEL_IGNITE_CHANCE },
     { with: SETTINGS.MOLD_TYPE, becomes: SETTINGS.MOLD_TYPE, chance: Wood.MOLD_CHANCE },
   ];
 

@@ -1,6 +1,6 @@
 # Electricity in the shipped worlds
 
-Status: plan, nothing built. Follows `plans/electricity.md` (implemented), which left the three default worlds unchanged on purpose. Checked on 2026-10-13: `src/worlds/alchemist-lab.idw`, `farmstead.idw` and `death-machine.idw` contain no tile of types 28 to 36, and no scene script names an electric element.
+Status: phase 0 (copper) built, the rest is plan. Phase 0 was checked statically (type check, registry rule count 119 of 128, outcomes 18 of 32) and with the test suites; the simulation was not run by hand. Follows `plans/electricity.md` (implemented), which left the three default worlds unchanged on purpose. Checked on 2026-10-13: `src/worlds/alchemist-lab.idw`, `farmstead.idw` and `death-machine.idw` contain no tile of types 28 to 36, and no scene script names an electric element.
 
 Decisions already made:
 

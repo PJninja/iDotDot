@@ -52,6 +52,9 @@ export const SETTINGS = {
   FUSE_TYPE: 34,
   LIVE_FUSE_TYPE: 35,
   RUBBER_TYPE: 36,
+  COPPER_TYPE: 37,
+  LIVE_COPPER_TYPE: 38,
+  SPENT_COPPER_TYPE: 39,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

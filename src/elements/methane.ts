@@ -61,6 +61,7 @@ export class Methane extends Element {
     { with: SETTINGS.HOT_STEEL_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.HOT_STEEL_IGNITE_CHANCE },
     { with: SETTINGS.ARC_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.ARC_IGNITE_CHANCE },
     { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.LIVE_STEEL_IGNITE_CHANCE },
+    { with: SETTINGS.LIVE_COPPER_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.LIVE_STEEL_IGNITE_CHANCE },
   ];
 
   private readonly ramp: [number, number, number][];
