@@ -359,6 +359,7 @@ const WATER : u32 = ${SETTINGS.WATER_TYPE}u;
 const WATER_FALL : i32 = ${Water.FALL_SPEED};
 const WATER_SPREAD : f32 = ${Water.SPREAD_SPEED};
 const WATER_RANGE : i32 = ${Water.SPREAD_RANGE};
+const WATER_SLIDE_STEP : i32 = ${Water.SLIDE_STEP};
 const WATER_DEPTH_LIMIT : i32 = ${Water.DEPTH_LIMIT};
 const WATER_WANDER : f32 = ${Water.WANDER_CHANCE};
 const WATER_FLOW_SCALE : u32 = ${Water.FLOW_SCALE}u;
@@ -1353,18 +1354,27 @@ fn waterColumnDepth(t : u32, x : i32, y : i32) -> i32 {
 }
 
 // Sideways slide for a resting tile, as a signed offset (0 = none): along its
-// row, through up to WATER_RANGE open cells each way, to the column whose
-// surface is lowest (nearest on ties), so a mound flows straight downhill.
+// row, looking through up to WATER_RANGE open cells each way, toward the column
+// whose surface is lowest (nearest on ties), so a mound flows straight downhill.
+// It moves as far as it likes over the top of its own liquid (levelling a pool
+// fast, out of sight) but at most WATER_SLIDE_STEP cells past where that liquid
+// ends (the slide and the wander hop alike), so a puddle spreads over dry ground
+// a few cells a step instead of single tiles landing far from it. A tile with
+// its own liquid on top of it (covered: under a pour or a bump) is pushed out
+// sideways even over level ground, up to WATER_SLIDE_STEP cells: that is the
+// pressure that lets a column sink into a pool instead of standing on it; an
+// uncovered surface tile over level ground rests or wanders as before.
 // When both sides are equally good it takes the one with more open room, so a
 // tile at the edge of a void keeps heading into it instead of flipping back
 // with the random flow direction. With no lower surface in reach it
-// occasionally hops the full reach along the shared flow direction, which
+// occasionally hops along the shared flow direction, which
 // carries levelling across wide pools; but when the open stretch ends within
 // reach on both sides, the whole stretch is on the same level, so the surface is
 // level and the tile rests (otherwise an incomplete top row shuffles forever).
 // A tile that may still hop later keeps its chunk awake.
-fn waterSlide(t : u32, x : i32, y : i32, dir : i32) -> i32 {
+fn waterSlide(t : u32, x : i32, y : i32, dir : i32, covered : bool) -> i32 {
   var reach = array<i32, 2>(0, 0);
+  var limit = array<i32, 2>(WATER_SLIDE_STEP, WATER_SLIDE_STEP);
   var bestDepth = array<i32, 2>(0, 0);
   var bestOffset = array<i32, 2>(0, 0);
   for (var k = 0; k < 2; k++) {
@@ -1374,6 +1384,9 @@ fn waterSlide(t : u32, x : i32, y : i32, dir : i32) -> i32 {
         break;
       }
       reach[k] = d;
+      if (limit[k] == d - 1 + WATER_SLIDE_STEP && typeAt(x + s * d, y + 1, t) == 1u) {
+        limit[k] = d + WATER_SLIDE_STEP;
+      }
       let depth = waterColumnDepth(t, x + s * d, y);
       if (depth > bestDepth[k]) {
         bestDepth[k] = depth;
@@ -1384,14 +1397,58 @@ fn waterSlide(t : u32, x : i32, y : i32, dir : i32) -> i32 {
   let second = bestDepth[1] > bestDepth[0] || (bestDepth[1] == bestDepth[0] && reach[1] > reach[0]);
   let best = select(bestOffset[0], bestOffset[1], second);
   let level = reach[0] < WATER_RANGE && reach[1] < WATER_RANGE;
-  if (best != 0 || level) {
-    return best;
+  if (best != 0) {
+    let most = select(limit[0], limit[1], second);
+    return clamp(best, -most, most);
+  }
+  if (covered) {
+    let roomier = reach[1] > reach[0];
+    let s = select(dir, -dir, roomier);
+    return s * min(select(reach[0], reach[1], roomier), WATER_SLIDE_STEP);
+  }
+  if (level) {
+    return 0;
   }
   if (stepPhase(2246822519u) >= WATER_WANDER) {
     mark(x, y);
     return 0;
   }
-  return select(-dir * reach[1], dir * reach[0], reach[0] > 0);
+  return select(-dir * min(reach[1], limit[1]), dir * min(reach[0], limit[0]), reach[0] > 0);
+}
+
+// Where a tile inside a row of its own liquid (no open cell beside it) can flow
+// to: when the nearer end of the row, within WATER_RANGE / 4 tiles, has open cells
+// past it over lower ground, the tile may pass through the row into one of them
+// (up to WATER_SLIDE_STEP past the end). Returns (direction, cells to the first
+// open cell, open cells), or zero. Liquid tiles look alike, so this reads as the
+// row flowing out; without it only the end tile of a row can leave per step, so a
+// heavy pour piles up faster than its mound spreads and stands as a pillar. A row
+// over a level surface (nothing lower past its end) stays put, so a settled pool
+// can still sleep, unless the tile is covered by its own liquid (pressure, see
+// waterSlide).
+fn rowOutlet(t : u32, x : i32, y : i32, dir : i32, covered : bool) -> vec3i {
+  var outlet = vec3i(0, 0, 0);
+  var nearest = WATER_RANGE;
+  for (var k = 0; k < 2; k++) {
+    let s = select(dir, -dir, k == 1);
+    var run = 1;
+    while (run < WATER_RANGE / 4 && typeAt(x + s * run, y, t) == 1u) {
+      run++;
+    }
+    if (run == 1 || run >= nearest) {
+      continue;
+    }
+    var open = 0;
+    while (open < WATER_SLIDE_STEP && enterable(t, x + s * (run + open), y)) {
+      open++;
+    }
+    if (open == 0 || (!covered && waterColumnDepth(t, x + s * run, y) == 0)) {
+      continue;
+    }
+    nearest = run;
+    outlet = vec3i(s, run, open);
+  }
+  return outlet;
 }
 
 // Top of the water in column x above row y: the first free cell going up, if it sits
@@ -1459,14 +1516,35 @@ fn surfaceReturn(t : u32, x : i32, y : i32) -> Move {
 fn updateLiquid(x : i32, y : i32, t : u32) -> Move {
   let dir = waterFlow(x, y);
 
+  // How far it falls: the open cells under it, looking through the falling tiles
+  // below (up to FALL_CHAIN of them), which fall too. Counting only the open cells
+  // after an unbroken stack would hold a stream of drops one cell apart to a fall of
+  // one cell a step, since each drop sees the next one right under it.
   let chain = fallChain(x, y, t);
   var depth = 0;
-  while (depth < WATER_FALL && enterable(t, x, y + chain + depth + 1)) {
-    depth++;
+  var tiles = 0;
+  for (var cy = y + 1; depth < WATER_FALL && tiles <= FALL_CHAIN && cy < i32(u.height); cy++) {
+    if (enterable(t, x, cy)) {
+      depth++;
+    } else if (fallsAlong(x, cy) && !clings(x, cy, readBuf[u32(cy) * u.width + u32(x)] & 0xFFu)) {
+      tiles++;
+    } else {
+      break;
+    }
   }
-  for (var d = depth; d > 0; d--) {
-    if (claim(x, y + d)) {
-      return moveTo(x, y + d, 0u);
+  // A tile near the bottom of a stack that creeps down slower than free fall (its
+  // bottom is blocked by the body it pours into, and only drops as that body makes
+  // room) spreads sideways first, the way a stream splashes where it lands; riding
+  // the stack instead backs a pour up into a standing pillar. Higher up (the bottom
+  // out of sight) it rides along, so the stream above stays in one piece.
+  let openSide = enterable(t, x - 1, y) || enterable(t, x + 1, y);
+  let covered = typeAt(x, y - 1, t) == 1u;
+  let creeping = depth > 0 && depth < WATER_FALL && chain > 0 && chain < FALL_CHAIN;
+  if (!creeping) {
+    for (var d = depth; d > 0; d--) {
+      if (claim(x, y + d)) {
+        return moveTo(x, y + d, 0u);
+      }
     }
   }
   let pocket = pocketMove(x, y, t, WATER_POCKET);
@@ -1476,7 +1554,6 @@ fn updateLiquid(x : i32, y : i32, t : u32) -> Move {
 
   // A tile too high up a falling stack to see its bottom is not resting: it waits
   // for the stack instead of sliding off sideways in mid-air.
-  let openSide = enterable(t, x - 1, y) || enterable(t, x + 1, y);
   let openDiagonal = depth == 0 && (enterable(t, x - 1, y + 1) || enterable(t, x + 1, y + 1));
   let suspended = (openSide || openDiagonal) && depth == 0 && chain == FALL_CHAIN && onFallingStack(t, x, y);
   if (suspended) {
@@ -1485,7 +1562,7 @@ fn updateLiquid(x : i32, y : i32, t : u32) -> Move {
 
   // Only a tile with an open cell beside it can slide (waterSlide needs one).
   if (!suspended && openSide) {
-    let slide = waterSlide(t, x, y, dir);
+    let slide = waterSlide(t, x, y, dir, covered);
     if (rand(u32(x), u32(y), stepU.step ^ 0x51ED270Bu) < WATER_SPREAD) {
       for (var d = abs(slide); d > 0; d--) {
         let nx = x + sign(slide) * d;
@@ -1496,6 +1573,26 @@ fn updateLiquid(x : i32, y : i32, t : u32) -> Move {
     } else if (slide != 0) {
       // Skipped its spread roll with somewhere to slide: it will try again.
       mark(x, y);
+    }
+  } else if (!suspended && chain < FALL_CHAIN && (depth == 0 || creeping)) {
+    let outlet = rowOutlet(t, x, y, dir, covered);
+    if (outlet.x != 0) {
+      if (rand(u32(x), u32(y), stepU.step ^ 0x51ED270Bu) < WATER_SPREAD) {
+        for (var d = outlet.y + outlet.z - 1; d >= outlet.y; d--) {
+          if (claim(x + outlet.x * d, y)) {
+            return moveTo(x + outlet.x * d, y, 0u);
+          }
+        }
+      } else {
+        mark(x, y);
+      }
+    }
+  }
+  if (creeping) {
+    for (var d = depth; d > 0; d--) {
+      if (claim(x, y + d)) {
+        return moveTo(x, y + d, 0u);
+      }
     }
   }
 

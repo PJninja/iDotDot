@@ -27,8 +27,10 @@ export class Water extends Element {
   static FALL_SPEED = 4;
   /** Chance per step that a resting tile slides sideways. */
   static SPREAD_SPEED = 0.8;
-  /** Max cells a tile slides per step; it heads for the lowest surface (at least 2 cells below it) within this range along its row. Must be long enough to see the low end of a gentle slope. */
+  /** Cells a tile looks along its row for the lowest surface to head for. Must be long enough to see the low end of a gentle slope. */
   static SPREAD_RANGE = 64;
+  /** Max cells a tile moves sideways per step beyond the end of its own liquid below it (slide or wander hop), so a liquid spreads onto dry ground a few cells at a time instead of jumping SPREAD_RANGE at once; across the top of its own pool it still moves the full range, which keeps levelling fast. */
+  static SLIDE_STEP = 4;
   /** Open cells below a column are counted up to this depth when comparing surface heights. */
   static DEPTH_LIMIT = 8;
   /** Chance per step that a tile with no lower surface in reach hops along the flow direction (spreads levelling across wide pools). */
