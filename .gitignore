@@ -4,6 +4,7 @@
 # Project root
 !.gitignore
 !AGENTS.md
+!elements.md
 !index.html
 !package.json
 !package-lock.json

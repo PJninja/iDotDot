@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "worlds": "node tools/make-worlds.ts",
+    "elements": "node tools/make-elements-doc.mjs",
     "test:ui": "node tools/browser/test-ui.mjs",
     "test:gpu": "node tools/browser/test-gpu.mjs",
     "test:pulse": "node tools/browser/test-pulse.mjs"
