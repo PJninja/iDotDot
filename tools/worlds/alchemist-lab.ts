@@ -1,6 +1,8 @@
 import { Grid, T } from '../world-kit.ts';
 import { BLOCK } from '../../src/worlds/board-slots.ts';
 import { POCKETS, SURFACE, carvePockets, fillGround, finishBoard, boardHall, galleryCorridor, lined, pipeLattice, shaft } from './underground.ts';
+import type { Circuit } from './circuits.ts';
+import type { CellRect } from '../../src/worlds/board-slots.ts';
 
 const ROOM_W = 146;
 const DIVIDER = 5;
@@ -187,6 +189,41 @@ function acidLab(g: Grid): void {
   g.scatter(126, floor - 3, 20, 3, T.ASH, 0.5, T.AIR);
 }
 
+const BENCH_BUS_Y = 40;
+
+/**
+ * Conductivity bench above the sample race: a generator sealed in a stone box (its only air is a
+ * small notch above it) feeds one copper bus, and every test is its own finger off the bus: a stem,
+ * the sample, then a tail that lights only if the sample conducted. Fingers, not a chain, so a
+ * blocking sample does not hide the ones after it. All copper, and no flammable touches it.
+ * Steel and the water jar pass the pulse, rubber, stone and ice stop it, and the fuse passes it
+ * once and is gone. The jar is stone, not ice, because ice freezes the water beside it.
+ */
+function conductivityBench(g: Grid): void {
+  g.rect(78, 34, 11, 12, T.STONE);
+  g.rect(89, 41, 57, 4, T.STONE);
+  g.air(81, 37, 2, 2);
+  g.rect(81, 39, 2, 2, T.GENERATOR);
+  g.rect(83, 39, 1, 2, T.COPPER);
+  g.rect(83, BENCH_BUS_Y, 59, 1, T.COPPER);
+  const finger = (cx: number, topY: number, tailTop: number, sample: () => void): void => {
+    sample();
+    g.rect(cx, 37, 1, 3, T.COPPER);
+    g.rect(cx, tailTop, 1, topY - tailTop, T.COPPER);
+  };
+  finger(93, 33, 28, () => g.rect(92, 33, 3, 4, T.STEEL));
+  finger(103, 28, 23, () => {
+    g.rect(100, 28, 7, 9, T.STONE);
+    g.rect(101, 29, 5, 7, T.WATER);
+    g.rect(103, 34, 1, 3, T.COPPER);
+    g.rect(103, 28, 1, 3, T.COPPER);
+  });
+  finger(114, 33, 28, () => g.rect(113, 33, 3, 4, T.RUBBER));
+  finger(123, 33, 28, () => g.rect(122, 33, 3, 4, T.STONE));
+  finger(132, 33, 28, () => g.rect(131, 33, 3, 4, T.ICE));
+  finger(141, 33, 28, () => g.rect(140, 33, 3, 4, T.FUSE));
+}
+
 /** Forge (pocket 1): a charcoal hearth under a chimney to the surface, a glowing bar on the anvil and a quench trough. */
 function forge(g: Grid): void {
   g.at(0, 23, () => {
@@ -339,6 +376,25 @@ function wastePit(g: Grid): void {
   g.scatter(44, floor - 3, 24, 3, T.ASH, 0.4, T.AIR);
 }
 
+/**
+ * A spark gap above the crates: a small sealed methane chamber in thick stone (a blast reaches
+ * about three stone cells in), two steel electrodes with a gap between their tips, and a generator
+ * walled into the stone feeding both through copper leads. The first pulse lights the methane once;
+ * the chamber is empty afterwards. The chamber and its walls sit well clear of the crates and bell.
+ */
+function sparkGap(g: Grid): void {
+  g.rect(22, 12, 28, 19, T.STONE);
+  g.rect(29, 19, 14, 5, T.METHANE);
+  g.rect(24, 14, 2, 2, T.GENERATOR);
+  g.rect(26, 14, 21, 1, T.COPPER);
+  g.rect(26, 15, 1, 7, T.COPPER);
+  g.rect(27, 21, 2, 1, T.COPPER);
+  g.rect(29, 21, 4, 1, T.STEEL);
+  g.rect(46, 15, 1, 7, T.COPPER);
+  g.rect(43, 21, 3, 1, T.COPPER);
+  g.rect(39, 21, 4, 1, T.STEEL);
+}
+
 /** Gas cellar (pocket 6): rotting crates under a steel bell, a vent shaft to a stack on the surface. */
 function gasCellar(g: Grid): void {
   const floor = 97;
@@ -404,15 +460,40 @@ function rightGrounds(g: Grid): void {
   g.rect(574, SURFACE - 16, 14, 2, T.STEEL);
 }
 
+const inRoom = (r: CellRect): CellRect => ({ x: ROOM_X[1] + r.x, y: ROOM_Y + r.y, w: r.w, h: r.h });
+const inPocket = (i: number, r: CellRect): CellRect => ({ x: POCKETS[i].x + r.x, y: POCKETS[i].y + r.y, w: r.w, h: r.h });
+
+const benchCircuit: Circuit = {
+  name: 'conductivity bench',
+  sources: inRoom({ x: 78, y: 36, w: 8, h: 8 }),
+  bounds: [inRoom({ x: 76, y: 20, w: 70, h: 28 })],
+  loads: [
+    { name: 'steel sample tail', at: inRoom({ x: 93, y: 28, w: 1, h: 5 }) },
+    { name: 'water jar', at: inRoom({ x: 101, y: 29, w: 5, h: 7 }) },
+    { name: 'fuse sample tail', at: inRoom({ x: 141, y: 28, w: 1, h: 5 }) },
+  ],
+};
+
+const sparkGapCircuit: Circuit = {
+  name: 'spark gap',
+  sources: inPocket(4, { x: 22, y: 12, w: 6, h: 6 }),
+  bounds: [inPocket(4, { x: 22, y: 12, w: 28, h: 19 })],
+  loads: [
+    { name: 'left electrode', at: inPocket(4, { x: 32, y: 21, w: 1, h: 1 }) },
+    { name: 'right electrode', at: inPocket(4, { x: 39, y: 21, w: 1, h: 1 }) },
+  ],
+  ignites: [inPocket(4, { x: 29, y: 19, w: 14, h: 5 })],
+};
+
 export const ROOMS: Record<string, { w: number; h: number; draw: (g: Grid) => void }> = {
   distillery: { w: ROOM_W, h: ROOM_H, draw: (g) => distillery(g, ROOM_H) },
   greenhouse: { w: ROOM_W, h: ROOM_H, draw: greenhouse },
-  acidLab: { w: ROOM_W, h: ROOM_H, draw: acidLab },
+  acidLab: { w: ROOM_W, h: ROOM_H, draw: (g) => { acidLab(g); conductivityBench(g); } },
   forge: { w: POCKETS[0].w, h: POCKETS[0].h, draw: forge },
   coldCellar: { w: POCKETS[1].w, h: POCKETS[1].h, draw: coldCellar },
   cistern: { w: POCKETS[2].w, h: POCKETS[2].h, draw: cistern },
   wastePit: { w: POCKETS[3].w, h: POCKETS[3].h, draw: wastePit },
-  gasCellar: { w: POCKETS[4].w, h: POCKETS[4].h, draw: gasCellar },
+  gasCellar: { w: POCKETS[4].w, h: POCKETS[4].h, draw: (g) => { gasCellar(g); sparkGap(g); } },
 };
 
 export function buildAlchemistLab(): Grid {
@@ -469,6 +550,9 @@ export function buildAlchemistLab(): Grid {
   g.air(571, 29, 22, 22);
   g.disc(580, 40, 10, T.ICE);
   g.disc(586, 36, 9, T.AIR);
-  finishBoard(g, 'alchemist-lab');
+  // the electric parts go in last, so none of the scene's random draws before them shift
+  g.at(ROOM_X[1], ROOM_Y, () => conductivityBench(g));
+  g.at(POCKETS[4].x, POCKETS[4].y, () => sparkGap(g));
+  finishBoard(g, 'alchemist-lab', [benchCircuit, sparkGapCircuit]);
   return g;
 }

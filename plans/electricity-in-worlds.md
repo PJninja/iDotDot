@@ -1,6 +1,6 @@
 # Electricity in the shipped worlds
 
-Status: phases 0 (copper), 1 (tooling) and 2 (farmstead) built, the other two scenes are plan. Phases 0 to 2 were checked statically (type check, registry rule count 119 of 128, outcomes 18 of 32, `checkCircuits` run on synthetic grids) and with the test suites; the simulation was not run by hand. Follows `plans/electricity.md` (implemented), which left the three default worlds unchanged on purpose. Checked on 2026-10-13: `src/worlds/alchemist-lab.idw`, `farmstead.idw` and `death-machine.idw` contain no tile of types 28 to 36, and no scene script names an electric element.
+Status: phases 0 (copper), 1 (tooling), 2 (farmstead) and 3 (alchemist lab) built, the death machine is plan. Phases 0 to 3 were checked statically (type check, registry rule count 119 of 128, outcomes 18 of 32, `checkCircuits` run on synthetic grids) and with the test suites; the simulation was not run by hand. Follows `plans/electricity.md` (implemented), which left the three default worlds unchanged on purpose. Checked on 2026-10-13: `src/worlds/alchemist-lab.idw`, `farmstead.idw` and `death-machine.idw` contain no tile of types 28 to 36, and no scene script names an electric element.
 
 Decisions already made:
 
@@ -82,6 +82,13 @@ Hooks already in the scene: the acid lab room (a race between seven samples in a
 - **Electrolysis jar**: two copper electrodes in a glass (ice) jar of water. Each pulse shocks the water into a flash, the "combining" beat.
 - **Spark gap (one-shot)**: two steel electrodes in a sealed stone box in the gas cellar, set to light the methane there once per visit. The sealed volume must be small enough that the blast stays in the cellar; check it in the room sim, and shrink the box or thin the gas if it does not. This uses steel on purpose, since the arcs are the point.
 - Keep every circuit off the cistern's steel anchor, the distillery's torches and the forge's hot steel.
+
+As built (phase 3): `conductivityBench` and `sparkGap` in `tools/worlds/alchemist-lab.ts`, drawn last (inside `g.at`) so no earlier random draw shifts; the regenerated world differs from the old one in 1112 cells, all inside the two circuit boxes. They are also part of the `acidLab` and `gasCellar` room exports, so `make-rooms.ts` shows them.
+
+- **Bench** (acid lab, local rows 23 to 45, clear of the acid, which starts at row 61): a generator sealed in a stone box (only a 2 x 2 air notch above it) feeds one copper bus on a stone shelf. Six fingers branch off it, each a stem, a sample and a tail: steel, the water jar, rubber, stone, ice and a fuse, left to right. Fingers rather than one chain, because a blocking sample in a chain would leave every station after it dark. On the generated grid the tails of steel, the jar and the fuse are powered, the tails of rubber, stone and ice are not, and with the fuse removed its tail goes dark. 158 powered cells, none ignitable.
+- **Electrolysis jar** is station 2 of the bench rather than a separate jar: a 7 x 9 stone jar of water with a copper tip entering from below and another from above, so each pulse shocks 35 tiles of water. It is stone, not the planned glass, because ice freezes the water beside it (`Water.FREEZE_CHANCE`) and the jar would stop conducting.
+- **Spark gap** (gas cellar, local x 22 to 49, y 12 to 30, above the crates and the bell): a 14 x 5 methane chamber (62 methane tiles after the electrodes) in 7-thick stone, because a blast reaches about 3 stone cells in (stone resists 0.9, so each cell costs 28 of the blast's 100). The generator is walled into the top-left stone, and two copper leads inside the stone reach two steel electrodes whose tips are 6 cells apart. Live steel lights methane on contact, so the first pulse sets it off, and detonation is likely (0.004 per burning tile per step over 62 tiles). 52 powered cells, 22 ignitable and 62 in the blast chain, all inside the chamber, and the chain is far from the board (the chamber is about 140 columns from the hall).
+- Not looked at in the running sim: pulse timing along the bus, the jar flash, whether the 7-thick walls hold through a full detonation, how the methane and its haze read.
 
 ## Death machine: electricity as weapon and ignition
 
