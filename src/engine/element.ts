@@ -40,7 +40,7 @@ export interface AgedOutcome {
 export const MAX_OUTCOMES = 32;
 
 /** Most reaction rules across all elements (size of the GPU reaction table). */
-export const MAX_REACTIONS = 128;
+export const MAX_REACTIONS = 256;
 
 /** Largest reaction radius; within one chunk so a change in range always wakes the reacting chunk. */
 export const MAX_REACTION_RADIUS = 8;
