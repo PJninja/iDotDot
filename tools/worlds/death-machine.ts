@@ -1,11 +1,15 @@
 import { Grid, T } from '../world-kit.ts';
 import { POCKETS, SURFACE, carvePockets, fillGround, finishBoard, boardHall, galleryCorridor, lined, pipeLattice, shaft } from './underground.ts';
+import type { Circuit } from './circuits.ts';
+import type { CellRect } from '../../src/worlds/board-slots.ts';
 
 const S = SURFACE;
 const SKULL_X = 324;
 /** The methane spine runs along the rock under the soil, down the east side of the chips and into the reservoir in pocket 4. */
 const DUCT_Y = 184;
 const SPINE_X = 438;
+/** Left edge of each bomb tooth (5 wide, a top and a bottom row): out on the cheeks, 6 or more cells from the neck. */
+const TEETH_X = [SKULL_X - 24, SKULL_X - 18, SKULL_X + 14, SKULL_X + 20];
 
 /** Points of an ellipse outline, for brick-patterned polygons. */
 function ellipsePoints(cx: number, cy: number, rx: number, ry: number, n = 72): [number, number][] {
@@ -58,7 +62,12 @@ function stacks(g: Grid): void {
   for (let i = 0; i < 40; i++) g.setIfAir(190 + Math.floor(g.rand() * 4), 100 + Math.floor(g.rand() * 56), T.STEAM);
 }
 
-/** The skull: a stone head with a methane brain, torch eyes, bomb teeth and flaming horns, on a neck over the spine. */
+/**
+ * The skull: a stone head with a sealed methane brain, torch eyes, bomb teeth set well out to the
+ * cheeks and flaming horns, on a solid stone neck over the spine. The neck holds no methane, so
+ * the brain and the spine are two separate bodies about 90 cells apart and a blast in the head
+ * cannot chain into the reservoir (see `skullWiring` for what ignites the head).
+ */
 function skullTower(g: Grid): void {
   const cx = SKULL_X;
   g.brickPoly([[270, S], [378, S], [378, S - 10], [352, S - 30], [348, S - 36], [300, S - 36], [296, S - 30], [270, S - 10]], T.STONE, 8, 4);
@@ -84,15 +93,12 @@ function skullTower(g: Grid): void {
   for (const rx of [cx - 30, cx - 24, cx + 24, cx + 30]) g.rect(rx, 92, 2, 2, T.STEEL);
   // mouth and teeth
   g.air(cx - 25, 102, 50, 14);
-  for (let i = 0; i < 7; i++) {
-    const tx = cx - 24 + i * 7;
-    if (Math.abs(tx + 2 - cx) < 8) continue;
+  for (const tx of TEETH_X) {
     g.rect(tx, 102, 5, 5, T.BOMB);
-    g.rect(tx + 3, 111, 5, 5, T.BOMB);
+    g.rect(tx, 111, 5, 5, T.BOMB);
   }
-  // methane spine from the chamber down through the neck into the rock
+  // solid stone neck from the brain's floor down to the tower; the methane spine starts below ground
   g.rect(cx - 6, 66, 13, S - 66, T.STONE);
-  g.rect(cx - 3, 66, 7, S - 66, T.METHANE);
   // flaming horns
   for (const hx of [cx - 31, cx + 23]) {
     g.bricks(hx, 16, 8, 28, T.STONE, 4, 3);
@@ -276,6 +282,83 @@ function acidPit(g: Grid): void {
   g.rect(62, floor - 6, 2, 6, T.MUD);
 }
 
+/**
+ * The skull's power and ignition. A generator is walled into the stone neck and a copper trunk
+ * runs up the middle of the neck, inside the stone. At the jaw a copper row along the mouth's
+ * ceiling touches every top tooth, so the bombs go off; at the top the trunk feeds two steel spark
+ * plugs standing in the methane brain, so the head goes off too. The first pulse starts it.
+ */
+function skullWiring(g: Grid): void {
+  const cx = SKULL_X;
+  g.rect(cx - 1, 140, 2, 2, T.GENERATOR);
+  g.rect(cx, 67, 1, 73, T.COPPER);
+  g.rect(cx - 24, 101, 49, 1, T.COPPER);
+  g.rect(cx - 2, 67, 5, 1, T.COPPER);
+  g.rect(cx - 2, 60, 1, 7, T.STEEL);
+  g.rect(cx + 2, 60, 1, 7, T.STEEL);
+}
+
+/**
+ * A tesla coil in the empty meadow left of the stacks: a generator walled into a stone base, a copper
+ * riser with copper windings round a stone core, and a steel terminal on top that throws arcs. The
+ * terminal is the only steel, so an overloaded pulse can only make it glow. Nothing flammable is near.
+ */
+function teslaCoil(g: Grid): void {
+  g.bricks(120, S - 8, 18, 8, T.STONE, 6, 2);
+  g.rect(131, 152, 2, 2, T.GENERATOR);
+  g.rect(128, 121, 4, 29, T.STONE);
+  g.rect(132, 118, 1, 34, T.COPPER);
+  for (const y of [124, 129, 134, 139, 144]) g.rect(125, y, 8, 1, T.COPPER);
+  g.disc(132, 114, 4, T.STEEL);
+}
+
+/**
+ * Pocket 5's detonator, in pocket-local coordinates: a generator in a stone vault at the crane
+ * rail's left end powers the crane's steel (rail, rope and hook, which touches the hanging bomb),
+ * and a copper line down the left wall reaches the first bomb on the conveyor, clear of the gear beside it.
+ */
+function bombLineWiring(g: Grid): void {
+  g.rect(0, 9, 4, 7, T.STONE);
+  g.rect(1, 11, 2, 2, T.GENERATOR);
+  g.rect(3, 11, 1, 3, T.COPPER);
+  g.rect(3, 14, 1, 69, T.COPPER);
+  g.rect(4, 82, 6, 1, T.COPPER);
+}
+
+const inPocket = (i: number, r: CellRect): CellRect => ({ x: POCKETS[i].x + r.x, y: POCKETS[i].y + r.y, w: r.w, h: r.h });
+
+const skullCircuit: Circuit = {
+  name: 'skull',
+  sources: { x: SKULL_X - 3, y: 138, w: 6, h: 6 },
+  bounds: [{ x: SKULL_X - 26, y: 58, w: 53, h: 86 }],
+  loads: [
+    { name: 'brain spark plugs', at: { x: SKULL_X - 2, y: 60, w: 5, h: 1 } },
+    { name: 'teeth wire', at: { x: SKULL_X - 24, y: 101, w: 49, h: 1 } },
+  ],
+  ignites: [
+    { x: SKULL_X - 30, y: 36, w: 61, h: 32 },
+    { x: SKULL_X - 26, y: 100, w: 53, h: 17 },
+  ],
+};
+
+const teslaCircuit: Circuit = {
+  name: 'tesla coil',
+  sources: { x: 130, y: 151, w: 4, h: 4 },
+  bounds: [{ x: 118, y: 108, w: 22, h: 52 }],
+  loads: [{ name: 'terminal', at: { x: 132, y: 112, w: 1, h: 1 } }],
+};
+
+const bombLineCircuit: Circuit = {
+  name: 'bomb line detonator',
+  sources: inPocket(3, { x: 0, y: 9, w: 4, h: 7 }),
+  bounds: [inPocket(3, { x: 0, y: 9, w: 70, h: 80 })],
+  loads: [
+    { name: 'crane hook', at: inPocket(3, { x: 10, y: 49, w: 8, h: 1 }) },
+    { name: 'conveyor bomb wire', at: inPocket(3, { x: 9, y: 82, w: 1, h: 1 }) },
+  ],
+  ignites: [inPocket(3, { x: 8, y: 48, w: 12, h: 8 }), inPocket(3, { x: 9, y: 81, w: 6, h: 6 })],
+};
+
 export function buildDeathMachine(): Grid {
   const g = new Grid(666);
   fillGround(g, () => S, 0);
@@ -304,6 +387,10 @@ export function buildDeathMachine(): Grid {
   boardHall(g);
   pipeLattice(g, T.STEEL, T.AIR);
   galleryCorridor(g);
-  finishBoard(g, 'death-machine');
+  // the electric parts go in last, so the scatter drawn before them is not disturbed
+  skullWiring(g);
+  teslaCoil(g);
+  g.at(POCKETS[3].x, POCKETS[3].y, () => bombLineWiring(g));
+  finishBoard(g, 'death-machine', [skullCircuit, teslaCircuit, bombLineCircuit]);
   return g;
 }
