@@ -10,17 +10,15 @@ import { ElementPicker } from './ui/picker';
 import { BrushPicker } from './ui/brush-picker';
 import { PerfHud } from './ui/perf-hud';
 import { loadPreferences, savePreferences } from './ui/preferences';
-import { WorldMenu } from './ui/world-menu';
-import { pickDefaultWorld } from './worlds';
+import { SettingsMenu } from './ui/settings-menu';
+import { nextDefaultWorld, pickDefaultWorld } from './worlds';
 import { MESSAGE_NO_WEBGPU, showGpuErrorDialog } from './ui/gpu-error-dialog';
 import { Board } from './ui/board';
 import { ProjectFilter } from './ui/project-filter';
 import { ContactMenu } from './ui/contact-menu';
 import { ProjectWindow } from './ui/project-window';
 import { ProjectRoute } from './ui/project-route';
-import { ModeControls } from './ui/mode-controls';
 import { PlainView } from './ui/plain-view';
-import { showFirstHint } from './ui/first-hint';
 
 const NOTICE_GPU_FAILED = 'The GPU could not be started, so the simulation cannot run.';
 const NOTICE_TOO_SMALL = 'This window is too small to show the project board beside the simulation.';
@@ -39,7 +37,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  initHeader();
+  const headerLinks = initHeader();
   applyHeaderHeight();
 
   const canvas = document.getElementById('sandbox');
@@ -79,12 +77,13 @@ async function main(): Promise<void> {
   board.onOpen = (project, chip) => projectWindow.openPreview(project, chip);
   const route = new ProjectRoute(projectWindow, projects, (id) => board.chipFor(id));
 
-  // Every world rebuild (start, resize, tile size) clears the grid, then restores this visit's default world.
-  const defaultWorld = await pickDefaultWorld();
-  const loadDefaultWorld = (): void => {
-    if (defaultWorld !== null) world.loadWorld(defaultWorld);
+  // Every world rebuild (start, resize, tile size) clears the grid, then restores the current
+  // world: this visit's default one until the settings menu picks another preset or an empty world.
+  let baseWorld = await pickDefaultWorld();
+  const loadBaseWorld = (): void => {
+    if (baseWorld !== null) world.loadWorld(baseWorld);
   };
-  board.setBase(defaultWorld);
+  board.setBase(baseWorld);
 
   // The simulation yields to the plain page when the chips cannot fit the window.
   let plainForSize = false;
@@ -106,7 +105,7 @@ async function main(): Promise<void> {
     if (plainForSize) plain.hide();
     const fits = board.place();
     overlay.refreshColliders();
-    loadDefaultWorld();
+    loadBaseWorld();
     if (fits) board.stamp();
     applyFit(fits);
   };
@@ -159,8 +158,6 @@ async function main(): Promise<void> {
     showGpuErrorDialog(`device lost: ${reason}`);
   };
 
-  new WorldMenu(world);
-
   // Third header button: toggleable performance readout and tile size dropdown.
   const perfHud = new PerfHud(world, prefs.tileSize);
   perfHud.onTileSizeChange = (cssPx) => {
@@ -177,11 +174,18 @@ async function main(): Promise<void> {
     [lastGX, lastGY] = pointerGrid();
   };
 
-  const modeControls = new ModeControls(prefs.mode);
-  new ContactMenu(modeControls.links, modeControls.resetLink);
-  modeControls.onModeChange = (mode) => savePreferences({ mode });
-  modeControls.onReset = resizeWorld;
-  if (!prefs.hintSeen) showFirstHint(() => savePreferences({ hintSeen: true }));
+  new ContactMenu(headerLinks, null);
+
+  const switchWorld = (next: typeof baseWorld): void => {
+    baseWorld = next;
+    board.setBase(next);
+    resizeWorld();
+  };
+  new SettingsMenu(world, {
+    reset: resizeWorld,
+    empty: () => switchWorld(null),
+    nextPreset: () => void nextDefaultWorld().then(switchWorld),
+  });
 
   // --- Frame hook: paint (if held) -------------------------------------------
   // One stamp per sim step, not per frame, so the paint rate is the same at any

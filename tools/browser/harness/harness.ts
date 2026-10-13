@@ -1,6 +1,6 @@
 /**
  * Test page for the portfolio UI without a GPU: the real Board, Overlay, ProjectFilter, ProjectWindow,
- * ProjectRoute and ModeControls run against a fake world whose `stampCells` records the tiles and
+ * ProjectRoute and ContactMenu run against a fake world whose `stampCells` records the tiles and
  * draws them into a 2D canvas. Query: `n` (pad the project list to n entries), `tile` (CSS px per
  * cell), `colliders` (outline the colliders), plus the app's `q`, `tag` and `page`. Exposes `window.__h` for tests/test-ui.mjs.
  */
@@ -18,7 +18,7 @@ import { Board } from '../../../src/ui/board';
 import { ProjectFilter } from '../../../src/ui/project-filter';
 import { ProjectWindow } from '../../../src/ui/project-window';
 import { ProjectRoute } from '../../../src/ui/project-route';
-import { ModeControls } from '../../../src/ui/mode-controls';
+import { ContactMenu } from '../../../src/ui/contact-menu';
 import { ElementPicker } from '../../../src/ui/picker';
 
 const params = new URLSearchParams(location.search);
@@ -37,7 +37,7 @@ if (n > projects.length) {
   projects = [...base, ...extra];
 }
 
-initHeader();
+const headerLinks = initHeader();
 const canvas = document.getElementById('sandbox') as HTMLCanvasElement;
 const dpr = window.devicePixelRatio || 1;
 const geometry = computeGridGeometry(window.innerWidth, window.innerHeight - applyHeaderHeight(), dpr, tile, SETTINGS.MAX_SIM_DIMENSION);
@@ -89,7 +89,7 @@ board.setBase(null);
 const win = new ProjectWindow((p) => board.borderElement(p), () => fake.tileSize);
 board.onOpen = (p, chip) => win.openPreview(p, chip);
 const route = new ProjectRoute(win, projects, (id) => board.chipFor(id));
-new ModeControls('portfolio');
+new ContactMenu(headerLinks, null);
 new ElementPicker(registry, 1);
 
 const fits = board.place();

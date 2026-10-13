@@ -1,4 +1,4 @@
-import { Grid, T } from '../world-kit.ts';
+import { Grid, T, shades } from '../world-kit.ts';
 import { checkCircuits, type Circuit } from './circuits.ts';
 import {
   BLOCK,
@@ -126,17 +126,78 @@ export function pipeLattice(g: Grid, hull: number = T.STEEL, bore: number = T.AI
   g.rect(x, ROW_STRIP.y + 1, BLOCK.w + 2 * HALL_MARGIN, ROW_STRIP.h - 2, bore);
 }
 
+/** Smooth random offsets in [0, amp] along `length` cells, through a random value every `step` cells. */
+function wobble(g: Grid, length: number, amp: number, step: number): number[] {
+  const knots = Array.from({ length: Math.ceil(length / step) + 2 }, () => g.rand() * amp);
+  return Array.from({ length }, (_, i) => {
+    const k = Math.floor(i / step);
+    const t = (1 - Math.cos(((i % step) / step) * Math.PI)) / 2;
+    return Math.round(knots[k] + (knots[k + 1] - knots[k]) * t);
+  });
+}
+
+/**
+ * A natural cavern around the board instead of the brick hall: open air from `side` cells left
+ * and right of the block and `top` cells above it down to the floor under the gallery, with a
+ * rough outline up to `rough` cells further out and a darker rock face. Returns its bounds,
+ * which `finishBoard` takes as `hall`. Draw the gallery corridor afterwards.
+ */
+export function naturalCavern(g: Grid, side = 8, top = 4, rough = 4): CellRect {
+  const outer = corridor(WIDE.gallery);
+  const x0 = BLOCK.x - side;
+  const x1 = BLOCK.x + BLOCK.w + side;
+  const y0 = BLOCK.y - top;
+  const y1 = outer.y + outer.h;
+  const rows = y1 - y0 + rough;
+  const left = wobble(g, rows, rough, 9);
+  const right = wobble(g, rows, rough, 9);
+  const ceiling = wobble(g, x1 - x0 + 2 * rough, rough, 11);
+  const floor = wobble(g, x1 - x0 + 2 * rough, 2, 7);
+  const bounds = { x: x0 - rough, y: y0 - rough, w: x1 - x0 + 2 * rough, h: y1 - y0 + rough + 2 };
+  const open = (x: number, y: number): boolean => {
+    const i = x - bounds.x;
+    const j = y - bounds.y;
+    if (i < 0 || i >= bounds.w || j < 0 || j >= rows) return false;
+    const underGallery = x >= outer.x && x < outer.x + outer.w;
+    const bottom = underGallery ? y1 : y1 + floor[i];
+    return x >= x0 - left[j] && x < x1 + right[j] && y >= y0 - ceiling[i] && y < bottom;
+  };
+  const order = shades(T.STONE);
+  for (let y = bounds.y - 2; y < bounds.y + bounds.h + 2; y++) {
+    for (let x = bounds.x - 2; x < bounds.x + bounds.w + 2; x++) {
+      if (open(x, y)) {
+        g.set(x, y, T.AIR);
+        continue;
+      }
+      if (g.typeAt(x, y) !== T.STONE) continue;
+      let near = 3;
+      for (let d = 1; d <= 2 && near === 3; d++) {
+        for (let dy = -d; dy <= d && near === 3; dy++) for (let dx = -d; dx <= d; dx++) if (open(x + dx, y + dy)) near = d;
+      }
+      if (near <= 2) g.set(x, y, T.STONE, { variant: order[near === 1 ? 0 : Math.floor(g.rand() * 2)] });
+    }
+  }
+  return bounds;
+}
+
 /** Cells a scene must not put within `KEEP_OUT_CELLS` of a ring: anything that acts on its own. */
 const ACTIVE_TYPES = new Set<number>([
   T.WATER, T.ACID, T.STEAM, T.METHANE, T.SMOKE, T.FLAME, T.EMBER, T.SPARK, T.EXPLOSION, T.BOMB, T.TORCH, T.SPRING,
   T.HOT_STEEL, T.COOLING_STEEL, T.MOLD, T.MUD, T.GENERATOR, T.ARC, T.LIVE_STEEL, T.LIVE_COPPER, T.SHOCKED_WATER, T.LIVE_FUSE,
 ]);
 
+export interface BoardOptions {
+  /** Bounds of the cavity the chips hang in (default: the brick hall of `boardHall`). */
+  hall?: CellRect;
+  /** Cells around `hall` that must hold nothing that acts on its own (default 0: only the rings' keep-out zones are checked). */
+  quiet?: number;
+}
+
 /** Turn the bedrock's random mud lenses near the board into dirt, then run `checkBoard` and `checkCircuits` for the scene's electric `circuits`. Call last. */
-export function finishBoard(g: Grid, world: string, circuits: Circuit[] = []): void {
+export function finishBoard(g: Grid, world: string, circuits: Circuit[] = [], options: BoardOptions = {}): void {
   const outer = corridor(WIDE.gallery);
   g.replace(BLOCK.x - 8, BLOCK.y - 8, BLOCK.w + 16, outer.y + outer.h - BLOCK.y + 16, T.MUD, T.DIRT);
-  checkBoard(g, world);
+  checkBoard(g, world, options);
   checkCircuits(g, world, circuits);
 }
 
@@ -167,7 +228,7 @@ function leaks(g: Grid, label: string, x: number, y: number, bounds: CellRect): 
   return [];
 }
 
-function checkBoard(g: Grid, world: string): void {
+function checkBoard(g: Grid, world: string, options: BoardOptions): void {
   const problems: string[] = [];
   const scan = (rect: CellRect, label: string): void => {
     for (let y = rect.y - KEEP_OUT_CELLS; y < rect.y + rect.h + KEEP_OUT_CELLS; y++) {
@@ -185,8 +246,17 @@ function checkBoard(g: Grid, world: string): void {
       for (let i = 0; i < w; i++) if (g.typeAt(x + i, y + j) !== T.AIR && !(j === h - 1 && g.typeAt(x + i, y + j) === T.STEEL)) problems.push(`${name} gallery: not air at (${x + i}, ${y + j})`);
     }
   }
-  const hall = { x: BLOCK.x - HALL_MARGIN, y: BLOCK.y - HALL_MARGIN, w: BLOCK.w + 2 * HALL_MARGIN, h: BLOCK.h + 2 * HALL_MARGIN };
+  const hall = options.hall ?? { x: BLOCK.x - HALL_MARGIN, y: BLOCK.y - HALL_MARGIN, w: BLOCK.w + 2 * HALL_MARGIN, h: BLOCK.h + 2 * HALL_MARGIN };
   problems.push(...leaks(g, 'hall', BLOCK.x + 5, BLOCK.y + 5, hall));
+  const quiet = options.quiet ?? 0;
+  if (quiet > 0) {
+    for (let y = hall.y - quiet; y < hall.y + hall.h + quiet; y++) {
+      for (let x = hall.x - quiet; x < hall.x + hall.w + quiet; x++) {
+        const t = g.typeAt(x, y);
+        if (ACTIVE_TYPES.has(t)) problems.push(`quiet zone: type ${t} at (${x}, ${y})`);
+      }
+    }
+  }
   problems.push(...leaks(g, 'gallery', WIDE.gallery.x + 2, WIDE.gallery.y + 2, WIDE.gallery));
   if (problems.length > 0) {
     const shown = problems.slice(0, 12).join('\n  ');

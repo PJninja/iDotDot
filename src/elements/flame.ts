@@ -15,7 +15,8 @@ export class Flame extends Element {
   readonly displayName = 'Flame';
   readonly defaultColor: [number, number, number] = [255, 160, 40];
   readonly phase = 'gas';
-  readonly density = 0.05;
+  /** Denser than smoke, steam and methane (but not sparks), so flames rise through them instead of being pushed out. */
+  readonly density = 0.25;
 
   /** Chance per step that a tile rises one cell (0..1). */
   static RISE_SPEED = 0.8;

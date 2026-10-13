@@ -29,9 +29,9 @@ How to read the columns:
 | 7 | Wet Sand | powder | yes | `#968458` | 1.8 | 3 | 0.3 | 0.85 |  |  | tiles |  |  |  | 0.5 |  |
 | 8 | Mud | powder | yes | `#5c402c` | 1.8 | 4 | 0.15 | 0.9 |  |  | tiles |  |  |  | 0.5 |  |
 | 9 | Ember | powder | yes | `#f06e1e` | 1.5 | 1.5 | 0.4 | 0.8 |  |  | tiles | 0.4 | Charcoal 10%, Ash 25%, else gone | Flame 0.6% | 0.3 | holds on flammable |
-| 10 | Flame | gas | yes | `#ffa028` | 0.05 |  |  |  | 0.8 |  | tiles | 8 | Smoke 80%, Spark 3%, else gone |  |  | fuel fed |
+| 10 | Flame | gas | yes | `#ffa028` | 0.25 |  |  |  | 0.8 |  | tiles | 8 | Smoke 80%, Spark 3%, else gone |  |  | fuel fed |
 | 11 | Spark | gas | yes | `#ffe078` | 0.3 |  |  |  | 0 |  | tiles | 6 | gone |  |  |  |
-| 12 | Explosion | static | hidden | `#ffbe46` |  |  |  |  |  |  | tiles | 5 | Smoke 25%, Flame 8%, Spark 2%, Rubble 6%, else gone |  |  |  |
+| 12 | Explosion | static | hidden | `#ffbe46` |  |  |  |  |  |  | tiles | 12 | Smoke 25%, Flame 3%, Spark 2%, Rubble 6%, else gone |  |  |  |
 | 13 | Bomb | static | yes | `#3e3e48` |  |  |  |  |  |  | tiles |  |  |  |  | flammable |
 | 14 | Charcoal | powder | yes | `#262428` | 1.5 | 3 | 0.3 |  |  |  | tiles |  |  |  | 0.2 | flammable |
 | 15 | Stone | static | yes | `#767470` |  |  |  |  |  |  | tiles |  |  |  | 0.9 |  |
@@ -51,8 +51,8 @@ How to read the columns:
 | 29 | Spent Steel | static | hidden | `#4a5e86` |  |  |  |  |  |  | tiles | 4 | Steel 100% |  | 0.98 |  |
 | 30 | Arc | static | hidden | `#c8e6ff` |  |  |  |  |  |  | tiles | 32 | gone |  |  |  |
 | 31 | Generator | static | yes | `#5c6aa8` |  |  |  |  |  |  | tiles |  |  | Arc 0.2% (also below) | 0.5 |  |
-| 32 | Shocked Water | static | hidden | `#c8ecff` |  |  |  |  |  |  | tiles | 16 | Numb Water 100% |  | 0.75 |  |
-| 33 | Numb Water | static | hidden | `#3a78c4` |  |  |  |  |  |  | tiles | 10 | Water 100% |  | 0.75 |  |
+| 32 | Shocked Water | static | hidden | `#c8ecff` |  |  |  |  |  |  | water | 16 | Numb Water 100% |  | 0.75 |  |
+| 33 | Numb Water | static | hidden | `#3a78c4` |  |  |  |  |  |  | water | 10 | Water 100% |  | 0.75 |  |
 | 34 | Fuse | static | yes | `#bea470` |  |  |  |  |  |  | tiles |  |  |  | 0.3 |  |
 | 35 | Live Fuse | static | hidden | `#ffd696` |  |  |  |  |  |  | tiles | 12 | gone |  | 0.3 |  |
 | 36 | Rubber | static | yes | `#42303a` |  |  |  |  |  |  | tiles |  |  |  | 0.3 | flammable |

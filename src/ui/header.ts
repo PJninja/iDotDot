@@ -2,9 +2,10 @@ const SITE_TITLE = 'iDotDot by Anthony Liparulo';
 
 /**
  * Populate the fixed 48px header bar. The element itself lives in
- * index.html; styling lives in main.css.
+ * index.html; styling lives in main.css. Returns the text links group
+ * (Contact) that sits left of the toolbox.
  */
-export function initHeader(): void {
+export function initHeader(): HTMLDivElement {
   const header = document.getElementById('header');
   if (header === null) throw new Error('#header element not found');
 
@@ -17,4 +18,9 @@ export function initHeader(): void {
   // Insert before the actions block so space-between keeps the title left
   // and the action buttons right.
   nav.insertBefore(title, nav.firstChild);
+
+  const links = document.createElement('div');
+  links.className = 'header-links';
+  nav.insertBefore(links, nav.querySelector('.header-actions'));
+  return links;
 }

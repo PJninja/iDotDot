@@ -6,6 +6,7 @@ import { SETTINGS } from '../settings';
  * Numb water (type 33) - water that just carried a pulse, hidden from the picker. A static
  * solid that cannot be shocked again, then turns back into water. Shocked water plus numb
  * water must last at least as long as live steel, or a pool would shock itself forever.
+ * Drawn as part of the water body with a faint, fading afterglow of shocked water's veins.
  */
 export class NumbWater extends Element {
   readonly type = SETTINGS.NUMB_WATER_TYPE;
@@ -20,6 +21,7 @@ export class NumbWater extends Element {
   readonly ageRate = NumbWater.AGE_RATE;
   readonly agedInto = [{ type: SETTINGS.WATER_TYPE, chance: 1 }];
   readonly blastResistance = 0.75;
+  readonly hazeChannel = 1;
 
   private readonly ramp = buildGradient([
     { at: 0, color: [96, 170, 240] },

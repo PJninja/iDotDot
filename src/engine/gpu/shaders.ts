@@ -11,6 +11,7 @@ import { MAX_OUTCOMES, MAX_REACTIONS } from '../element';
 import { Explosion } from '../../elements/explosion';
 import { Flame } from '../../elements/flame';
 import { Methane } from '../../elements/methane';
+import { ShockedWater } from '../../elements/shocked-water';
 import { Smoke } from '../../elements/smoke';
 import { Spark } from '../../elements/spark';
 import { Steam } from '../../elements/steam';
@@ -152,6 +153,15 @@ const WATER_BOTTOM : vec3f = ${wgslColor(Water.DEEP_COLOR)};
 const WATER_OPACITY : f32 = ${Water.OPACITY};
 const WATER_EDGE_LOW : f32 = ${Water.EDGE_LOW};
 const WATER_EDGE_HIGH : f32 = ${Water.EDGE_HIGH};
+const SHOCKED_WATER : u32 = ${SETTINGS.SHOCKED_WATER_TYPE}u;
+const NUMB_WATER : u32 = ${SETTINGS.NUMB_WATER_TYPE}u;
+const VEIN_CORE : vec3f = ${wgslColor(ShockedWater.VEIN_CORE)};
+const VEIN_GLOW : vec3f = ${wgslColor(ShockedWater.VEIN_GLOW)};
+const SHOCK_TINT : f32 = ${ShockedWater.TINT};
+const VEIN_WIDTH : f32 = ${ShockedWater.VEIN_WIDTH};
+const VEIN_SCALE : f32 = ${ShockedWater.VEIN_SCALE}.0;
+const VEIN_FLICKER_HZ : f32 = ${ShockedWater.FLICKER_HZ}.0;
+const NUMB_GLOW : f32 = ${ShockedWater.NUMB_GLOW};
 const WISP_AMOUNT : f32 = ${Smoke.WISP_AMOUNT};
 const WISP_SCALE : f32 = ${Smoke.WISP_SCALE}.0;
 const WISP_RISE : f32 = ${Smoke.RISE_SPEED * SETTINGS.SIM_HZ};
@@ -169,6 +179,15 @@ fn valueNoise(p : vec2f) -> f32 {
   let top = mix(hash2(c), hash2(c + vec2u(1u, 0u)), t.x);
   let bottom = mix(hash2(c + vec2u(0u, 1u)), hash2(c + vec2u(1u, 1u)), t.x);
   return mix(top, bottom, t.y);
+}
+
+// Electric veins over water carrying a pulse: thin bright lines where a jittering noise
+// field crosses its midpoint, with a wider glow around them (0 = none, 1 = vein core).
+fn veins(g : vec2f) -> vec2f {
+  let frame = floor(u.time * VEIN_FLICKER_HZ);
+  let q = g / VEIN_SCALE + vec2f(hash2(vec2u(u32(frame), 7u)), hash2(vec2u(u32(frame), 13u))) * 64.0;
+  let d = abs(0.6 * valueNoise(q) + 0.4 * valueNoise(q * 2.3 + 5.0) - 0.5);
+  return vec2f(1.0 - smoothstep(0.0, VEIN_WIDTH, d), 1.0 - smoothstep(0.0, VEIN_WIDTH * 4.0, d));
 }
 
 // Three octaves of noise scrolling upward at the smoke's rise speed (0..1).
@@ -211,6 +230,15 @@ fn fs(@builtin(position) pos : vec4f) -> @location(0) vec4f {
   if (water > 0.0) {
     let body = mix(WATER_TOP, WATER_BOTTOM, clamp(g.y / f32(u.height), 0.0, 1.0));
     color = mix(color, vec4f(body, 1.0), WATER_OPACITY * smoothstep(WATER_EDGE_LOW, WATER_EDGE_HIGH, water));
+  }
+  if (t == SHOCKED_WATER || t == NUMB_WATER) {
+    let life = 1.0 - f32(p >> 24u) / 255.0;
+    let strength = select(NUMB_GLOW * life, 0.4 + 0.6 * life, t == SHOCKED_WATER);
+    let v = veins(g);
+    var rgb = mix(color.rgb, VEIN_GLOW, SHOCK_TINT * strength);
+    rgb = mix(rgb, VEIN_GLOW, 0.6 * v.y * strength);
+    rgb = mix(rgb, VEIN_CORE, v.x * strength);
+    color = vec4f(rgb, 1.0);
   }
   let hz = hazeSmooth(g);
   if (hz.x > 0.0) {
@@ -343,6 +371,7 @@ const SMOKE_WIND_SPEED : f32 = ${Smoke.WIND_SPEED};
 const SMOKE_TURB_SPEED : f32 = ${Smoke.TURBULENCE_SPEED};
 const SMOKE_TURB_SCALE : f32 = ${Smoke.TURBULENCE_SCALE}.0;
 const SMOKE_TURB_PERIOD : u32 = ${Smoke.TURBULENCE_PERIOD}u;
+const SMOKE : u32 = ${SETTINGS.SMOKE_TYPE}u;
 const STEAM : u32 = ${SETTINGS.STEAM_TYPE}u;
 const STEAM_COMPACT : u32 = ${Steam.CONDENSE_NEIGHBORS}u;
 const STEAM_CONDENSE_STEPS : u32 = ${Steam.CONDENSE_STEPS}u;
@@ -357,8 +386,15 @@ const EXPLOSION : u32 = ${SETTINGS.EXPLOSION_TYPE}u;
 const BLAST_HOP_COST : u32 = ${Explosion.HOP_COST}u;
 const BLAST_DIAGONAL_COST : u32 = ${Explosion.DIAGONAL_COST}u;
 const BLAST_REACH : u32 = ${Explosion.REACH}u;
-const BLAST_SPREAD_MAX_AGE : u32 = ${Explosion.SPREAD_MAX_AGE}u;
+const BLAST_SPREAD_WINDOW : u32 = ${Explosion.SPREAD_WINDOW}u;
 const BLAST_ABSORB : f32 = ${Explosion.ABSORB}.0;
+const BLAST_SOLID_COST : u32 = ${Explosion.SOLID_COST}u;
+const BLAST_FADE_AGE : f32 = ${Explosion.FADE_AGE}.0;
+const BLAST_MIN_SPEED : f32 = ${Explosion.MIN_SPEED};
+const BLAST_RIM_SPARK_CHANCE : f32 = ${Explosion.RIM_SPARK_CHANCE};
+const BLAST_SPARK_FROM : f32 = ${Explosion.SPARK_FROM};
+const BLAST_SPARK_SHARE : f32 = ${Explosion.SPARK_SHARE};
+const BLAST_NONE : u32 = 0xFFFFu;
 const SPARK : u32 = ${SETTINGS.SPARK_TYPE}u;
 const FLAME_FLICKER : f32 = ${Flame.FLICKER};
 const FLAME_WIND_FLICKER : f32 = ${Flame.WIND_FLICKER};
@@ -729,7 +765,7 @@ fn react(x : i32, y : i32, t : u32) -> u32 {
   let count = rules >> 16u;
   for (var k = 0u; k < count; k++) {
     let rule = u.reactions[start + k];
-    if (typeWithin(x, y, rule.other, rule.radius)) {
+    if (reactsWith(x, y, rule.other, rule.radius)) {
       if (rule.consumes == 0u && rand(u32(x), u32(y), stepU.step ^ (0x632BE5ABu + k)) < rule.chance) {
         return rule.result;
       }
@@ -965,6 +1001,12 @@ fn typeWithin(x : i32, y : i32, t : u32, r : i32) -> bool {
   return false;
 }
 
+// A rule's other type is within reach. Smoke counts as air, so a rule that needs air
+// (an ember making flames) still fires under smoke instead of being smothered by it.
+fn reactsWith(x : i32, y : i32, other : u32, r : i32) -> bool {
+  return typeWithin(x, y, other, r) || (other == AIR && typeWithin(x, y, SMOKE, r));
+}
+
 fn flammableAt(x : i32, y : i32) -> bool {
   if (!inBounds(x, y)) {
     return false;
@@ -988,14 +1030,14 @@ fn fuelAround(x : i32, y : i32) -> bool {
   return flammableAround(x, y) || typeAround(x, y, EMBER) > 0u;
 }
 
-// An empty cell beside or above an emitter (also below it for emitters with
+// An empty (or smoke) cell beside or above an emitter (also below it for emitters with
 // FLAG_EMITS_BELOW) pulls in the emitter's product with its emitChance per step, so
 // embers keep producing flames and springs keep producing water without being used up
 // (the cell only writes itself, so no thread ever writes a second cell). Each emitter
-// rolls independently; the first to succeed wins.
-fn emit(i : u32, x : i32, y : i32, p : u32) {
+// rolls independently; the first to succeed wins. Returns whether the cell was written.
+fn emit(i : u32, x : i32, y : i32, p : u32) -> bool {
   if (solidBuf[i] != 0u) {
-    return;
+    return false;
   }
   var k = 0u;
   for (var dy = -1; dy <= 1; dy++) {
@@ -1012,26 +1054,61 @@ fn emit(i : u32, x : i32, y : i32, p : u32) {
       k++;
       if (rand(u32(x), u32(y), stepU.step ^ (0xD1B54A32u + k)) < u.types[nt].emitChance && claim(x, y)) {
         commit(i, i, pack(product, 0u, 0u, 0u), p);
-        return;
+        return true;
       }
     }
   }
+  return false;
 }
 
-// The reach an explosion has spent when it spreads into (x, y): the cheapest
-// neighboring blast tile that may still spread (younger than BLAST_SPREAD_MAX_AGE),
-// its spent reach plus the hop cost (diagonals cost more, which keeps the blast
-// round) plus absorb, the extra cost of eating through the tile there. Above
-// BLAST_REACH means no blast reaches the cell.
-fn blastSpent(x : i32, y : i32, absorb : u32) -> u32 {
-  var best = BLAST_REACH + 1u;
+// A blast tile is born older the more reach it has spent, so the blast dims and fades
+// faster as it spreads, and the core burns out while the front is still moving.
+fn blastBirthAge(spent : u32) -> u32 {
+  return u32(f32(spent) * BLAST_FADE_AGE / f32(BLAST_REACH));
+}
+
+// A blast tile spreads for BLAST_SPREAD_WINDOW age after its birth.
+fn blastSpreads(n : u32) -> bool {
+  return (n & 0xFFu) == EXPLOSION && (n >> 24u) < blastBirthAge((n >> 8u) & 0xFFu) + BLAST_SPREAD_WINDOW;
+}
+
+fn blastTile(spent : u32) -> u32 {
+  return pack(EXPLOSION, spent, 0u, blastBirthAge(spent));
+}
+
+// The front advances into a cell with a chance per step that drops from 1 at the origin
+// to BLAST_MIN_SPEED at the reach, so it slows down and frays as it weakens. A diagonal
+// step is that much less likely (the hop costs' ratio), which keeps the front round
+// while it grows instead of square.
+fn blastAdvances(x : i32, y : i32, source : BlastSource) -> bool {
+  let weak = f32(source.spent) / f32(BLAST_REACH);
+  let diagonal = source.offset.x != 0 && source.offset.y != 0;
+  let chance = mix(1.0, BLAST_MIN_SPEED, weak) * select(1.0, f32(BLAST_HOP_COST) / f32(BLAST_DIAGONAL_COST), diagonal);
+  return rand(u32(x), u32(y), stepU.step ^ 0x3C6EF372u) < chance;
+}
+
+struct BlastSource {
+  spent : u32,
+  offset : vec2i,
+}
+
+// The blast arriving at (x, y): the cheapest neighboring blast tile that still spreads,
+// with its spent reach plus the hop cost (diagonals cost more, which keeps the blast
+// round) plus absorb, the extra cost of eating through the tile there, and the offset
+// to that tile. spent is BLAST_NONE when no blast tile next to the cell spreads, and
+// above BLAST_REACH at the rim, where the reach runs out.
+fn blastSource(x : i32, y : i32, absorb : u32) -> BlastSource {
+  var best = BlastSource(BLAST_NONE, vec2i(0, 0));
   for (var dy = -1; dy <= 1; dy++) {
     for (var dx = -1; dx <= 1; dx++) {
       if ((dx != 0 || dy != 0) && inBounds(x + dx, y + dy)) {
         let n = readBuf[u32(y + dy) * u.width + u32(x + dx)];
-        if ((n & 0xFFu) == EXPLOSION && (n >> 24u) < BLAST_SPREAD_MAX_AGE) {
+        if (blastSpreads(n)) {
           let hop = select(BLAST_HOP_COST, BLAST_DIAGONAL_COST, dx != 0 && dy != 0);
-          best = min(best, ((n >> 8u) & 0xFFu) + hop + absorb);
+          let spent = ((n >> 8u) & 0xFFu) + hop + absorb;
+          if (spent < best.spent) {
+            best = BlastSource(spent, vec2i(dx, dy));
+          }
         }
       }
     }
@@ -1041,33 +1118,64 @@ fn blastSpent(x : i32, y : i32, absorb : u32) -> u32 {
 
 // The explosion tile the non-air tile t at (x, y) turns into this step (packed, with
 // the reach spent so far in its value byte), or 0 if it survives. A tile holds against
-// the blast with its blastResistance per step; a blast next to it is a random roll
-// pending, so it keeps the chunk awake.
+// the blast with its blastResistance per step, and eating through it costs
+// BLAST_SOLID_COST (gases excepted, which the blast crosses like air) plus its share of
+// BLAST_ABSORB, so the blast goes much further in air than in the ground; a blast next
+// to it is a random roll pending, so it keeps the chunk awake.
 fn blastHit(x : i32, y : i32, t : u32) -> u32 {
   if (t == EXPLOSION) {
     return 0u;
   }
   let resist = f32((u.types[t].flags >> BLAST_RESIST_SHIFT) & 0xFFu) / 255.0;
-  let spent = blastSpent(x, y, u32(resist * BLAST_ABSORB));
-  if (spent > BLAST_REACH) {
+  let solid = select(BLAST_SOLID_COST, 0u, u.types[t].phase == PHASE_GAS);
+  let source = blastSource(x, y, solid + u32(resist * BLAST_ABSORB));
+  if (source.spent > BLAST_REACH) {
     return 0u;
   }
   mark(x, y);
-  if (rand(u32(x), u32(y), stepU.step ^ 0x4B1D0F57u) < resist) {
+  if (rand(u32(x), u32(y), stepU.step ^ 0x4B1D0F57u) < resist || !blastAdvances(x, y, source)) {
     return 0u;
   }
-  return pack(EXPLOSION, spent, 0u, 0u);
+  return blastTile(source.spent);
+}
+
+// The velocity byte of a spark thrown out of the rim (see updateSpark): away from the
+// blast tile it came from, 2 to 5 cells per step, with a little sideways scatter.
+fn rimSparkVelocity(x : i32, y : i32, toSource : vec2i) -> u32 {
+  let speed = 2 + min(i32(rand(u32(x), u32(y), stepU.step ^ 0x9E3779B9u) * 4.0), 3);
+  let jx = min(i32(rand(u32(x), u32(y), stepU.step ^ 0x85EBCA6Bu) * 3.0), 2) - 1;
+  let jy = min(i32(rand(u32(x), u32(y), stepU.step ^ 0xC2B2AE35u) * 3.0), 2) - 1;
+  let vx = clamp(-toSource.x * speed + jx, -6, 6);
+  let vy = clamp(-toSource.y * speed + jy, -6, 6);
+  return u32(vx + 8) | (u32(vy + 8) << 4u);
 }
 
 // An empty cell next to a spreading blast pulls it in (like emit, it only writes
-// itself, and loses to any mover that already claimed it this step).
+// itself, and loses to any mover that already claimed it this step). In the outer part
+// of the reach a growing share of the cells the front takes become sparks thrown outward
+// instead, and past the reach the rim throws sparks, so the blast frays into a spray of
+// sparks.
 fn blastFill(i : u32, x : i32, y : i32, p : u32) {
   if (solidBuf[i] != 0u) {
     return;
   }
-  let spent = blastSpent(x, y, 0u);
-  if (spent <= BLAST_REACH && claim(x, y)) {
-    commit(i, i, pack(EXPLOSION, spent, 0u, 0u), p);
+  let source = blastSource(x, y, 0u);
+  if (source.spent == BLAST_NONE) {
+    return;
+  }
+  mark(x, y);
+  let spark = pack(SPARK, rimSparkVelocity(x, y, source.offset), 0u, 0u);
+  if (source.spent <= BLAST_REACH) {
+    if (!blastAdvances(x, y, source) || !claim(x, y)) {
+      return;
+    }
+    let outer = max(f32(source.spent) / f32(BLAST_REACH) - BLAST_SPARK_FROM, 0.0) / (1.0 - BLAST_SPARK_FROM);
+    let sparks = rand(u32(x), u32(y), stepU.step ^ 0x27D4EB2Fu) < outer * BLAST_SPARK_SHARE;
+    commit(i, i, select(blastTile(source.spent), spark, sparks), p);
+    return;
+  }
+  if (rand(u32(x), u32(y), stepU.step ^ 0x27D4EB2Fu) < BLAST_RIM_SPARK_CHANCE && claim(x, y)) {
+    commit(i, i, spark, p);
   }
 }
 
@@ -1534,7 +1642,7 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   let t = p & 0xFFu;
   if (t == AIR) {
     blastFill(i, i32(g.x), i32(g.y), p);
-    emit(i, i32(g.x), i32(g.y), p);
+    _ = emit(i, i32(g.x), i32(g.y), p);
     return;
   }
   if (u.types[t].phase != PHASE_GAS) {
@@ -1543,6 +1651,10 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   markCell(i);
   let x = i32(g.x);
   let y = i32(g.y);
+  // Smoke counts as empty for emitters, so embers and torches keep burning under it.
+  if (t == SMOKE && emit(i, x, y, p)) {
+    return;
+  }
   let variant = (p >> 16u) & 0xFFu;
   if (rand(g.x, g.y, stepU.step ^ 0xE6546B64u) < u.types[t].dissipation) {
     return;

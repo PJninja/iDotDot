@@ -9,6 +9,7 @@ import { HIDDEN_TYPES, TYPE_NAMES, type Grid } from './world-kit.ts';
 import { buildAlchemistLab } from './worlds/alchemist-lab.ts';
 import { buildFarmstead } from './worlds/farmstead.ts';
 import { buildDeathMachine } from './worlds/death-machine.ts';
+import { buildMeadow } from './worlds/meadow.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -16,6 +17,7 @@ const WORLDS: Record<string, () => Grid> = {
   'alchemist-lab': buildAlchemistLab,
   farmstead: buildFarmstead,
   'death-machine': buildDeathMachine,
+  meadow: buildMeadow,
 };
 
 const args = process.argv.slice(2);

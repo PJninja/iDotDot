@@ -2,6 +2,10 @@ import type { ProjectFilter } from './project-filter';
 
 const NO_MATCH = 'No projects match.';
 
+const SEARCH_ICON =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" aria-hidden="true">' +
+  '<circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10 L14 14"/></svg>';
+
 /**
  * The one line of controls in the corridor under the chips: a search field, the most shared
  * tags as plain words, and the pager. It only draws state; `ProjectFilter` owns it. The input
@@ -23,7 +27,7 @@ export class Gallery {
     this.element.setAttribute('role', 'group');
     this.element.setAttribute('aria-label', 'Find projects');
 
-    this.search.type = 'text';
+    this.search.type = 'search';
     this.search.className = 'gallery-search';
     this.search.placeholder = 'Search';
     this.search.setAttribute('aria-label', 'Search projects');
@@ -31,6 +35,11 @@ export class Gallery {
     this.search.spellcheck = false;
     this.search.value = filter.currentQuery;
     this.search.addEventListener('input', () => filter.setQuery(this.search.value));
+
+    const searchBox = document.createElement('label');
+    searchBox.className = 'gallery-search-box';
+    searchBox.innerHTML = SEARCH_ICON;
+    searchBox.appendChild(this.search);
 
     this.tags.className = 'gallery-tags';
 
@@ -55,7 +64,7 @@ export class Gallery {
     this.position.className = 'gallery-position';
     this.pager.append(this.previous, this.position, this.next);
 
-    this.element.append(this.search, this.tags, this.empty, this.clear, this.pager);
+    this.element.append(searchBox, this.tags, this.empty, this.clear, this.pager);
   }
 
   /** Redraw the tag words, the Clear word and the pager for a page size. */
