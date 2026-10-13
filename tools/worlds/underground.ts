@@ -4,13 +4,33 @@ import {
   BLOCK,
   COMPACT,
   KEEP_OUT_CELLS,
+  MOBILE,
+  MOBILE_BLOCK,
   NARROW,
   ROW_STRIP,
   WIDE,
   corridor,
   footprint,
+  type BoardGeometry,
   type CellRect,
 } from '../../src/worlds/board-slots.ts';
+
+/** Where the chips of one world sit: the block of slots (rings included), the gallery, and the layouts to check. */
+export interface BoardLayout {
+  block: CellRect;
+  gallery: CellRect;
+  geometries: readonly (readonly [string, BoardGeometry])[];
+}
+
+/** The 640-wide worlds. */
+export const DESKTOP_LAYOUT: BoardLayout = {
+  block: BLOCK,
+  gallery: WIDE.gallery,
+  geometries: [['wide', WIDE], ['narrow', NARROW], ['compact', COMPACT]],
+};
+
+/** The phone world. */
+export const MOBILE_LAYOUT: BoardLayout = { block: MOBILE_BLOCK, gallery: MOBILE.gallery, geometries: [['mobile', MOBILE]] };
 
 /** Row of the first ground cell on the flat plateaus; every world is "above ground" up to here. */
 export const SURFACE = 158;
@@ -142,11 +162,12 @@ function wobble(g: Grid, length: number, amp: number, step: number): number[] {
  * rough outline up to `rough` cells further out and a darker rock face. Returns its bounds,
  * which `finishBoard` takes as `hall`. Draw the gallery corridor afterwards.
  */
-export function naturalCavern(g: Grid, side = 8, top = 4, rough = 4): CellRect {
-  const outer = corridor(WIDE.gallery);
-  const x0 = BLOCK.x - side;
-  const x1 = BLOCK.x + BLOCK.w + side;
-  const y0 = BLOCK.y - top;
+export function naturalCavern(g: Grid, side = 8, top = 4, rough = 4, layout: BoardLayout = DESKTOP_LAYOUT): CellRect {
+  const { block } = layout;
+  const outer = corridor(layout.gallery);
+  const x0 = block.x - side;
+  const x1 = block.x + block.w + side;
+  const y0 = block.y - top;
   const y1 = outer.y + outer.h;
   const rows = y1 - y0 + rough;
   const left = wobble(g, rows, rough, 9);
@@ -191,12 +212,15 @@ export interface BoardOptions {
   hall?: CellRect;
   /** Cells around `hall` that must hold nothing that acts on its own (default 0: only the rings' keep-out zones are checked). */
   quiet?: number;
+  /** Where the chips sit in this world (default: the 640-wide worlds). */
+  layout?: BoardLayout;
 }
 
 /** Turn the bedrock's random mud lenses near the board into dirt, then run `checkBoard` and `checkCircuits` for the scene's electric `circuits`. Call last. */
 export function finishBoard(g: Grid, world: string, circuits: Circuit[] = [], options: BoardOptions = {}): void {
-  const outer = corridor(WIDE.gallery);
-  g.replace(BLOCK.x - 8, BLOCK.y - 8, BLOCK.w + 16, outer.y + outer.h - BLOCK.y + 16, T.MUD, T.DIRT);
+  const { block, gallery } = options.layout ?? DESKTOP_LAYOUT;
+  const outer = corridor(gallery);
+  g.replace(block.x - 8, block.y - 8, block.w + 16, outer.y + outer.h - block.y + 16, T.MUD, T.DIRT);
   checkBoard(g, world, options);
   checkCircuits(g, world, circuits);
 }
@@ -229,6 +253,7 @@ function leaks(g: Grid, label: string, x: number, y: number, bounds: CellRect): 
 }
 
 function checkBoard(g: Grid, world: string, options: BoardOptions): void {
+  const { block, gallery, geometries } = options.layout ?? DESKTOP_LAYOUT;
   const problems: string[] = [];
   const scan = (rect: CellRect, label: string): void => {
     for (let y = rect.y - KEEP_OUT_CELLS; y < rect.y + rect.h + KEEP_OUT_CELLS; y++) {
@@ -239,15 +264,15 @@ function checkBoard(g: Grid, world: string, options: BoardOptions): void {
       }
     }
   };
-  for (const [name, geometry] of [['wide', WIDE], ['narrow', NARROW], ['compact', COMPACT]] as const) {
+  for (const [name, geometry] of geometries) {
     geometry.slots.forEach((slot, i) => scan(footprint(slot), `${name} slot ${i}`));
     const { x, y, w, h } = geometry.gallery;
     for (let j = 0; j < h; j++) {
       for (let i = 0; i < w; i++) if (g.typeAt(x + i, y + j) !== T.AIR && !(j === h - 1 && g.typeAt(x + i, y + j) === T.STEEL)) problems.push(`${name} gallery: not air at (${x + i}, ${y + j})`);
     }
   }
-  const hall = options.hall ?? { x: BLOCK.x - HALL_MARGIN, y: BLOCK.y - HALL_MARGIN, w: BLOCK.w + 2 * HALL_MARGIN, h: BLOCK.h + 2 * HALL_MARGIN };
-  problems.push(...leaks(g, 'hall', BLOCK.x + 5, BLOCK.y + 5, hall));
+  const hall = options.hall ?? { x: block.x - HALL_MARGIN, y: block.y - HALL_MARGIN, w: block.w + 2 * HALL_MARGIN, h: block.h + 2 * HALL_MARGIN };
+  problems.push(...leaks(g, 'hall', block.x + 5, block.y + 5, hall));
   const quiet = options.quiet ?? 0;
   if (quiet > 0) {
     for (let y = hall.y - quiet; y < hall.y + hall.h + quiet; y++) {
@@ -257,7 +282,7 @@ function checkBoard(g: Grid, world: string, options: BoardOptions): void {
       }
     }
   }
-  problems.push(...leaks(g, 'gallery', WIDE.gallery.x + 2, WIDE.gallery.y + 2, WIDE.gallery));
+  problems.push(...leaks(g, 'gallery', gallery.x + 2, gallery.y + 2, gallery));
   if (problems.length > 0) {
     const shown = problems.slice(0, 12).join('\n  ');
     throw new Error(`${world}: board check failed (${problems.length} problems)\n  ${shown}`);

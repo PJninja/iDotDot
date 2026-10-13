@@ -3,6 +3,7 @@ import {
   COMPACT,
   COMPACT_MIN_WIDTH,
   MIN_CANVAS_HEIGHT,
+  MOBILE,
   NARROW,
   NARROW_MIN_WIDTH,
   RING_CELLS,
@@ -10,6 +11,7 @@ import {
   WIDE_MIN_WIDTH,
   WORLD_CELLS,
   footprint,
+  isMobileWorld,
   type BoardGeometry,
   type CellRect,
 } from '../worlds/board-slots';
@@ -50,25 +52,30 @@ export interface PlacementInput {
   windowHeight: number;
   /** Height of the header above the canvas in CSS px. */
   headerHeight: number;
+  /** Size of the default world the board sits in (the 640-wide worlds when omitted, e.g. an empty grid). */
+  world?: { width: number; height: number; tileCss: number };
 }
 
 /**
  * Place the board for the current window: the wide block (four big chips) from
  * `WIDE_MIN_WIDTH`, one column of two big chips from `NARROW_MIN_WIDTH`, and one column of
- * two small chips below that. Slots are world cells mapped through the same
+ * two small chips below that (in the phone world, `MOBILE`, when that is the loaded world). Slots are world cells mapped through the same
  * bottom-center anchor as the default world, so a chip stays on the same patch of rock at
  * every window size. Null when the canvas is shorter than `MIN_CANVAS_HEIGHT`, narrower than
- * the compact layout, or the board would fall outside the visible grid; the caller then
- * shows the plain page.
+ * the compact layout, the phone world is loaded in a window that is not compact, or the
+ * board would fall outside the visible grid; the caller then shows the plain page.
  */
 export function placeBoard(input: PlacementInput): BoardPlacement | null {
   if (input.windowHeight - input.headerHeight < MIN_CANVAS_HEIGHT) return null;
   if (input.windowWidth < COMPACT_MIN_WIDTH) return null;
   const mode: BoardMode = input.windowWidth >= WIDE_MIN_WIDTH ? 'wide' : input.windowWidth >= NARROW_MIN_WIDTH ? 'narrow' : 'compact';
-  const geometry: BoardGeometry = { wide: WIDE, narrow: NARROW, compact: COMPACT }[mode];
+  const world = input.world ?? WORLD_CELLS;
+  const mobileWorld = isMobileWorld(world);
+  if (mobileWorld && mode !== 'compact') return null;
+  const geometry: BoardGeometry = mobileWorld ? MOBILE : { wide: WIDE, narrow: NARROW, compact: COMPACT }[mode];
 
   const { tile, gridWidth, gridHeight } = input;
-  const at = worldPlacement(WORLD_CELLS, gridWidth, gridHeight, tile);
+  const at = worldPlacement(world, gridWidth, gridHeight, tile);
   const ring = Math.max(1, Math.round(RING_CELLS * at.scale));
   // Round inward so a mapped box never covers a cell the authored box did not.
   const map = (r: CellRect): CellBox => {

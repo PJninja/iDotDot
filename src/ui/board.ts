@@ -134,6 +134,7 @@ export class Board {
       windowWidth: window.innerWidth,
       windowHeight: window.innerHeight,
       headerHeight: headerHeight(),
+      world: this.baseWorld ?? undefined,
     });
     const placement = this.placement;
     if (placement === null) {

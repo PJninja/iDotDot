@@ -6,22 +6,31 @@ const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 
 /** The world every visit opens on unless `?world=` names another. */
 const PRIMARY_WORLD = 'meadow';
+/** The same for phone-sized windows: worlds named `*-mobile` are cut to a phone's grid and only used there. */
+const PRIMARY_MOBILE_WORLD = 'meadow-mobile';
 
 const presets = Object.keys(worldUrls)
   .sort()
-  .map((path) => ({ name: baseName(path), url: worldUrls[path] }));
+  .map((path) => {
+    const name = baseName(path);
+    return { name, url: worldUrls[path], mobile: name.endsWith('-mobile') };
+  });
 const loaded = new Map<number, Promise<WorldSnapshot | null>>();
 let current = -1;
 
-function firstPick(): number {
+/** Indices of the presets for phone windows (`mobile`) or for every other window. */
+const kindOf = (mobile: boolean): number[] => presets.flatMap((p, i) => (p.mobile === mobile ? [i] : []));
+
+function firstPick(mobile: boolean): number {
+  const pool = kindOf(mobile);
   const requested = new URLSearchParams(window.location.search).get('world');
   if (requested !== null) {
-    const match = presets.findIndex((p) => p.name === requested);
-    if (match >= 0) return match;
-    console.warn(`[world] no default world "${requested}"; available: ${presets.map((p) => p.name).join(', ')}`);
+    const match = pool.find((i) => presets[i].name === requested);
+    if (match !== undefined) return match;
+    console.warn(`[world] no default world "${requested}" for this window; available: ${pool.map((i) => presets[i].name).join(', ')}`);
   }
-  const primary = presets.findIndex((p) => p.name === PRIMARY_WORLD);
-  return primary >= 0 ? primary : Math.floor(Math.random() * presets.length);
+  const primary = presets.findIndex((p) => p.name === (mobile ? PRIMARY_MOBILE_WORLD : PRIMARY_WORLD));
+  return primary >= 0 ? primary : pool[Math.floor(Math.random() * pool.length)];
 }
 
 async function load(index: number): Promise<WorldSnapshot | null> {
@@ -36,8 +45,8 @@ async function load(index: number): Promise<WorldSnapshot | null> {
   }
 }
 
-function preset(index: number): Promise<WorldSnapshot | null> {
-  if (presets.length === 0) return Promise.resolve(null);
+function preset(index: number | undefined): Promise<WorldSnapshot | null> {
+  if (index === undefined) return Promise.resolve(null);
   current = index;
   let world = loaded.get(index);
   if (world === undefined) {
@@ -48,20 +57,26 @@ function preset(index: number): Promise<WorldSnapshot | null> {
 }
 
 /**
- * The default world for this page visit (null = start empty). The choice is made once,
- * so resizes and tile size changes reload the same world: `?world=<name>` picks
- * src/worlds/<name>.idw, otherwise the primary world (meadow). If that world fails to
- * load, a random other one is tried.
+ * The default world for this page visit (null = start empty). `mobile` asks for a phone-sized
+ * world (a window under the narrow layout's width), otherwise one of the big worlds. The choice
+ * is made once per kind, so resizes and tile size changes reload the same world:
+ * `?world=<name>` picks src/worlds/<name>.idw, otherwise the primary world (meadow, or
+ * meadow-mobile). If that world fails to load, a random other one of the kind is tried.
  */
-export async function pickDefaultWorld(): Promise<WorldSnapshot | null> {
-  if (current >= 0) return preset(current);
-  const first = firstPick();
+export async function pickDefaultWorld(mobile: boolean): Promise<WorldSnapshot | null> {
+  const pool = kindOf(mobile);
+  if (current >= 0 && presets[current].mobile === mobile) return preset(current);
+  if (pool.length === 0) return null;
+  const first = firstPick(mobile);
   const world = await preset(first);
-  if (world !== null || presets.length < 2) return world;
-  return preset((first + 1 + Math.floor(Math.random() * (presets.length - 1))) % presets.length);
+  if (world !== null || pool.length < 2) return world;
+  const others = pool.filter((i) => i !== first);
+  return preset(others[Math.floor(Math.random() * others.length)]);
 }
 
-/** The bundled world after the current one (in file name order, wrapping), which becomes the current one. */
-export function nextDefaultWorld(): Promise<WorldSnapshot | null> {
-  return preset((current + 1) % Math.max(presets.length, 1));
+/** The bundled world of the same kind after the current one (in file name order, wrapping), which becomes the current one. */
+export function nextDefaultWorld(mobile: boolean): Promise<WorldSnapshot | null> {
+  const pool = kindOf(mobile);
+  const at = pool.indexOf(current);
+  return preset(pool[(at + 1) % Math.max(pool.length, 1)]);
 }

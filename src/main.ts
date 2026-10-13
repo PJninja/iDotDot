@@ -12,6 +12,7 @@ import { PerfHud } from './ui/perf-hud';
 import { loadPreferences, savePreferences } from './ui/preferences';
 import { SettingsMenu } from './ui/settings-menu';
 import { nextDefaultWorld, pickDefaultWorld } from './worlds';
+import { NARROW_MIN_WIDTH, isMobileWorld } from './worlds/board-slots';
 import { MESSAGE_NO_WEBGPU, showGpuErrorDialog } from './ui/gpu-error-dialog';
 import { Board } from './ui/board';
 import { ProjectFilter } from './ui/project-filter';
@@ -79,7 +80,8 @@ async function main(): Promise<void> {
 
   // Every world rebuild (start, resize, tile size) clears the grid, then restores the current
   // world: this visit's default one until the settings menu picks another preset or an empty world.
-  let baseWorld = await pickDefaultWorld();
+  const phoneWindow = (): boolean => window.innerWidth < NARROW_MIN_WIDTH;
+  let baseWorld = await pickDefaultWorld(phoneWindow());
   const loadBaseWorld = (): void => {
     if (baseWorld !== null) world.loadWorld(baseWorld);
   };
@@ -168,6 +170,11 @@ async function main(): Promise<void> {
   };
 
   const resizeWorld = (): void => {
+    // Phone windows have their own small world; a resize across the layout limit swaps it.
+    if (baseWorld !== null && isMobileWorld(baseWorld) !== phoneWindow()) {
+      void pickDefaultWorld(phoneWindow()).then(switchWorld);
+      return;
+    }
     applyHeaderHeight();
     world.resize(window.innerWidth, window.innerHeight - headerHeight());
     rebuildWorld();
@@ -184,7 +191,7 @@ async function main(): Promise<void> {
   new SettingsMenu(world, {
     reset: resizeWorld,
     empty: () => switchWorld(null),
-    nextPreset: () => void nextDefaultWorld().then(switchWorld),
+    nextPreset: () => void nextDefaultWorld(phoneWindow()).then(switchWorld),
   });
 
   // --- Frame hook: paint (if held) -------------------------------------------

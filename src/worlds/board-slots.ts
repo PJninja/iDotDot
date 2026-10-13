@@ -45,6 +45,7 @@ const ROW_GAP = 8;
 const FOOT_W = CHIP_CELLS.w + 2 * RING_CELLS;
 const FOOT_H = CHIP_CELLS.h + 2 * RING_CELLS;
 const COMPACT_FOOT_H = COMPACT_CHIP_CELLS.h + 2 * RING_CELLS;
+const FOOT_W_COMPACT = COMPACT_CHIP_CELLS.w + 2 * RING_CELLS;
 
 /** Left edge and top of the whole block (the wide layout), ring included. */
 export const BLOCK = {
@@ -104,6 +105,46 @@ export const COMPACT: BoardGeometry = {
   chipScale: 1,
   galleryScale: 1,
 };
+
+/**
+ * The phone world (`meadow-mobile`): a small world cut to a phone's grid (about 80 to 105
+ * columns at 4 px) instead of the middle slice of a 640-wide one. It has its own compact
+ * layout, so the same slot sizes sit at different cells: the corridor ends 4 rows above the
+ * floor and the block is stacked on it, the same way as in the big worlds.
+ */
+export const MOBILE_WORLD_CELLS = { width: 106, height: 232, tileCss: 4 } as const;
+
+const MOBILE_CENTER = MOBILE_WORLD_CELLS.width / 2;
+const MOBILE_FLOOR_ROWS = 4;
+const MOBILE_GALLERY_ROW = MOBILE_WORLD_CELLS.height - MOBILE_FLOOR_ROWS - GALLERY_LINING - GALLERY_ROWS;
+const MOBILE_BLOCK_H = 2 * COMPACT_FOOT_H + ROW_GAP;
+
+/** The compact block in the phone world, ring included; the row strip between its chips is `MOBILE_ROW_STRIP`. */
+export const MOBILE_BLOCK: CellRect = {
+  x: MOBILE_CENTER - FOOT_W_COMPACT / 2,
+  y: MOBILE_GALLERY_ROW - GALLERY_LINING - 4 - MOBILE_BLOCK_H,
+  w: FOOT_W_COMPACT,
+  h: MOBILE_BLOCK_H,
+};
+export const MOBILE_ROW_STRIP = { y: MOBILE_BLOCK.y + COMPACT_FOOT_H, h: ROW_GAP } as const;
+
+/** One column of two small chips in the phone world. */
+export const MOBILE: BoardGeometry = {
+  slots: [0, 1].map((row) => ({
+    x: MOBILE_CENTER - COMPACT_CHIP_CELLS.w / 2,
+    y: MOBILE_BLOCK.y + RING_CELLS + row * (COMPACT_FOOT_H + ROW_GAP),
+    w: COMPACT_CHIP_CELLS.w,
+    h: COMPACT_CHIP_CELLS.h,
+  })),
+  gallery: { x: MOBILE_CENTER - 40, y: MOBILE_GALLERY_ROW, w: 80, h: GALLERY_ROWS },
+  chipScale: 1,
+  galleryScale: 1,
+};
+
+/** True for a world authored at the phone world's size, which the board lays out with `MOBILE`. */
+export function isMobileWorld(world: { width: number; height: number }): boolean {
+  return world.width === MOBILE_WORLD_CELLS.width && world.height === MOBILE_WORLD_CELLS.height;
+}
 
 export const WIDE_MIN_WIDTH = 920;
 export const NARROW_MIN_WIDTH = 420;

@@ -10,6 +10,7 @@ import { buildAlchemistLab } from './worlds/alchemist-lab.ts';
 import { buildFarmstead } from './worlds/farmstead.ts';
 import { buildDeathMachine } from './worlds/death-machine.ts';
 import { buildMeadow } from './worlds/meadow.ts';
+import { buildMeadowMobile } from './worlds/meadow-mobile.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -18,6 +19,7 @@ const WORLDS: Record<string, () => Grid> = {
   farmstead: buildFarmstead,
   'death-machine': buildDeathMachine,
   meadow: buildMeadow,
+  'meadow-mobile': buildMeadowMobile,
 };
 
 const args = process.argv.slice(2);
