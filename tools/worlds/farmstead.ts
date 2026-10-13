@@ -1,6 +1,8 @@
 import { Grid, T } from '../world-kit.ts';
 import { BLOCK } from '../../src/worlds/board-slots.ts';
 import { POCKETS, finishBoard, boardHall, galleryCorridor, lined, pipeLattice, shaft } from './underground.ts';
+import type { Circuit } from './circuits.ts';
+import type { CellRect } from '../../src/worlds/board-slots.ts';
 
 const W = 640;
 const H = 348;
@@ -172,6 +174,19 @@ function orchard(g: Grid): void {
   }
 }
 
+/** A box in the scene's own coordinates (drawn lifted by LIFT) as world cells. */
+const lifted = (r: CellRect): CellRect => ({ ...r, y: r.y - LIFT });
+
+const dynamoCircuit: Circuit = {
+  name: 'windmill dynamo and fence',
+  sources: lifted({ x: 326, y: 162, w: 8, h: 6 }),
+  bounds: [lifted({ x: 324, y: 158, w: 50, h: 30 })],
+  loads: [
+    { name: 'water in the trough', at: lifted({ x: 351, y: 178, w: 4, h: 5 }) },
+    { name: 'fence rails', at: lifted({ x: 365, y: 170, w: 6, h: 1 }) },
+  ],
+};
+
 export function buildFarmstead(): Grid {
   const g = new Grid(7001);
   terrain(g);
@@ -213,7 +228,8 @@ export function buildFarmstead(): Grid {
   for (let i = 0; i < 40; i++) g.setIfAir(241 + Math.floor(g.rand() * 10), 86 + Math.floor(g.rand() * 56), T.STEAM);
   for (let i = 0; i < 40; i++) g.setIfAir(618 + Math.floor(g.rand() * 3), 150 + Math.floor(g.rand() * 90), T.METHANE);
   boardWeave(g);
-  finishBoard(g, 'farmstead');
+  g.at(0, -LIFT, () => dynamoFence(g));
+  finishBoard(g, 'farmstead', [dynamoCircuit]);
   return g;
 }
 
@@ -341,6 +357,45 @@ function campfire(g: Grid): void {
   g.rect(618, base - 16, 3, 17, T.AIR);
   g.rect(614, base - 17, 2, 1, T.TORCH);
   g.rect(623, base - 17, 2, 1, T.TORCH);
+}
+
+/**
+ * The windmill's dynamo and an electric fence, all copper so the circuit never overloads or
+ * throws arcs. A generator sits sealed in a stone shed right of the windmill (its only air is a
+ * small notch above it, so the arcs stay inside), a cable runs east on a stone post with rubber
+ * stand-offs, dips into a stone trough through two legs, and carries on as a two-rail fence
+ * beside the field drain. The pulse crosses the trough only while the water between the legs
+ * is there. Wires stay clear of every wooden thing: copper lights flammables on contact.
+ */
+function dynamoFence(g: Grid): void {
+  // shed on the flat ground at the windmill's foot; the generator is walled in and the copper lead leaves through the right wall
+  g.bricks(324, 160, 12, 11, T.STONE, 4, 2);
+  g.rect(323, 159, 14, 1, T.STONE);
+  g.rect(329, 164, 2, 2, T.GENERATOR);
+  g.air(329, 162, 2, 2);
+  g.rect(331, 164, 2, 2, T.COPPER);
+  // cable on one post: stone column, rubber seat, copper wire above it
+  const cableY = 163;
+  g.rect(333, 164, 3, 1, T.COPPER);
+  g.rect(336, cableY, 15, 1, T.COPPER);
+  g.rect(336, cableY, 1, 2, T.COPPER);
+  g.rect(340, 165, 3, surface(341) - 164, T.STONE);
+  g.rect(340, 164, 3, 1, T.RUBBER);
+  // trough: stone box with a sealed floor, open above, two copper legs dipping into the water
+  g.air(348, 165, 10, 13);
+  g.rect(346, 172, 2, 12, T.STONE);
+  g.rect(358, 172, 2, 12, T.STONE);
+  g.rect(346, 183, 14, 1, T.STONE);
+  g.rect(348, 178, 10, 5, T.WATER);
+  g.rect(350, cableY, 1, 18, T.COPPER);
+  g.rect(355, cableY, 1, 18, T.COPPER);
+  // from the right leg down to a two-rail fence between two stone posts at the field drain
+  g.line(356, cableY, 361, 170, T.COPPER, 1);
+  g.rect(362, 171, 2, 12, T.STONE);
+  g.rect(370, 171, 2, surface(371) - 169, T.STONE);
+  g.rect(361, 170, 11, 1, T.COPPER);
+  g.rect(361, 174, 11, 1, T.COPPER);
+  g.rect(361, 170, 1, 5, T.COPPER);
 }
 
 /** Room-local drawing: (0, 0) is the room's top-left interior cell. */
