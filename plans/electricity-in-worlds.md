@@ -1,6 +1,6 @@
 # Electricity in the shipped worlds
 
-Status: phase 0 (copper) built, the rest is plan. Phase 0 was checked statically (type check, registry rule count 119 of 128, outcomes 18 of 32) and with the test suites; the simulation was not run by hand. Follows `plans/electricity.md` (implemented), which left the three default worlds unchanged on purpose. Checked on 2026-10-13: `src/worlds/alchemist-lab.idw`, `farmstead.idw` and `death-machine.idw` contain no tile of types 28 to 36, and no scene script names an electric element.
+Status: phase 0 (copper) and phase 1 (tooling) built, the scenes are plan. Phases 0 and 1 were checked statically (type check, registry rule count 119 of 128, outcomes 18 of 32, `checkCircuits` run on synthetic grids) and with the test suites; the simulation was not run by hand. Follows `plans/electricity.md` (implemented), which left the three default worlds unchanged on purpose. Checked on 2026-10-13: `src/worlds/alchemist-lab.idw`, `farmstead.idw` and `death-machine.idw` contain no tile of types 28 to 36, and no scene script names an electric element.
 
 Decisions already made:
 
@@ -30,7 +30,7 @@ New pickable element **Copper** (type 37) with hidden **Live copper** (38) and *
 
 | Behavior | Steel family | Copper family |
 |---|---|---|
-| Conducts a pulse (same timings: live 32 steps, spent 64) | yes | yes |
+| Conducts a pulse (live 32 steps in both; spent rest 64 steps for steel, 85 for copper) | yes | yes |
 | Throws arcs from live tiles (`emitType`) | yes | **no** |
 | Ages into hot steel at `OVERLOAD_CHANCE` | yes | **no**, live copper ages into spent copper with chance 1 |
 | Heats from flame, ember, spark, hot steel; conducts heat | yes | no, fire and heat leave it alone |
@@ -59,7 +59,9 @@ Interop and reactions (all one-sided, so each side needs its rule):
      - an `allowedIgnitions` target lies within `2 * REACH / HOP_COST` (about 20) cells of the board footprint, other than listed exceptions.
    - It also prints each circuit's tile counts and path length, which is the number to check against pulse speed (about 12 to 20 cells per second).
 3. `tools/make-rooms.ts`: add the new rooms to each scene's `ROOMS` export so a circuit can be simulated alone in a small grid.
-4. A small node script (not shipped as a test) that decodes the three `.idw` files and counts electric tiles, used in the checks below.
+4. Electric tile counts need no extra script: `make-worlds.ts` already prints the tiles per type for each world.
+
+As built (phase 1): `tools/worlds/circuits.ts` holds `checkCircuits(g, world, circuits)`, called by `finishBoard(g, world, circuits = [])`. A `Circuit` is `{ name, sources, bounds, loads, ignites? }`: `sources` is the box holding its generators, `bounds` the boxes every powered cell must lie in (a leak into any other structure fails the build), `loads` the things that must be powered, and `ignites` the boxes where a powered cell may deliberately light flammables. Conduction follows the elements' own rules: contact between conductors (steel family, copper family, fuse, water) over the 8 neighbors, plus arcs from steel and generators to any steel, copper or water within one empty cell, so a one-cell air gap conducts for steel and not for copper. It also fails when a pulse comes within `KEEP_OUT_CELLS + 3` of a chip ring, the hall or the gallery, and when the explosive chain set off by an allowed ignition (bombs within 10 cells of each other, a whole connected body of methane) comes within 12 cells of those zones. It prints each circuit's powered, ignitable and blast-chain cell counts. The world-kit has the type ids and colors for 28 to 39, and `make-worlds.ts` leaves hidden types out of its unused list. The three worlds regenerate byte-identical, since no scene declares a circuit yet.
 
 ## Farmstead: low electricity
 
@@ -90,6 +92,7 @@ Hooks already in the scene: the skull tower (methane brain, torch eyes, bomb tee
 - The lattice (steel) and the gallery rail (steel) stay unconnected; `checkCircuits` enforces it.
 - Timing: the generator's own chance starts the first pulse, with no fuse delay for it. That chance is 0.002 per step per touching tile, so on the order of seconds, not instant, and a pulse needs about 5 s to cross 100 cells. Measure the time to first ignition in a room, and add generators or touching tiles if it is too slow.
 - Destruction is allowed for the skull and the pocket 5 bomb line, once per visit. Never the board, the pocket 4 magazine or the reservoir.
+- **Constraint found in phase 1: the skull's methane is next to the reservoir's.** In the generated world there are two methane bodies: the skull's brain and neck (1805 cells, rows 38 to 156) and the spine with the reservoir (3716 cells from row 158, as close as 8 cells to the block). Only the one-cell stone cap at row 157 (the spine's hull) separates them. A flame cannot cross the cap, but a detonation in the brain is within blast reach (10 cells) of the spine's top, and `checkCircuits` counts that as a chain into the reservoir and fails the build. So spark plugs in the brain are not possible as the scene stands. The bomb teeth are no safer: the methane neck runs down the middle of the mouth and the teeth sit about 5 cells from it, inside blast reach, so detonating them also counts as a chain into the brain and on to the reservoir. Sites that look clear (far from the block and the spine; `checkCircuits` will confirm): the pocket 5 bomb line and the depot's bomb stacks. Options for phase 4: keep ignitions to those sites and the fire-based parts, or restructure the skull (a longer stone neck, teeth moved away from it). This needs a decision before the death machine is built.
 
 ## Verification
 

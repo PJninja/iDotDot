@@ -1,4 +1,5 @@
 import { Grid, T } from '../world-kit.ts';
+import { checkCircuits, type Circuit } from './circuits.ts';
 import {
   BLOCK,
   COMPACT,
@@ -128,14 +129,15 @@ export function pipeLattice(g: Grid, hull: number = T.STEEL, bore: number = T.AI
 /** Cells a scene must not put within `KEEP_OUT_CELLS` of a ring: anything that acts on its own. */
 const ACTIVE_TYPES = new Set<number>([
   T.WATER, T.ACID, T.STEAM, T.METHANE, T.SMOKE, T.FLAME, T.EMBER, T.SPARK, T.EXPLOSION, T.BOMB, T.TORCH, T.SPRING,
-  T.HOT_STEEL, T.COOLING_STEEL, T.MOLD, T.MUD,
+  T.HOT_STEEL, T.COOLING_STEEL, T.MOLD, T.MUD, T.GENERATOR, T.ARC, T.LIVE_STEEL, T.LIVE_COPPER, T.SHOCKED_WATER, T.LIVE_FUSE,
 ]);
 
-/** Turn the bedrock's random mud lenses near the board into dirt, then run `checkBoard`. Call last. */
-export function finishBoard(g: Grid, world: string): void {
+/** Turn the bedrock's random mud lenses near the board into dirt, then run `checkBoard` and `checkCircuits` for the scene's electric `circuits`. Call last. */
+export function finishBoard(g: Grid, world: string, circuits: Circuit[] = []): void {
   const outer = corridor(WIDE.gallery);
   g.replace(BLOCK.x - 8, BLOCK.y - 8, BLOCK.w + 16, outer.y + outer.h - BLOCK.y + 16, T.MUD, T.DIRT);
   checkBoard(g, world);
+  checkCircuits(g, world, circuits);
 }
 
 /**

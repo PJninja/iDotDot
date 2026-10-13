@@ -5,7 +5,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TYPE_NAMES, type Grid } from './world-kit.ts';
+import { HIDDEN_TYPES, TYPE_NAMES, type Grid } from './world-kit.ts';
 import { buildAlchemistLab } from './worlds/alchemist-lab.ts';
 import { buildFarmstead } from './worlds/farmstead.ts';
 import { buildDeathMachine } from './worlds/death-machine.ts';
@@ -35,7 +35,7 @@ for (const [name, build] of Object.entries(WORLDS)) {
   const used = grid.typesUsed();
   console.log(`${name}: ${used.size} element types`);
   console.log('  ' + [...used].map(([t, n]) => `${TYPE_NAMES[t]}:${n}`).join(' '));
-  const missing = Object.entries(TYPE_NAMES).filter(([t]) => !used.has(Number(t))).map(([, n]) => n);
+  const missing = Object.entries(TYPE_NAMES).filter(([t]) => !used.has(Number(t)) && !HIDDEN_TYPES.has(Number(t))).map(([, n]) => n);
   console.log(`  unused: ${missing.join(' ')}`);
   if (previewDir !== null) {
     mkdirSync(previewDir, { recursive: true });

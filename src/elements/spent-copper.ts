@@ -6,7 +6,7 @@ import { SETTINGS } from '../settings';
  * Spent copper (type 39) - copper that just carried a pulse, hidden from the picker. Static,
  * fades from dark copper back to copper, then turns into copper. It neither conducts nor can
  * be shocked, and it lasts longer than live copper does: that gap stops a pulse from bouncing
- * back into tiles that just discharged (the same trick as SpentSteel).
+ * back into tiles that just discharged (the same trick as SpentSteel, with a slightly longer rest).
  */
 export class SpentCopper extends Element {
   readonly type = SETTINGS.SPENT_COPPER_TYPE;
@@ -15,8 +15,8 @@ export class SpentCopper extends Element {
   readonly defaultColor: [number, number, number] = [112, 66, 50];
   readonly hidden = true;
 
-  /** Age steps per sim step (keep it below LiveCopper.AGE_RATE; 4 = 64 steps). */
-  static AGE_RATE = 4;
+  /** Age steps per sim step (keep it below LiveCopper.AGE_RATE; 3 = 85 steps, a little longer than SpentSteel's 64). */
+  static AGE_RATE = 3;
 
   readonly ageRate = SpentCopper.AGE_RATE;
   readonly agedInto = [{ type: SETTINGS.COPPER_TYPE, chance: 1 }];

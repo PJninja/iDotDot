@@ -35,7 +35,25 @@ export const T = {
   RUBBLE: 25,
   SPRING: 26,
   TORCH: 27,
+  LIVE_STEEL: 28,
+  SPENT_STEEL: 29,
+  ARC: 30,
+  GENERATOR: 31,
+  SHOCKED_WATER: 32,
+  NUMB_WATER: 33,
+  FUSE: 34,
+  LIVE_FUSE: 35,
+  RUBBER: 36,
+  COPPER: 37,
+  LIVE_COPPER: 38,
+  SPENT_COPPER: 39,
 } as const;
+
+/** Types the picker hides: transient stages of an electric pulse, never placed by a scene. */
+export const HIDDEN_TYPES: ReadonlySet<number> = new Set([
+  T.HOT_STEEL, T.COOLING_STEEL, T.EXPLOSION, T.LIVE_STEEL, T.SPENT_STEEL, T.ARC, T.SHOCKED_WATER, T.NUMB_WATER,
+  T.LIVE_FUSE, T.LIVE_COPPER, T.SPENT_COPPER,
+]);
 
 export const TYPE_NAMES: Record<number, string> = Object.fromEntries(
   Object.entries(T).map(([name, id]) => [id, name.toLowerCase()]),
@@ -75,6 +93,18 @@ const LOOKS: Record<number, { color: [number, number, number]; count: number; va
   [T.RUBBLE]: { color: [112, 104, 98], count: 6, variance: 24 },
   [T.SPRING]: { color: [74, 132, 196], count: 4, variance: 10 },
   [T.TORCH]: { color: [196, 112, 44], count: 4, variance: 14 },
+  [T.LIVE_STEEL]: { color: [150, 205, 255], count: 1, variance: 0 },
+  [T.SPENT_STEEL]: { color: [74, 94, 134], count: 1, variance: 0 },
+  [T.ARC]: { color: [200, 230, 255], count: 1, variance: 0 },
+  [T.GENERATOR]: { color: [92, 106, 168], count: 4, variance: 14 },
+  [T.SHOCKED_WATER]: { color: [200, 236, 255], count: 1, variance: 0 },
+  [T.NUMB_WATER]: { color: [58, 120, 196], count: 1, variance: 0 },
+  [T.FUSE]: { color: [190, 164, 112], count: 4, variance: 12 },
+  [T.LIVE_FUSE]: { color: [255, 214, 150], count: 1, variance: 0 },
+  [T.RUBBER]: { color: [66, 48, 58], count: 4, variance: 8 },
+  [T.COPPER]: { color: [184, 104, 62], count: 4, variance: 10 },
+  [T.LIVE_COPPER]: { color: [255, 226, 190], count: 1, variance: 0 },
+  [T.SPENT_COPPER]: { color: [112, 66, 50], count: 1, variance: 0 },
 };
 
 function variantColor(type: number, variant: number): [number, number, number] {

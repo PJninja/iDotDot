@@ -4,7 +4,7 @@ import { SETTINGS } from '../settings';
 
 /**
  * Copper (type 37) - a wire that carries the same pulse as steel (see LiveCopper and
- * SpentCopper, the same loop with the same timings) but never overloads into hot steel and
+ * SpentCopper, the same loop with the same live time and a slightly longer rest) but never overloads into hot steel and
  * never throws arcs, so it is the safe way to run a long circuit. Fire and heat leave it
  * alone. Live copper lights flammables only on contact (their own rules name it), so a
  * copper tip is a detonator and nothing ignites at a distance. A static solid, pickable.
