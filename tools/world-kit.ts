@@ -50,12 +50,18 @@ export const T = {
   BARK: 40,
   CHARRED_BARK: 41,
   LEAVES: 42,
+  POWERED_TORCH: 43,
+  LIT_TORCH_A: 44,
+  LIT_TORCH_B: 45,
+  POWERED_SPRING: 46,
+  LIT_SPRING_A: 47,
+  LIT_SPRING_B: 48,
 } as const;
 
 /** Types the picker hides: transient stages of an electric pulse or of fire, never placed by a scene. */
 export const HIDDEN_TYPES: ReadonlySet<number> = new Set([
   T.HOT_STEEL, T.COOLING_STEEL, T.EXPLOSION, T.LIVE_STEEL, T.SPENT_STEEL, T.ARC, T.SHOCKED_WATER, T.NUMB_WATER,
-  T.LIVE_FUSE, T.LIVE_COPPER, T.SPENT_COPPER, T.CHARRED_BARK,
+  T.LIVE_FUSE, T.LIVE_COPPER, T.SPENT_COPPER, T.CHARRED_BARK, T.LIT_TORCH_A, T.LIT_TORCH_B, T.LIT_SPRING_A, T.LIT_SPRING_B,
 ]);
 
 export const TYPE_NAMES: Record<number, string> = Object.fromEntries(
@@ -111,6 +117,12 @@ const LOOKS: Record<number, { color: [number, number, number]; count: number; va
   [T.BARK]: { color: [104, 76, 56], count: 4, variance: 14 },
   [T.CHARRED_BARK]: { color: [40, 30, 28], count: 1, variance: 0 },
   [T.LEAVES]: { color: [56, 122, 48], count: 8, variance: 22 },
+  [T.POWERED_TORCH]: { color: [98, 82, 72], count: 4, variance: 10 },
+  [T.LIT_TORCH_A]: { color: [226, 138, 56], count: 1, variance: 0 },
+  [T.LIT_TORCH_B]: { color: [226, 138, 56], count: 1, variance: 0 },
+  [T.POWERED_SPRING]: { color: [72, 90, 112], count: 4, variance: 8 },
+  [T.LIT_SPRING_A]: { color: [108, 190, 255], count: 1, variance: 0 },
+  [T.LIT_SPRING_B]: { color: [108, 190, 255], count: 1, variance: 0 },
 };
 
 function variantColor(type: number, variant: number): [number, number, number] {

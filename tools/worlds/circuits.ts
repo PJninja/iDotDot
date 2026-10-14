@@ -33,6 +33,8 @@ const WATER_FAMILY = new Set<number>([T.WATER, T.SHOCKED_WATER, T.NUMB_WATER]);
 const FUSE_FAMILY = new Set<number>([T.FUSE, T.LIVE_FUSE]);
 /** What a pulse can pass through when two of these touch (8 neighbors). */
 const CONDUCTORS = new Set<number>([...STEEL_FAMILY, ...COPPER_FAMILY, ...WATER_FAMILY, ...FUSE_FAMILY]);
+/** Powered emitters: a pulse switches them on, but they insulate, so it stops there. */
+const RECEIVERS = new Set<number>([T.POWERED_TORCH, T.LIT_TORCH_A, T.LIT_TORCH_B, T.POWERED_SPRING, T.LIT_SPRING_A, T.LIT_SPRING_B]);
 /** What an arc starts a pulse in (fuses have no arc rule). */
 const ARC_RECEPTIVE = new Set<number>([...STEEL_FAMILY, ...COPPER_FAMILY, ...WATER_FAMILY]);
 /** Live steel and generators throw arcs into empty cells beside them; copper never does. */
@@ -57,7 +59,7 @@ const BLAST = { reach: 200, hop: 10, diagonal: 14, solid: 15, absorb: 20 };
 const BLAST_RESISTANCE = new Map<number, number>([
   [T.ACID, 0.75], [T.ASH, 0.05], [T.BARK, 0.35], [T.CHARCOAL, 0.2], [T.CHARRED_BARK, 0.15], [T.COOLING_STEEL, 0.98], [T.COPPER, 0.95], [T.DIRT, 0.35],
   [T.EMBER, 0.3], [T.FUSE, 0.3], [T.GENERATOR, 0.5], [T.GRASS, 0.1], [T.HOT_STEEL, 0.98], [T.ICE, 0.2],
-  [T.LEAVES, 0.05], [T.LIVE_COPPER, 0.95], [T.LIVE_FUSE, 0.3], [T.LIVE_STEEL, 0.98], [T.MOLD, 0.1], [T.MUD, 0.5], [T.NUMB_WATER, 0.75],
+  [T.LEAVES, 0.05], [T.LIT_SPRING_A, 0.9], [T.LIT_SPRING_B, 0.9], [T.LIT_TORCH_A, 0.3], [T.LIT_TORCH_B, 0.3], [T.LIVE_COPPER, 0.95], [T.LIVE_FUSE, 0.3], [T.LIVE_STEEL, 0.98], [T.MOLD, 0.1], [T.MUD, 0.5], [T.NUMB_WATER, 0.75], [T.POWERED_SPRING, 0.9], [T.POWERED_TORCH, 0.3],
   [T.RUBBER, 0.3], [T.RUBBLE, 0.4], [T.SAND, 0.2], [T.SHOCKED_WATER, 0.75], [T.SPENT_COPPER, 0.95], [T.SPENT_STEEL, 0.98],
   [T.SPRING, 0.9], [T.STEEL, 0.98], [T.STONE, 0.9], [T.TORCH, 0.3], [T.WATER, 0.75], [T.WET_SAND, 0.5], [T.WOOD, 0.3],
 ]);
@@ -110,9 +112,10 @@ function reach(g: Grid, starts: [number, number][]): Set<number> {
   while (stack.length > 0) {
     const [x, y] = stack.pop() as [number, number];
     const t = g.typeAt(x, y);
+    if (RECEIVERS.has(t)) continue;
     const next: [number, number][] = [];
     if (t === T.GENERATOR) next.push(...around(g, x, y, (n) => STEEL_FAMILY.has(n) || COPPER_FAMILY.has(n)));
-    else next.push(...around(g, x, y, (n) => CONDUCTORS.has(n)));
+    else next.push(...around(g, x, y, (n) => CONDUCTORS.has(n) || RECEIVERS.has(n)));
     if (isEmitter(t)) next.push(...arcLandings(g, x, y, (n) => ARC_RECEPTIVE.has(n)));
     for (const [nx, ny] of next) {
       const k = key(nx, ny);

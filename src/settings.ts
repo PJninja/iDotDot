@@ -58,6 +58,12 @@ export const SETTINGS = {
   BARK_TYPE: 40,
   CHARRED_BARK_TYPE: 41,
   LEAVES_TYPE: 42,
+  POWERED_TORCH_TYPE: 43,
+  LIT_TORCH_A_TYPE: 44,
+  LIT_TORCH_B_TYPE: 45,
+  POWERED_SPRING_TYPE: 46,
+  LIT_SPRING_A_TYPE: 47,
+  LIT_SPRING_B_TYPE: 48,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

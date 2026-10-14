@@ -184,6 +184,7 @@ const dynamoCircuit: Circuit = {
   loads: [
     { name: 'water in the trough', at: lifted({ x: 351, y: 178, w: 4, h: 5 }) },
     { name: 'fence rails', at: lifted({ x: 365, y: 170, w: 6, h: 1 }) },
+    { name: 'fence lantern', at: lifted({ x: 365, y: 171, w: 4, h: 1 }) },
   ],
 };
 
@@ -365,7 +366,9 @@ function campfire(g: Grid): void {
  * small notch above it, so the arcs stay inside), a cable runs east on a stone post with rubber
  * stand-offs, dips into a stone trough through two legs, and carries on as a two-rail fence
  * beside the field drain. The pulse crosses the trough only while the water between the legs
- * is there. Wires stay clear of every wooden thing: copper lights flammables on contact.
+ * is there. A powered torch hangs under the top rail between the two rails and the posts: a closed
+ * cage of copper and stone, so its flames and sparks cannot reach the crops, and it burns only while
+ * the fence is live. Wires stay clear of every wooden thing: copper lights flammables on contact.
  */
 function dynamoFence(g: Grid): void {
   // shed on the flat ground at the windmill's foot; the generator is walled in and the copper lead leaves through the right wall
@@ -396,6 +399,7 @@ function dynamoFence(g: Grid): void {
   g.rect(361, 170, 11, 1, T.COPPER);
   g.rect(361, 174, 11, 1, T.COPPER);
   g.rect(361, 170, 1, 5, T.COPPER);
+  g.rect(365, 171, 4, 1, T.POWERED_TORCH);
 }
 
 /** Room-local drawing: (0, 0) is the room's top-left interior cell. */
