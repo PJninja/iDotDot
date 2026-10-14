@@ -30,6 +30,7 @@ import { Methane } from './methane';
 import { Mold } from './mold';
 import { Mud } from './mud';
 import { NumbWater } from './numb-water';
+import { Oil } from './oil';
 import { PoweredSpring } from './powered-spring';
 import { PoweredTorch } from './powered-torch';
 import { Rubber } from './rubber';
@@ -104,5 +105,6 @@ export function createElementRegistry(): ElementRegistry {
   registry.register(new PoweredSpring());
   registry.register(new LitSpringA());
   registry.register(new LitSpringB());
+  registry.register(new Oil());
   return registry;
 }

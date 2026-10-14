@@ -1,6 +1,6 @@
 # Elements
 
-All 43 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
+All 50 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
 
 ## Properties
 
@@ -62,10 +62,17 @@ How to read the columns:
 | 40 | Bark | static | yes | `#684c38` |  |  |  |  |  |  | tiles |  |  |  | 0.35 | flammable |
 | 41 | Charred Bark | static | hidden | `#281e1c` |  |  |  |  |  |  | tiles | 0.4 | Ember 45%, Charcoal 30%, Ash 15%, else gone |  | 0.15 |  |
 | 42 | Leaves | static | yes | `#387a30` |  |  |  |  |  |  | tiles |  |  |  | 0.05 | flammable |
+| 43 | Powered Torch | static | yes | `#625248` |  |  |  |  |  |  | tiles |  |  |  | 0.3 |  |
+| 44 | Lit Torch | static | hidden | `#e28a38` |  |  |  |  |  |  | tiles | 1 | Powered Torch 100% | Flame 5% | 0.3 |  |
+| 45 | Lit Torch | static | hidden | `#e28a38` |  |  |  |  |  |  | tiles | 1 | Powered Torch 100% | Flame 5% | 0.3 |  |
+| 46 | Powered Spring | static | yes | `#485a70` |  |  |  |  |  |  | tiles |  |  |  | 0.9 |  |
+| 47 | Live Spring | static | hidden | `#6cbeff` |  |  |  |  |  |  | tiles | 1 | Powered Spring 100% | Water 12% (also below) | 0.9 |  |
+| 48 | Live Spring | static | hidden | `#6cbeff` |  |  |  |  |  |  | tiles | 1 | Powered Spring 100% | Water 12% (also below) | 0.9 |  |
+| 49 | Oil | liquid | yes | `#16110c` | 0.8 |  |  |  |  |  | tiles |  |  |  | 0.1 | flammable |
 
 ## Reactions
 
-142 one-sided rules. A tile of the element in the first column that touches a `with` tile (8 neighbors, or within `radius` cells) becomes the result at that chance per step. **Consumes** means the touched tile turns into air at the same time.
+173 one-sided rules. A tile of the element in the first column that touches a `with` tile (8 neighbors, or within `radius` cells) becomes the result at that chance per step. **Consumes** means the touched tile turns into air at the same time.
 
 | Element | Touching | Becomes | Chance | Consumes | Radius |
 | --- | --- | --- | --- | --- | --- |
@@ -211,3 +218,34 @@ How to read the columns:
 | Leaves | Live Steel | Flame | 1% |  |  |
 | Leaves | Live Copper | Flame | 1% |  |  |
 | Leaves | Mold | Mold | 0.4% |  |  |
+| Powered Torch | Live Steel | Lit Torch | 20% |  |  |
+| Powered Torch | Live Copper | Lit Torch | 20% |  |  |
+| Powered Torch | Live Fuse | Lit Torch | 20% |  |  |
+| Powered Torch | Shocked Water | Lit Torch | 20% |  |  |
+| Lit Torch | Live Steel | Lit Torch | 20% |  |  |
+| Lit Torch | Live Copper | Lit Torch | 20% |  |  |
+| Lit Torch | Live Fuse | Lit Torch | 20% |  |  |
+| Lit Torch | Shocked Water | Lit Torch | 20% |  |  |
+| Lit Torch | Live Steel | Lit Torch | 20% |  |  |
+| Lit Torch | Live Copper | Lit Torch | 20% |  |  |
+| Lit Torch | Live Fuse | Lit Torch | 20% |  |  |
+| Lit Torch | Shocked Water | Lit Torch | 20% |  |  |
+| Powered Spring | Live Steel | Live Spring | 20% |  |  |
+| Powered Spring | Live Copper | Live Spring | 20% |  |  |
+| Powered Spring | Live Fuse | Live Spring | 20% |  |  |
+| Powered Spring | Shocked Water | Live Spring | 20% |  |  |
+| Live Spring | Live Steel | Live Spring | 20% |  |  |
+| Live Spring | Live Copper | Live Spring | 20% |  |  |
+| Live Spring | Live Fuse | Live Spring | 20% |  |  |
+| Live Spring | Shocked Water | Live Spring | 20% |  |  |
+| Live Spring | Live Steel | Live Spring | 20% |  |  |
+| Live Spring | Live Copper | Live Spring | 20% |  |  |
+| Live Spring | Live Fuse | Live Spring | 20% |  |  |
+| Live Spring | Shocked Water | Live Spring | 20% |  |  |
+| Oil | Flame | Flame | 35% |  |  |
+| Oil | Ember | Flame | 20% |  |  |
+| Oil | Spark | Flame | 80% |  |  |
+| Oil | Hot Steel | Flame | 8% |  |  |
+| Oil | Arc | Flame | 40% |  |  |
+| Oil | Live Steel | Flame | 5% |  |  |
+| Oil | Live Copper | Flame | 5% |  |  |
