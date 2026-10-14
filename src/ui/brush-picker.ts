@@ -24,6 +24,13 @@ export const BRUSH_MAX_RADIUS = 50;
 export const BRUSH_MIN_DENSITY = 0.01;
 export const BRUSH_MAX_DENSITY = 1;
 
+/** Publishes a range input's position as `--fill` (0% to 100%), which the CSS track paints up to the knob. */
+function showFill(input: HTMLInputElement): void {
+  const min = Number(input.min);
+  const fraction = (Number(input.value) - min) / (Number(input.max) - min);
+  input.style.setProperty('--fill', `${fraction * 100}%`);
+}
+
 /**
  * Header brush picker: an icon button that opens a panel to choose the
  * placement brush shape (circle or square), its radius and its density, and
@@ -104,6 +111,7 @@ export class BrushPicker {
     this.radiusInput.min = String(BRUSH_MIN_RADIUS);
     this.radiusInput.max = String(BRUSH_MAX_RADIUS);
     this.radiusInput.value = String(this.selectedRadius);
+    showFill(this.radiusInput);
     this.radiusInput.addEventListener('input', () => {
       this.setRadius(Number(this.radiusInput.value));
     });
@@ -233,6 +241,7 @@ export class BrushPicker {
     this.selectedRadius = Math.min(BRUSH_MAX_RADIUS, Math.max(BRUSH_MIN_RADIUS, radius));
     this.radiusValue.textContent = String(this.selectedRadius);
     this.radiusInput.value = String(this.selectedRadius);
+    showFill(this.radiusInput);
     this.onChange?.(this.selectedShape, this.selectedRadius, this.selectedDensity);
   }
 
@@ -246,6 +255,7 @@ export class BrushPicker {
     const percent = Math.round(this.selectedDensity * 100);
     this.densityValue.textContent = `${percent}%`;
     this.densityInput.value = String(percent);
+    showFill(this.densityInput);
   }
 
   private setDisplay(display: boolean): void {

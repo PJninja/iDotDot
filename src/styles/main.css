@@ -29,6 +29,7 @@
   --accent: #36cfc0;
   --accent-hover: #6be0d4;
   --accent-tint: rgba(54, 207, 192, 0.14);
+  --outline: rgba(143, 179, 161, 0.3);
 }
 
 html,
@@ -115,6 +116,7 @@ body {
   color: var(--accent);
   background: var(--accent-tint);
   border-color: transparent;
+  border-radius: 0;
 }
 
 .picker-button {
@@ -150,9 +152,7 @@ body {
   background: var(--dropdown);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--outline);
 }
 
 .picker-dropdown[hidden] {
@@ -164,7 +164,6 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border-radius: 6px;
   font-size: 14px;
   white-space: nowrap;
   cursor: pointer;
@@ -183,7 +182,6 @@ body {
   flex: none;
   width: 12px;
   height: 12px;
-  border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
@@ -195,7 +193,6 @@ body {
   gap: 4px;
   width: 210px;
   padding-top: 3px;
-  border-top-right-radius: 6px;
 }
 
 .element-panel[hidden] {
@@ -214,7 +211,6 @@ body {
 }
 
 .element-search-box {
-  --block: 2px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -223,12 +219,6 @@ body {
   color: var(--muted);
   background: var(--field);
   cursor: text;
-  clip-path: polygon(
-    var(--block) 0, calc(100% - var(--block)) 0, calc(100% - var(--block)) var(--block), 100% var(--block),
-    100% calc(100% - var(--block)), calc(100% - var(--block)) calc(100% - var(--block)),
-    calc(100% - var(--block)) 100%, var(--block) 100%, var(--block) calc(100% - var(--block)),
-    0 calc(100% - var(--block)), 0 var(--block), var(--block) var(--block)
-  );
 }
 
 .element-search-box:hover {
@@ -341,7 +331,6 @@ body {
   top: 0;
   min-width: 200px;
   padding: 0 10px 10px;
-  border-top-right-radius: 6px;
 }
 
 .brush-dropdown .brush-section:first-child .brush-section-label {
@@ -380,7 +369,6 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border-radius: 6px;
   font-size: 14px;
   cursor: pointer;
 }
@@ -424,11 +412,57 @@ body {
 }
 
 .brush-radius-input {
+  --fill: 0%;
   width: 100%;
   height: 16px;
   margin: 0;
-  accent-color: var(--accent);
+  background: none;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Square knob on a flat track, filled up to the knob (--fill, set by BrushPicker). */
+.brush-radius-input::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(to right, var(--accent) var(--fill), var(--field-focus) var(--fill));
+}
+
+.brush-radius-input::-moz-range-track {
+  height: 4px;
+  background: linear-gradient(to right, var(--accent) var(--fill), var(--field-focus) var(--fill));
+}
+
+.brush-radius-input::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  background: var(--accent);
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.brush-radius-input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border: 0;
+  border-radius: 0;
+}
+
+.brush-radius-input:hover::-webkit-slider-thumb {
+  background: var(--accent-hover);
+}
+
+.brush-radius-input:hover::-moz-range-thumb {
+  background: var(--accent-hover);
+}
+
+.brush-radius-input:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 /* HTML overlay layer: between header (100) and canvas (auto/0) */
