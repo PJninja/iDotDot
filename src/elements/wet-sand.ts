@@ -15,6 +15,7 @@ export class WetSand extends Element {
   readonly type = SETTINGS.WET_SAND_TYPE;
   readonly name = 'wet-sand';
   readonly displayName = 'Wet Sand';
+  readonly hidden = true;
   readonly defaultColor: [number, number, number] = [150, 132, 88];
 
   static GRAVITY_SCALE = 3;

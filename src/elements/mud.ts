@@ -15,6 +15,7 @@ export class Mud extends Element {
   readonly type = SETTINGS.MUD_TYPE;
   readonly name = 'mud';
   readonly displayName = 'Mud';
+  readonly hidden = true;
   readonly defaultColor: [number, number, number] = [92, 64, 44];
 
   static GRAVITY_SCALE = 4;

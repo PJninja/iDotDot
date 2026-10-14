@@ -26,11 +26,11 @@ How to read the columns:
 | 4 | Smoke | gas | yes | `#96969e` | 0.2 |  |  |  | 0.35 | 0.2% | smoke |  |  |  |  |  |
 | 5 | Water | liquid | yes | `#3478c8` | 1 |  |  |  |  |  | water |  |  |  | 0.75 |  |
 | 6 | Steam | gas | yes | `#eef2f8` | 0.1 |  |  |  | 0.5 | 0.06% | steam |  |  |  |  |  |
-| 7 | Wet Sand | powder | yes | `#968458` | 1.8 | 3 | 0.3 | 0.85 |  |  | tiles |  |  |  | 0.5 |  |
-| 8 | Mud | powder | yes | `#5c402c` | 1.8 | 4 | 0.15 | 0.9 |  |  | tiles |  |  |  | 0.5 |  |
-| 9 | Ember | powder | yes | `#f06e1e` | 1.5 | 1.5 | 0.4 | 0.8 |  |  | tiles | 0.4 | Charcoal 10%, Ash 25%, else gone | Flame 0.6% | 0.3 | holds on flammable |
+| 7 | Wet Sand | powder | hidden | `#968458` | 1.8 | 3 | 0.3 | 0.85 |  |  | tiles |  |  |  | 0.5 |  |
+| 8 | Mud | powder | hidden | `#5c402c` | 1.8 | 4 | 0.15 | 0.9 |  |  | tiles |  |  |  | 0.5 |  |
+| 9 | Ember | powder | hidden | `#f06e1e` | 1.5 | 1.5 | 0.4 | 0.8 |  |  | tiles | 0.4 | Charcoal 10%, Ash 25%, else gone | Flame 0.6% | 0.3 | holds on flammable |
 | 10 | Flame | gas | yes | `#ffa028` | 0.25 |  |  |  | 0.8 |  | tiles | 8 | Smoke 80%, Spark 3%, else gone |  |  | fuel fed |
-| 11 | Spark | gas | yes | `#ffe078` | 0.3 |  |  |  | 0 |  | tiles | 6 | gone |  |  |  |
+| 11 | Spark | gas | hidden | `#ffe078` | 0.3 |  |  |  | 0 |  | tiles | 6 | gone |  |  |  |
 | 12 | Explosion | static | hidden | `#ffbe46` |  |  |  |  |  |  | tiles | 12 | Smoke 25%, Flame 3%, Spark 2%, Rubble 6%, else gone |  |  |  |
 | 13 | Bomb | static | yes | `#3e3e48` |  |  |  |  |  |  | tiles |  |  |  |  | flammable |
 | 14 | Charcoal | powder | yes | `#262428` | 1.5 | 3 | 0.3 |  |  |  | tiles |  |  |  | 0.2 | flammable |
@@ -242,7 +242,7 @@ How to read the columns:
 | Live Spring | Live Copper | Live Spring | 20% |  |  |
 | Live Spring | Live Fuse | Live Spring | 20% |  |  |
 | Live Spring | Shocked Water | Live Spring | 20% |  |  |
-| Oil | Flame | Flame | 35% |  |  |
+| Oil | Flame | Flame | 50% |  | 3 |
 | Oil | Ember | Flame | 20% |  |  |
 | Oil | Spark | Flame | 80% |  |  |
 | Oil | Hot Steel | Flame | 8% |  |  |

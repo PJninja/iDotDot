@@ -14,6 +14,7 @@ export class Spark extends Element {
   readonly type = SETTINGS.SPARK_TYPE;
   readonly name = 'spark';
   readonly displayName = 'Spark';
+  readonly hidden = true;
   readonly defaultColor: [number, number, number] = [255, 224, 120];
   readonly phase = 'gas';
   readonly density = 0.3;

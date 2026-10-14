@@ -17,6 +17,7 @@ export class Ember extends Element {
   readonly type = SETTINGS.EMBER_TYPE;
   readonly name = 'ember';
   readonly displayName = 'Ember';
+  readonly hidden = true;
   readonly defaultColor: [number, number, number] = [240, 110, 30];
 
   static GRAVITY_SCALE = 1.5;
