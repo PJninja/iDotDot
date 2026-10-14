@@ -1,6 +1,6 @@
 # Elements
 
-All 50 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
+All 51 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
 
 ## Properties
 
@@ -69,6 +69,7 @@ How to read the columns:
 | 47 | Live Spring | static | hidden | `#6cbeff` |  |  |  |  |  |  | tiles | 1 | Powered Spring 100% | Water 12% (also below) | 0.9 |  |
 | 48 | Live Spring | static | hidden | `#6cbeff` |  |  |  |  |  |  | tiles | 1 | Powered Spring 100% | Water 12% (also below) | 0.9 |  |
 | 49 | Oil | liquid | yes | `#16110c` | 0.8 |  |  |  |  |  | tiles |  |  |  | 0.1 | flammable |
+| 50 | Void | static | yes | `#10081a` |  |  |  |  |  |  | tiles |  |  |  | 0.99 |  |
 
 ## Reactions
 

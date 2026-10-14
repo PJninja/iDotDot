@@ -56,6 +56,8 @@ export const T = {
   POWERED_SPRING: 46,
   LIT_SPRING_A: 47,
   LIT_SPRING_B: 48,
+  OIL: 49,
+  VOID: 50,
 } as const;
 
 /** Types the picker hides: transient stages of an electric pulse or of fire, never placed by a scene. */

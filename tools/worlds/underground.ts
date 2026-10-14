@@ -205,6 +205,7 @@ export function naturalCavern(g: Grid, side = 8, top = 4, rough = 4, layout: Boa
 const ACTIVE_TYPES = new Set<number>([
   T.WATER, T.ACID, T.STEAM, T.METHANE, T.SMOKE, T.FLAME, T.EMBER, T.SPARK, T.EXPLOSION, T.BOMB, T.TORCH, T.SPRING,
   T.HOT_STEEL, T.COOLING_STEEL, T.MOLD, T.MUD, T.GENERATOR, T.ARC, T.LIVE_STEEL, T.LIVE_COPPER, T.SHOCKED_WATER, T.LIVE_FUSE,
+  T.VOID,
 ]);
 
 export interface BoardOptions {

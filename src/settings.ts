@@ -65,6 +65,7 @@ export const SETTINGS = {
   LIT_SPRING_A_TYPE: 47,
   LIT_SPRING_B_TYPE: 48,
   OIL_TYPE: 49,
+  VOID_TYPE: 50,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.

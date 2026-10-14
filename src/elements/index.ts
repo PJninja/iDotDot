@@ -46,6 +46,7 @@ import { Steam } from './steam';
 import { Steel } from './steel';
 import { Stone } from './stone';
 import { Torch } from './torch';
+import { Void } from './void';
 import { Water } from './water';
 import { WetSand } from './wet-sand';
 import { Wood } from './wood';
@@ -106,5 +107,6 @@ export function createElementRegistry(): ElementRegistry {
   registry.register(new LitSpringA());
   registry.register(new LitSpringB());
   registry.register(new Oil());
+  registry.register(new Void());
   return registry;
 }

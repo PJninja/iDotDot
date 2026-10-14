@@ -16,6 +16,7 @@ import { ShockedWater } from '../../elements/shocked-water';
 import { Smoke } from '../../elements/smoke';
 import { Spark } from '../../elements/spark';
 import { Steam } from '../../elements/steam';
+import { Void } from '../../elements/void';
 import { Water } from '../../elements/water';
 import { SETTINGS } from '../../settings';
 
@@ -424,6 +425,8 @@ const FLAME_FLICKER : f32 = ${Flame.FLICKER};
 const FLAME_WIND_FLICKER : f32 = ${Flame.WIND_FLICKER};
 const SPARK_GRAVITY : f32 = ${Spark.GRAVITY};
 const SPARK_DRAG : f32 = ${Spark.DRAG};
+const VOID : u32 = ${SETTINGS.VOID_TYPE}u;
+const VOID_GROW_CHANCE : f32 = ${1 / Void.GROW_EVERY};
 // new-element:types
 
 struct StepUniform {
@@ -1011,6 +1014,16 @@ fn typeAround(x : i32, y : i32, t : u32) -> u32 {
     }
   }
   return count;
+}
+
+// What a tile of type t at (x, y) becomes when a void touches it: VOID with
+// VOID_GROW_CHANCE (the void grows into its cell), else AIR (eaten). Returns t when no
+// void touches it. The eaten tile decides alone, so the void needs no bookkeeping.
+fn devour(x : i32, y : i32, t : u32) -> u32 {
+  if (t == VOID || typeAround(x, y, VOID) == 0u) {
+    return t;
+  }
+  return select(AIR, VOID, rand(u32(x), u32(y), stepU.step ^ 0x5BD1E995u) < VOID_GROW_CHANCE);
 }
 
 // Whether any tile within Chebyshev distance r of (x, y) is of type t.
@@ -1698,6 +1711,21 @@ fn main(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid : 
     mark(x, y);
   }
 
+  // A void never changes; a tile touching one is eaten or becomes void.
+  if (t == VOID) {
+    commit(i, i, p, p);
+    return;
+  }
+  let eaten = devour(x, y, t);
+  if (eaten == AIR) {
+    markCell(i);
+    return;
+  }
+  if (eaten != t) {
+    settle(i, x, y, t, pack(VOID, 0u, variant, 0u), p);
+    return;
+  }
+
   // A tile that reacts turns into the result in place this step.
   let reacted = react(x, y, t);
   if (reacted == AIR) {
@@ -1771,11 +1799,18 @@ fn mainGas(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) lid
   markCell(i);
   let x = i32(g.x);
   let y = i32(g.y);
+  let variant = (p >> 16u) & 0xFFu;
+  let eaten = devour(x, y, t);
+  if (eaten != t) {
+    if (eaten == VOID && claim(x, y)) {
+      commit(i, i, pack(VOID, 0u, variant, 0u), p);
+    }
+    return;
+  }
   // Smoke counts as empty for emitters, so embers and torches keep burning under it.
   if (t == SMOKE && emit(i, x, y, p)) {
     return;
   }
-  let variant = (p >> 16u) & 0xFFu;
   if (rand(g.x, g.y, stepU.step ^ 0xE6546B64u) < u.types[t].dissipation) {
     return;
   }
@@ -1860,6 +1895,15 @@ fn mainLiquid(@builtin(workgroup_id) wid : vec3u, @builtin(local_invocation_id) 
   let x = i32(g.x);
   let y = i32(g.y);
   let variant = (p >> 16u) & 0xFFu;
+  let eaten = devour(x, y, t);
+  if (eaten != t) {
+    if (eaten == VOID && claim(x, y)) {
+      commit(i, i, pack(VOID, 0u, variant, 0u), p);
+    } else {
+      markCell(i);
+    }
+    return;
+  }
   let reacted = react(x, y, t);
   if (reacted == AIR) {
     markCell(i);
