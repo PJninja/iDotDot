@@ -20,6 +20,7 @@ export class PoweredTorch extends Element {
   static POWERED_TORCH_VARIANT_COUNT = 4;
   static POWERED_TORCH_COLOR_VARIANCE = 10;
 
+  readonly poweredEmitter = true;
   readonly blastResistance = 0.3;
   readonly reactions: readonly Reaction[] = poweredBy(SETTINGS.LIT_TORCH_A_TYPE);
 

@@ -2,7 +2,7 @@ import type { ProjectFilter } from './project-filter';
 
 const NO_MATCH = 'No projects match.';
 
-const SEARCH_ICON =
+export const SEARCH_ICON =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" aria-hidden="true">' +
   '<circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10 L14 14"/></svg>';
 

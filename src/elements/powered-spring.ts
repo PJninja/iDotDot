@@ -19,6 +19,7 @@ export class PoweredSpring extends Element {
   static POWERED_SPRING_VARIANT_COUNT = 4;
   static POWERED_SPRING_COLOR_VARIANCE = 8;
 
+  readonly poweredEmitter = true;
   readonly blastResistance = 0.9;
   readonly reactions: readonly Reaction[] = poweredBy(SETTINGS.LIT_SPRING_A_TYPE);
 

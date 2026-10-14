@@ -125,6 +125,16 @@ export abstract class Element {
   readonly emitType: number = SETTINGS.AIR_TYPE;
   readonly emitChance: number = 0;
   readonly emitBelow: boolean = false;
+  /**
+   * An emitter that only emits once a pulse switches it on (its lit stages carry the
+   * `emitType`). Lists it with the emitters in the element picker.
+   */
+  readonly poweredEmitter: boolean = false;
+
+  /** Emits now, or once a pulse switches it on. */
+  get isEmitter(): boolean {
+    return this.emitType !== SETTINGS.AIR_TYPE || this.poweredEmitter;
+  }
 
   /**
    * Falling elements only: a tile holds still while any of its 8 neighbors is

@@ -141,6 +141,142 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
+/* Element panel: search and phase toggles above a scrolling list. */
+.element-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 210px;
+}
+
+.element-panel[hidden] {
+  display: none;
+}
+
+.element-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 4px 6px;
+}
+
+.element-search-box {
+  --block: 2px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 9px;
+  color: #9a9ab0;
+  background: #2a2a48;
+  cursor: text;
+  clip-path: polygon(
+    var(--block) 0, calc(100% - var(--block)) 0, calc(100% - var(--block)) var(--block), 100% var(--block),
+    100% calc(100% - var(--block)), calc(100% - var(--block)) calc(100% - var(--block)),
+    calc(100% - var(--block)) 100%, var(--block) 100%, var(--block) calc(100% - var(--block)),
+    0 calc(100% - var(--block)), 0 var(--block), var(--block) var(--block)
+  );
+}
+
+.element-search-box:hover {
+  background: #30304f;
+}
+
+.element-search-box:focus-within {
+  color: #f4c44a;
+  background: #343458;
+}
+
+.element-search-box svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
+.element-search {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  color: #e8e8f0;
+  background: none;
+  border: 0;
+  outline: none;
+  appearance: none;
+}
+
+.element-search::-webkit-search-decoration,
+.element-search::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.element-search::placeholder {
+  color: #9a9ab0;
+  opacity: 1;
+}
+
+/* Filter toggles: a row of bare icons; a pressed one sits on a lit block with a bar under it. */
+.element-toggles {
+  display: flex;
+  gap: 2px;
+}
+
+.element-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0;
+  color: #8a8aa4;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.element-toggle:hover {
+  color: #e8e8f0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.element-toggle[aria-pressed='true'] {
+  color: #f4c44a;
+  background: rgba(244, 196, 74, 0.1);
+  border-bottom-color: #f4c44a;
+}
+
+.element-toggle:focus-visible {
+  outline: 2px solid #f4c44a;
+  outline-offset: -2px;
+}
+
+.element-list {
+  max-height: min(420px, calc(100vh - 170px));
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.element-list .picker-option[hidden] {
+  display: none;
+}
+
+.element-empty {
+  margin: 0;
+  padding: 6px 10px 8px;
+  font-size: 13px;
+  color: #9a9ab0;
+}
+
+.element-empty[hidden] {
+  display: none;
+}
+
 /* Brush picker panel (shape + radius + density) */
 .brush-dropdown {
   min-width: 200px;
