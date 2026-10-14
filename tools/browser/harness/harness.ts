@@ -62,7 +62,7 @@ const fake = {
 } as unknown as GpuSimulation;
 
 function draw(): void {
-  ctx.fillStyle = '#1a1a2e';
+  ctx.fillStyle = '#0d2a1f';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (const s of stamped) {
     for (let j = 0; j < s.h; j++) {

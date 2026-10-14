@@ -14,7 +14,7 @@ export const SETTINGS = {
   /** Header height in CSS pixels; the canvas fills the viewport below it. */
   HEADER_HEIGHT: 48,
   /** Canvas background; shows through transparent (air) pixels. */
-  CANVAS_BACKGROUND: '#1a1a2e',
+  CANVAS_BACKGROUND: '#0d2a1f',
 
   SAND_TYPE: 1,
   DIRT_TYPE: 2,

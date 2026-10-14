@@ -466,7 +466,7 @@ export class Grid {
     const pw = c.w * scale;
     const ph = c.h * scale;
     const raw = Buffer.alloc((pw * 4 + 1) * ph);
-    const bg: [number, number, number] = [26, 26, 46];
+    const bg: [number, number, number] = [13, 42, 31];
     for (let py = 0; py < ph; py++) {
       raw[py * (pw * 4 + 1)] = 0;
       for (let px = 0; px < pw; px++) {

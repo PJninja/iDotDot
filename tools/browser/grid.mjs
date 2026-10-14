@@ -58,7 +58,7 @@ export function readGridSummary(page, { scale = 0 } = {}) {
     canvas.width = world.width * imageScale;
     canvas.height = world.height * imageScale;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1a1a2e';
+    ctx.fillStyle = '#0d2a1f';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     for (let i = 0; i < grid.length; i++) {
       const word = grid[i];

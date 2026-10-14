@@ -13,7 +13,7 @@ import type { ProjectFilter } from './project-filter';
 import { hashString, ringCells, seededRandom } from './tile-art';
 
 const CHIP_FILL_MIX = 0.2;
-const BACKGROUND: [number, number, number] = [26, 26, 46];
+const BACKGROUND: [number, number, number] = [13, 42, 31];
 
 interface Slot {
   element: HTMLButtonElement;
