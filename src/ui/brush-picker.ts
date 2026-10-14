@@ -14,6 +14,10 @@ const CIRCLE_ICON =
 const SQUARE_ICON =
   '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">' +
   '<rect x="1.5" y="1.5" width="11" height="11" rx="1"/></svg>';
+/** Check mark shown on the Display brush toggle while it is on. */
+const CHECK_ICON =
+  '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M2.5 7.5 L5.5 10.5 L11.5 3.5"/></svg>';
 
 export const BRUSH_MIN_RADIUS = 1;
 export const BRUSH_MAX_RADIUS = 50;
@@ -22,13 +26,16 @@ export const BRUSH_MAX_DENSITY = 1;
 
 /**
  * Header brush picker: an icon button that opens a panel to choose the
- * placement brush shape (circle or square), its radius and its density. Unlike the
+ * placement brush shape (circle or square), its radius and its density, and
+ * whether the brush outline follows the pointer. Unlike the
  * element picker, the panel stays open while adjusting (so you can pick a
  * shape and then a radius); it closes on Escape or an outside click.
  */
 export class BrushPicker {
   /** Called when the brush shape, radius or density (0..1) changes. */
   onChange: ((shape: BrushShape, radius: number, density: number) => void) | null = null;
+  /** Called when the Display brush toggle changes. */
+  onDisplayChange: ((display: boolean) => void) | null = null;
 
   private readonly root: HTMLDivElement;
   private readonly button: HTMLButtonElement;
@@ -41,8 +48,11 @@ export class BrushPicker {
   private readonly densityValue: HTMLSpanElement;
   private selectedRadius: number;
   private selectedDensity: number;
+  private readonly displayOption: HTMLDivElement;
+  private displayBrush: boolean;
 
-  constructor(initialShape: BrushShape, initialRadius: number, initialDensity: number) {
+  constructor(initialShape: BrushShape, initialRadius: number, initialDensity: number, initialDisplay: boolean) {
+    this.displayBrush = initialDisplay;
     this.selectedShape = initialShape;
     this.selectedRadius = initialRadius;
     this.selectedDensity = initialDensity;
@@ -128,6 +138,30 @@ export class BrushPicker {
     densitySection.appendChild(this.densityInput);
     this.dropdown.appendChild(densitySection);
 
+    // Display toggle.
+    const displaySection = document.createElement('div');
+    displaySection.className = 'brush-section';
+    this.displayOption = document.createElement('div');
+    this.displayOption.className = 'brush-shape-option brush-display-option';
+    this.displayOption.setAttribute('role', 'switch');
+    this.displayOption.tabIndex = 0;
+    const displayIcon = document.createElement('span');
+    displayIcon.className = 'brush-shape-icon brush-display-check';
+    displayIcon.innerHTML = CHECK_ICON;
+    const displayLabel = document.createElement('span');
+    displayLabel.textContent = 'Display brush';
+    this.displayOption.appendChild(displayIcon);
+    this.displayOption.appendChild(displayLabel);
+    this.displayOption.addEventListener('click', () => this.setDisplay(!this.displayBrush));
+    this.displayOption.addEventListener('keydown', (e) => {
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      e.preventDefault();
+      this.setDisplay(!this.displayBrush);
+    });
+    this.updateDisplayToggle();
+    displaySection.appendChild(this.displayOption);
+    this.dropdown.appendChild(displaySection);
+
     this.root.appendChild(this.button);
     this.root.appendChild(this.dropdown);
 
@@ -159,6 +193,10 @@ export class BrushPicker {
 
   get density(): number {
     return this.selectedDensity;
+  }
+
+  get display(): boolean {
+    return this.displayBrush;
   }
 
   private createShapeOption(shape: BrushShape): HTMLDivElement {
@@ -208,6 +246,16 @@ export class BrushPicker {
     const percent = Math.round(this.selectedDensity * 100);
     this.densityValue.textContent = `${percent}%`;
     this.densityInput.value = String(percent);
+  }
+
+  private setDisplay(display: boolean): void {
+    this.displayBrush = display;
+    this.updateDisplayToggle();
+    this.onDisplayChange?.(display);
+  }
+
+  private updateDisplayToggle(): void {
+    this.displayOption.setAttribute('aria-checked', String(this.displayBrush));
   }
 
   private toggle(): void {

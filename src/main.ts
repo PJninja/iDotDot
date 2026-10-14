@@ -8,6 +8,7 @@ import { Overlay } from './ui/overlay';
 import { applyHeaderHeight, headerHeight } from './ui/frame';
 import { ElementPicker } from './ui/picker';
 import { BrushPicker } from './ui/brush-picker';
+import { BrushGhost } from './ui/brush-ghost';
 import { PerfHud } from './ui/perf-hud';
 import { loadPreferences, savePreferences } from './ui/preferences';
 import { SettingsMenu } from './ui/settings-menu';
@@ -122,12 +123,17 @@ async function main(): Promise<void> {
     density: prefs.brushDensity,
     type: SETTINGS.SAND_TYPE,
   };
-  const brushPicker = new BrushPicker(brush.shape, brush.radius, brush.density);
+  const brushPicker = new BrushPicker(brush.shape, brush.radius, brush.density, prefs.displayBrush);
   brushPicker.onChange = (shape, radius, density) => {
     brush.shape = shape;
     brush.radius = radius;
     brush.density = density;
     savePreferences({ brushShape: shape, brushRadius: radius, brushDensity: density });
+    updateGhost();
+  };
+  brushPicker.onDisplayChange = (display) => {
+    savePreferences({ displayBrush: display });
+    updateGhost();
   };
 
   // Element picker: selects which element the brush paints.
@@ -155,6 +161,18 @@ async function main(): Promise<void> {
   const pointerGrid = (): [number, number] =>
     world.cellAt(pointerX, pointerY - headerHeight());
 
+  // Display brush: the outline follows a hovering mouse or pen over the world (touch has no hover).
+  const ghost = new BrushGhost();
+  let hovering = false;
+  const updateGhost = (): void => {
+    if (!brushPicker.display || !hovering || plainForSize) {
+      ghost.hide();
+      return;
+    }
+    const [gx, gy] = pointerGrid();
+    ghost.show(gx, gy, brush.shape, brush.radius, world.tileSize, headerHeight() + world.originY);
+  };
+
   world.onDeviceLost = (reason) => {
     world.stop();
     showGpuErrorDialog(`device lost: ${reason}`);
@@ -167,6 +185,7 @@ async function main(): Promise<void> {
     savePreferences({ tileSize: cssPx });
     rebuildWorld();
     [lastGX, lastGY] = pointerGrid();
+    updateGhost();
   };
 
   const resizeWorld = (): void => {
@@ -179,6 +198,7 @@ async function main(): Promise<void> {
     world.resize(window.innerWidth, window.innerHeight - headerHeight());
     rebuildWorld();
     [lastGX, lastGY] = pointerGrid();
+    updateGhost();
   };
 
   new ContactMenu(headerLinks, null);
@@ -226,9 +246,16 @@ async function main(): Promise<void> {
     [lastGX, lastGY] = pointerGrid();
   });
   window.addEventListener('pointermove', (e) => {
-    if (!painting) return;
-    pointerX = e.clientX;
-    pointerY = e.clientY;
+    hovering = e.pointerType !== 'touch' && e.clientY >= headerHeight() && (painting || !isUiTarget(e));
+    if (painting || hovering) {
+      pointerX = e.clientX;
+      pointerY = e.clientY;
+    }
+    updateGhost();
+  });
+  document.documentElement.addEventListener('pointerleave', () => {
+    hovering = false;
+    updateGhost();
   });
   window.addEventListener('pointerup', () => {
     painting = false;

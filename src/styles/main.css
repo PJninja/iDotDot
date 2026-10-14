@@ -201,6 +201,25 @@ body {
   color: rgba(232, 232, 240, 0.8);
 }
 
+.brush-display-check {
+  outline: 1.5px solid rgba(232, 232, 240, 0.45);
+  outline-offset: -1px;
+}
+
+.brush-display-option[aria-checked='false'] .brush-display-check svg {
+  visibility: hidden;
+}
+
+/* Outline of the brush under the pointer (Display brush). Above the canvas, under the chips. */
+.brush-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
 .brush-radius-input {
   width: 100%;
   height: 16px;
