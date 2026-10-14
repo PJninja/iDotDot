@@ -1,11 +1,13 @@
 /**
  * Builds the default worlds in src/worlds/*.idw from the scene scripts in tools/worlds/.
- * Usage: node tools/make-worlds.ts [--preview <dir>] [name ...]
+ * Usage: node tools/make-worlds.ts [--preview <dir> [--wide <cells>]] [name ...]
+ * `--wide` also renders each big world on a grid that many cells wide, to look at its wings.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HIDDEN_TYPES, TYPE_NAMES, type Grid } from './world-kit.ts';
+import { fitWorld } from '../src/engine/world-file.ts';
+import { Grid, HIDDEN_TYPES, TYPE_NAMES } from './world-kit.ts';
 import { buildAlchemistLab } from './worlds/alchemist-lab.ts';
 import { buildFarmstead } from './worlds/farmstead.ts';
 import { buildDeathMachine } from './worlds/death-machine.ts';
@@ -44,6 +46,13 @@ for (const [name, build] of Object.entries(WORLDS)) {
   if (previewDir !== null) {
     mkdirSync(previewDir, { recursive: true });
     writeFileSync(join(previewDir, `${name}.png`), grid.png(2));
+    const wide = flag('--wide');
+    if (wide !== null && !name.endsWith('-mobile')) {
+      const cells = Number(wide);
+      const fitted = new Grid(0, cells, grid.height);
+      fitted.cells.set(fitWorld({ width: grid.width, height: grid.height, tileCss: 4, cells: grid.cells, wings: true }, cells, grid.height, 4));
+      writeFileSync(join(previewDir, `${name}-wide.png`), fitted.png(2));
+    }
     const crop = flag('--crop');
     if (crop !== null) {
       const [x, y, w, h] = crop.split(',').map(Number);

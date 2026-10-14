@@ -7,6 +7,8 @@
  * Header, little-endian: magic "IDW1", width u16, height u16, tile size in CSS px f32,
  * 4 reserved bytes. Type ids are stable constants (settings.ts); never renumber them.
  */
+import { extendWings } from './world-wings.ts';
+
 export interface WorldSnapshot {
   width: number;
   height: number;
@@ -14,6 +16,8 @@ export interface WorldSnapshot {
   tileCss: number;
   /** Packed grid words, row-major (y * width + x). */
   cells: Uint32Array;
+  /** Continue the ground sideways when the grid is wider than the world (set for the bundled worlds only, never saved). */
+  wings?: boolean;
 }
 
 const MAGIC = 0x31574449; // "IDW1" read as a little-endian u32
@@ -142,7 +146,7 @@ export function worldPlacement(
 /**
  * Fit a saved world onto a grid of the given size and tile size: resample to the target
  * tile size, then anchor it bottom-center (`worldPlacement`), cropping what overflows and
- * leaving air where it falls short.
+ * leaving air where it falls short, or ground wings (`extendWings`) for a world that asks for them.
  */
 export function fitWorld(world: WorldSnapshot, width: number, height: number, tileCss: number): Uint32Array {
   const { scale, dx, dy } = worldPlacement(world, width, height, tileCss);
@@ -156,5 +160,6 @@ export function fitWorld(world: WorldSnapshot, width: number, height: number, ti
     if (sx1 <= sx0) break;
     fitted.set(source.cells.subarray(sy * source.width + sx0, sy * source.width + sx1), y * width + sx0 + dx);
   }
+  if (world.wings === true) extendWings(fitted, width, height, dx, source.width, tileCss);
   return fitted;
 }

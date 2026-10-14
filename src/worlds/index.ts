@@ -38,7 +38,8 @@ async function load(index: number): Promise<WorldSnapshot | null> {
   try {
     const response = await fetch(preset.url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await decodeWorld(await response.arrayBuffer());
+    const world = await decodeWorld(await response.arrayBuffer());
+    return preset.mobile ? world : { ...world, wings: true };
   } catch (err) {
     console.warn(`[world] could not load "${preset.name}":`, err);
     return null;
