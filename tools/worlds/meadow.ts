@@ -55,19 +55,70 @@ function terrain(g: Grid, bare: (x: number) => boolean): void {
   }
 }
 
-/** A tree: trunk, a branch platform, a grass crown no steeper than it can hold (it narrows a cell per row), and roots spreading into the soil. */
-function tree(g: Grid, x: number, h: number): void {
+/** One clump of a crown: an ellipse of leaves with a ragged edge. */
+function leafClump(g: Grid, cx: number, cy: number, rx: number, ry: number): void {
+  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
+    for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+      const d = ((x - cx) / (rx + 0.5)) ** 2 + ((y - cy) / (ry + 0.5)) ** 2;
+      if (d <= 0.65 || (d <= 1 && g.rand() < 0.5)) g.setIfAir(x, y, T.LEAVES);
+    }
+  }
+}
+
+/**
+ * A tree: a bark trunk flaring at its foot, branches forking into a crown of leaf clumps (both
+ * static, so the crown needs nothing under it), and bark roots spreading into the soil. The
+ * crown is shaded light at the top left to dark underneath. `lean` (-1..1) tilts the crown to
+ * one side.
+ */
+function tree(g: Grid, x: number, h: number, spread: number, lean: number): void {
   const top = surface(x);
-  g.rect(x - 1, top - h, 3, h + 2, T.WOOD);
-  g.rect(x - 11, top - h - 1, 23, 2, T.WOOD);
-  for (let k = 0; k < 8; k++) g.rect(x - 10 + k, top - h - 2 - k, 21 - 2 * k, 1, T.GRASS);
-  g.line(x, top - h + 6, x - 6, top - h + 1, T.WOOD, 1);
-  g.line(x, top - h + 8, x + 6, top - h + 2, T.WOOD, 1);
+  const fork = top - h;
+  const grain = shades(T.BARK);
+  const columnShade = (cx: number): number => grain[(cx * 7 + 3) % grain.length];
+  for (let y = fork; y < top + 2; y++) {
+    const f = (y - fork) / (top + 2 - fork);
+    const half = f > 0.86 ? 3 : f > 0.4 ? 2 : 1;
+    for (let dx = -half; dx <= half; dx++) {
+      g.set(x + dx, y, T.BARK, { variant: g.rand() < 0.12 ? grain[0] : columnShade(x + dx) });
+    }
+  }
+
+  const cx = x + Math.round(lean * 4);
+  const crownTop = fork - 2 * Math.round(spread * 0.55);
+  const clumps: [number, number, number, number][] = [
+    [cx, crownTop + 7, Math.round(spread * 0.6), 7],
+    [cx - Math.round(spread * 0.55), fork - 7, Math.round(spread * 0.5), 6],
+    [cx + Math.round(spread * 0.55), fork - 8, Math.round(spread * 0.5), 6],
+    [cx - Math.round(spread * 0.2), fork - 2, Math.round(spread * 0.45), 4],
+    [cx + Math.round(spread * 0.3), fork - 1, Math.round(spread * 0.4), 4],
+  ];
+  for (const [ex, ey, rx, ry] of clumps) leafClump(g, ex, ey, rx, ry);
+
+  // branches over the leaves, from the fork about halfway to each clump, so they vanish into the crown
+  for (const [ex, ey] of clumps.slice(0, 3)) {
+    g.line(x, fork + 3, x + (ex - x) * 0.45, fork + (ey - fork) * 0.45, T.BARK, 2, { variant: grain[0] });
+  }
+  for (const [ex, ey] of clumps.slice(3)) {
+    g.line(x, fork + 1, x + (ex - x) * 0.8, fork + (ey - fork) * 0.8, T.BARK, 1, { variant: grain[1] });
+  }
+
+  const leafShades = shades(T.LEAVES);
+  const bottom = fork + 6;
+  for (let y = crownTop - 1; y <= bottom; y++) {
+    for (let lx = cx - spread - 2; lx <= cx + spread + 2; lx++) {
+      if (g.typeAt(lx, y) !== T.LEAVES) continue;
+      const light = 1 - (y - crownTop) / (bottom - crownTop) - 0.25 * (lx - cx) / spread + 0.35 * (g.rand() - 0.5);
+      const k = Math.max(0, Math.min(leafShades.length - 1, Math.round(light * (leafShades.length - 1))));
+      g.set(lx, y, T.LEAVES, { variant: leafShades[k] });
+    }
+  }
+
   for (const dir of [-1, -0.5, 0, 0.5, 1]) {
     let rx = x;
     for (let y = top + 2; y < top + 16 + Math.floor(g.rand() * 12); y++) {
       if (g.rand() < 0.6) rx += Math.sign(dir) * (g.rand() < Math.abs(dir) ? 1 : 0);
-      if (g.typeAt(rx, y) === T.DIRT) g.set(rx, y, T.WOOD);
+      if (g.typeAt(rx, y) === T.DIRT) g.set(rx, y, T.BARK, { variant: columnShade(rx) });
     }
   }
 }
@@ -340,8 +391,8 @@ export function buildMeadow(): Grid {
   buriedLog(g);
   bog(g);
   lake(g);
-  tree(g, 237, 22);
-  tree(g, 404, 26);
+  tree(g, 237, 14, 17, -0.5);
+  tree(g, 404, 16, 19, 0.5);
   rootNetwork(g, 200, 440);
   warren(g);
   rabbit(g, 196, surface(200), RABBIT);
