@@ -9,6 +9,8 @@ import { Charcoal } from './charcoal';
 import { CharredBark } from './charred-bark';
 import { CoolingSteel } from './cooling-steel';
 import { Copper } from './copper';
+import { Debris } from './debris';
+import { Scorch } from './scorch';
 import { Dirt } from './dirt';
 import { Ember } from './ember';
 import { Explosion } from './explosion';
@@ -99,6 +101,8 @@ export function createElementRegistry(): ElementRegistry {
   registry.register(new SpentCopper());
   registry.register(new Bark());
   registry.register(new CharredBark());
+  registry.register(new Debris());
+  registry.register(new Scorch());
   registry.register(new Leaves());
   registry.register(new PoweredTorch());
   registry.register(new LitTorchA());

@@ -17,6 +17,7 @@ export class Stone extends Element {
   static STONE_COLOR_VARIANCE = 12;
 
   readonly blastResistance = 0.9;
+readonly fragmentType = SETTINGS.RUBBLE_TYPE;
 
   private readonly variantColors: [number, number, number][];
 

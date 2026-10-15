@@ -34,6 +34,7 @@ export class Wood extends Element {
   static MOLD_CHANCE = 0.0012;
   readonly flammable = true;
   readonly blastResistance = 0.3;
+readonly fragmentType = SETTINGS.CHARCOAL_TYPE;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.FLAME_IGNITE_CHANCE },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EMBER_TYPE, chance: Wood.EMBER_IGNITE_CHANCE },

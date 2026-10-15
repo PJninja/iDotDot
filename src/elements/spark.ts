@@ -27,6 +27,7 @@ export class Spark extends Element {
   static AGE_RATE = 6;
 
   readonly ageRate = Spark.AGE_RATE;
+readonly glow = 0.7;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.WATER_TYPE, becomes: SETTINGS.AIR_TYPE, chance: 1 },
   ];

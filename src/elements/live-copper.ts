@@ -19,6 +19,7 @@ export class LiveCopper extends Element {
   static AGE_RATE = 8;
 
   readonly ageRate = LiveCopper.AGE_RATE;
+readonly glow = 0.25;
   readonly agedInto = [{ type: SETTINGS.SPENT_COPPER_TYPE, chance: 1 }];
   readonly blastResistance = 0.95;
 

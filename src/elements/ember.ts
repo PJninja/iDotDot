@@ -41,6 +41,7 @@ export class Ember extends Element {
   readonly slideChance = Ember.SLIDE_CHANCE;
   readonly cohesion = Ember.COHESION;
   readonly ageRate = Ember.AGE_RATE;
+readonly glow = 0.5;
   readonly agedInto = [
     { type: SETTINGS.CHARCOAL_TYPE, chance: Ember.CHARCOAL_CHANCE },
     { type: SETTINGS.ASH_TYPE, chance: Ember.ASH_CHANCE },

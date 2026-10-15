@@ -37,6 +37,7 @@ export class Flame extends Element {
 
   readonly riseSpeed = Flame.RISE_SPEED;
   readonly ageRate = Flame.AGE_RATE;
+readonly glow = 0.6;
   readonly fuelFed = true;
   readonly agedInto = [
     { type: SETTINGS.SMOKE_TYPE, chance: Flame.SMOKE_CHANCE },

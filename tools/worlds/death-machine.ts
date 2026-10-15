@@ -75,7 +75,6 @@ function skullTower(g: Grid): void {
   g.air(331, S - 30, 14, 22);
   g.gear(311, S - 20, 6, 8, T.STEEL, 4);
   g.gear(338, S - 20, 6, 8, T.STEEL, 4);
-  for (const [bx, by] of [[308, S - 29], [308, S - 11], [339, S - 29], [339, S - 11]]) g.rect(bx, by, 3, 3, T.BOMB);
   for (const [rx, ry] of [[312, S - 14], [334, S - 22]]) g.set(rx, ry, T.COOLING_STEEL, { age: 20 });
   // cranium and jaw
   g.brickPoly(ellipsePoints(cx, 66, 40, 34), T.STONE, 8, 4);
@@ -313,13 +312,14 @@ function teslaCoil(g: Grid): void {
 }
 
 /**
- * Pocket 5's detonator, in pocket-local coordinates: a generator in a stone vault at the crane
- * rail's left end powers the crane's steel (rail, rope and hook, which touches the hanging bomb),
- * and a copper line down the left wall reaches the first bomb on the conveyor, clear of the gear beside it.
+ * Pocket 5's detonator, in pocket-local coordinates: a stone vault at the crane rail's left end
+ * feeds the crane's steel (rail, rope and hook, which touches the hanging bomb), and a copper line
+ * down the left wall reaches the first bomb on the conveyor, clear of the gear beside it. The vault
+ * is empty: a bomb's blast reaches about 50 cells, and every bomb here is within that of the board
+ * (through 3 cells of rock into pocket 4's magazine), so nothing sets them off by itself.
  */
 function bombLineWiring(g: Grid): void {
   g.rect(0, 9, 4, 7, T.STONE);
-  g.rect(1, 11, 2, 2, T.GENERATOR);
   g.rect(3, 11, 1, 3, T.COPPER);
   g.rect(3, 14, 1, 69, T.COPPER);
   g.rect(4, 82, 6, 1, T.COPPER);
@@ -346,17 +346,6 @@ const teslaCircuit: Circuit = {
   sources: { x: 130, y: 151, w: 4, h: 4 },
   bounds: [{ x: 118, y: 108, w: 22, h: 52 }],
   loads: [{ name: 'terminal', at: { x: 132, y: 112, w: 1, h: 1 } }],
-};
-
-const bombLineCircuit: Circuit = {
-  name: 'bomb line detonator',
-  sources: inPocket(3, { x: 0, y: 9, w: 4, h: 7 }),
-  bounds: [inPocket(3, { x: 0, y: 9, w: 70, h: 80 })],
-  loads: [
-    { name: 'crane hook', at: inPocket(3, { x: 10, y: 49, w: 8, h: 1 }) },
-    { name: 'conveyor bomb wire', at: inPocket(3, { x: 9, y: 82, w: 1, h: 1 }) },
-  ],
-  ignites: [inPocket(3, { x: 8, y: 48, w: 12, h: 8 }), inPocket(3, { x: 9, y: 81, w: 6, h: 6 })],
 };
 
 export function buildDeathMachine(): Grid {
@@ -391,6 +380,6 @@ export function buildDeathMachine(): Grid {
   skullWiring(g);
   teslaCoil(g);
   g.at(POCKETS[3].x, POCKETS[3].y, () => bombLineWiring(g));
-  finishBoard(g, 'death-machine', [skullCircuit, teslaCircuit, bombLineCircuit]);
+  finishBoard(g, 'death-machine', [skullCircuit, teslaCircuit]);
   return g;
 }

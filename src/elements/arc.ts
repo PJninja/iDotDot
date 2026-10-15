@@ -19,6 +19,7 @@ export class Arc extends Element {
   static AGE_RATE = 32;
 
   readonly ageRate = Arc.AGE_RATE;
+readonly glow = 0.9;
 
   private readonly ramp = buildGradient([
     { at: 0, color: [255, 255, 255] },

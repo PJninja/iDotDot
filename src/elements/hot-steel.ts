@@ -22,6 +22,7 @@ export class HotSteel extends Element {
   static QUENCH_CHANCE = 0.15;
 
   readonly ageRate = HotSteel.AGE_RATE;
+readonly glow = 0.35;
   readonly agedInto = [{ type: SETTINGS.COOLING_STEEL_TYPE, chance: 1 }];
   readonly blastResistance = 0.98;
   readonly reactions: readonly Reaction[] = [

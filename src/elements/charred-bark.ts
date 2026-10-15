@@ -30,6 +30,7 @@ export class CharredBark extends Element {
     { type: SETTINGS.ASH_TYPE, chance: CharredBark.ASH_CHANCE },
   ];
   readonly blastResistance = 0.15;
+readonly fragmentType = SETTINGS.CHARCOAL_TYPE;
 
   private readonly ramp = buildGradient([
     { at: 0, color: [196, 70, 30] },

@@ -4,9 +4,12 @@ import { SETTINGS } from '../settings';
 
 /**
  * Bomb (type 13) - a static solid with no physics that explodes when heated: touching
- * a flame, ember or spark, or any explosion tile. Reaction results start at age 0 and
- * spent reach 0, so a bomb set off by a blast restarts the blast at full size from its
- * own cell; piles of bombs (even touching ones) chain into one bigger explosion.
+ * a flame, ember or spark, or any explosion tile. Its blast has BLAST_POWER, about 50
+ * cells of reach in air: enough to crater rock, throw debris and light up a cave.
+ * Reaction results start at age 0 and spent reach 0, so a bomb set off by a blast
+ * restarts the blast at full size from its own cell; piles of bombs (even touching
+ * ones) chain into one bigger explosion. A blast does not eat a bomb it has not set
+ * off (blastHit skips explosives), it keeps rolling CHAIN_CHANCE while it touches it.
  * Flammable, so flames hold under it and sparks stick to it long enough to set it off.
  *
  * Variants shift the base color by up to ±BOMB_COLOR_VARIANCE per channel
@@ -21,6 +24,11 @@ export class Bomb extends Element {
   static BOMB_VARIANT_COUNT = 4;
   static BOMB_COLOR_VARIANCE = 10;
 
+  /** Size of its blast (see Element.blastPower): about BLAST_POWER * 20 cells of reach in air. */
+  static BLAST_POWER = 2.5;
+
+  /** Chance per step that a bomb touching an explosion tile explodes. Below 1 the chain runs slower than the blasts spread (a certain chain moves 1.4 cells a step along a diagonal, faster than a blast front, and the blasts draw a square corner) and each hop is random, so a line of bombs burns as a rolling blob instead. */
+  static CHAIN_CHANCE = 0.4;
   /** Chance per step that a bomb touching a flame explodes. */
   static FLAME_CHANCE = 0.05;
   /** Chance per step that a bomb touching an ember explodes. */
@@ -36,8 +44,9 @@ export class Bomb extends Element {
   static LIVE_STEEL_CHANCE = 0.1;
 
   readonly flammable = true;
+  readonly blastPower = Bomb.BLAST_POWER;
   readonly reactions: readonly Reaction[] = [
-    { with: SETTINGS.EXPLOSION_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: 1 },
+    { with: SETTINGS.EXPLOSION_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.CHAIN_CHANCE },
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.FLAME_CHANCE },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.EMBER_CHANCE },
     { with: SETTINGS.SPARK_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Bomb.SPARK_CHANCE },

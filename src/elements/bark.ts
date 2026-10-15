@@ -37,6 +37,7 @@ export class Bark extends Element {
 
   readonly flammable = true;
   readonly blastResistance = 0.35;
+readonly fragmentType = SETTINGS.CHARCOAL_TYPE;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.CHARRED_BARK_TYPE, chance: Bark.FLAME_CHAR_CHANCE },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.CHARRED_BARK_TYPE, chance: Bark.EMBER_CHAR_CHANCE },

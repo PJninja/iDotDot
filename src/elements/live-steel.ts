@@ -24,6 +24,7 @@ export class LiveSteel extends Element {
   static ARC_CHANCE = 0.01;
 
   readonly ageRate = LiveSteel.AGE_RATE;
+readonly glow = 0.3;
   readonly agedInto = [
     { type: SETTINGS.SPENT_STEEL_TYPE, chance: 1 - LiveSteel.OVERLOAD_CHANCE },
     { type: SETTINGS.HOT_STEEL_TYPE, chance: LiveSteel.OVERLOAD_CHANCE },

@@ -45,6 +45,12 @@ export const MAX_REACTIONS = 256;
 /** Largest reaction radius; within one chunk so a change in range always wakes the reacting chunk. */
 export const MAX_REACTION_RADIUS = 8;
 
+/** Element.fragmentType for a type a blast destroys instead of throwing (255 is never a registered type). */
+export const NO_FRAGMENT = 255;
+
+/** Largest Element.blastPower: explosion tiles store it as power * 16 in their variant byte. */
+export const MAX_BLAST_POWER = 255 / 16;
+
 /**
  * One instance per element TYPE (not per tile). Elements are display and
  * tuning metadata only: per-tile behavior runs on the GPU in the compute
@@ -164,6 +170,34 @@ export abstract class Element {
    */
   readonly blastResistance: number = 0;
 
+  /**
+   * Explosives only: the size of the blast this element sets off when a reaction turns it
+   * into an explosion (0 = not an explosive, 1 = the base reach). The blast spends its reach
+   * that many times slower, so it grows that many times wider in air and in the ground,
+   * burns that much longer and breaks resistant tiles more easily.
+   */
+  readonly blastPower: number = 0;
+
+  /**
+   * What a tile of this element lands as after a blast throws it (see Debris), or null for
+   * the default: the element itself for falling elements and liquids that do not age, and
+   * not throwable (destroyed in place) for everything else. NO_FRAGMENT opts a type out.
+   */
+  readonly fragmentType: number | null = null;
+
+  /**
+   * 0..1: how strongly a tile of this element lights its surroundings (the blast light
+   * pass, tinted by the tile's own color, so an aging type's light fades with its ramp).
+   */
+  readonly glow: number = 0;
+
+  /** Type a thrown tile lands as, NO_FRAGMENT when the element cannot be thrown. */
+  get thrownAs(): number {
+    if (this.fragmentType !== null) return this.fragmentType;
+    const loose = this.gravityQuantum > 0 || this.phase === 'liquid';
+    return loose && this.ageRate === 0 ? this.type : NO_FRAGMENT;
+  }
+
   /** One-sided reactions this element undergoes (see Reaction). */
   readonly reactions: readonly Reaction[] = [];
 }
@@ -215,6 +249,15 @@ export class ElementRegistry {
     }
     if (!(element.blastResistance >= 0 && element.blastResistance < 1)) {
       throw new Error(`Blast resistance of "${element.name}" must be in [0, 1), got ${element.blastResistance}`);
+    }
+    if (!(element.blastPower === 0 || (element.blastPower >= 1 / 16 && element.blastPower <= MAX_BLAST_POWER))) {
+      throw new Error(`Blast power of "${element.name}" must be 0 or in [1/16, ${MAX_BLAST_POWER}], got ${element.blastPower}`);
+    }
+    if (!Number.isInteger(element.thrownAs) || element.thrownAs < 0 || element.thrownAs > 255) {
+      throw new Error(`fragmentType of "${element.name}" is an invalid type ${element.thrownAs}`);
+    }
+    if (!(element.glow >= 0 && element.glow <= 1)) {
+      throw new Error(`Glow of "${element.name}" must be in [0, 1], got ${element.glow}`);
     }
     for (const r of element.reactions) {
       for (const t of [r.with, r.becomes]) {

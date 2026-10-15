@@ -27,6 +27,8 @@ export class Methane extends Element {
   static DISSIPATION_CHANCE = 0.0003;
   /** Chance per step that a tile touching a flame detonates instead of just catching fire. */
   static DETONATE_CHANCE = 0.004;
+  /** Size of a detonation (see Element.blastPower): smaller than a bomb, but every tile that detonates restarts it. */
+  static BLAST_POWER = 1;
   /** Chance per step that a tile touching a flame catches fire. */
   static FLAME_IGNITE_CHANCE = 0.5;
   /** Chance per step that a tile touching an ember catches fire. */
@@ -53,6 +55,7 @@ export class Methane extends Element {
 
   readonly riseSpeed = Methane.RISE_SPEED;
   readonly dissipationChance = Methane.DISSIPATION_CHANCE;
+  readonly blastPower = Methane.BLAST_POWER;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.EXPLOSION_TYPE, chance: Methane.DETONATE_CHANCE },
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Methane.FLAME_IGNITE_CHANCE },

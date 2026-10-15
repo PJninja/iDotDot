@@ -1,6 +1,6 @@
 # Elements
 
-All 51 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
+All 53 registered elements, generated from the element registry (`src/elements/index.ts`) by `npm run elements`. Type ids are stable: never renumber them, or saved `.idw` worlds corrupt. Air is type 0.
 
 ## Properties
 
@@ -15,61 +15,64 @@ How to read the columns:
 - **Age rate**: age steps per sim step (age runs 0 to 255, so the mean life is about 256 / rate steps).
 - **Ages into**: outcomes once the age passes 255, rolled in order.
 - **Emits**: an empty cell beside or above this element pulls in that tile at the chance per step, without using the emitter up.
-- **Blast resist.**: chance per step a tile holds against an adjacent explosion.
+- **Blast resist.**: chance per step a tile holds against an adjacent explosion, raised to the blast's power times `Explosion.SHATTER`.
+- **Flags**: `blast power` is the size of the blast an explosive sets off (1 is about 20 cells of reach in air), `glow` how strongly a tile lights its surroundings, `thrown` that a blast's outer part throws the tile as debris that lands as itself (or as the named type).
 
 | Type | Element | Kind | In picker | Color | Density | Fall (cells/step) | Slide | Cohesion | Rise | Dissipates | Drawn as | Age rate | Ages into | Emits | Blast resist. | Flags |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 | Air | static | yes | `#000000` |  |  |  |  |  |  | tiles |  |  |  |  |  |
-| 1 | Sand | powder | yes | `#c2b280` | 1.5 | 3 | 1 |  |  |  | tiles |  |  |  | 0.2 |  |
-| 2 | Dirt | powder | yes | `#866043` | 1.5 | 4 | 0.25 |  |  |  | tiles |  |  |  | 0.35 |  |
-| 3 | Wood | static | yes | `#8b5a36` |  |  |  |  |  |  | tiles |  |  |  | 0.3 | flammable |
+| 1 | Sand | powder | yes | `#c2b280` | 1.5 | 3 | 1 |  |  |  | tiles |  |  |  | 0.2 | thrown |
+| 2 | Dirt | powder | yes | `#866043` | 1.5 | 4 | 0.25 |  |  |  | tiles |  |  |  | 0.35 | thrown |
+| 3 | Wood | static | yes | `#8b5a36` |  |  |  |  |  |  | tiles |  |  |  | 0.3 | flammable, thrown as Charcoal |
 | 4 | Smoke | gas | yes | `#96969e` | 0.2 |  |  |  | 0.35 | 0.2% | smoke |  |  |  |  |  |
-| 5 | Water | liquid | yes | `#3478c8` | 1 |  |  |  |  |  | water |  |  |  | 0.75 |  |
+| 5 | Water | liquid | yes | `#3478c8` | 1 |  |  |  |  |  | water |  |  |  | 0.75 | thrown |
 | 6 | Steam | gas | yes | `#eef2f8` | 0.1 |  |  |  | 0.5 | 0.06% | steam |  |  |  |  |  |
-| 7 | Wet Sand | powder | hidden | `#968458` | 1.8 | 3 | 0.3 | 0.85 |  |  | tiles |  |  |  | 0.5 |  |
-| 8 | Mud | powder | hidden | `#5c402c` | 1.8 | 4 | 0.15 | 0.9 |  |  | tiles |  |  |  | 0.5 |  |
-| 9 | Ember | powder | hidden | `#f06e1e` | 1.5 | 1.5 | 0.4 | 0.8 |  |  | tiles | 0.4 | Charcoal 10%, Ash 25%, else gone | Flame 0.6% | 0.3 | holds on flammable |
-| 10 | Flame | gas | yes | `#ffa028` | 0.25 |  |  |  | 0.8 |  | tiles | 8 | Smoke 80%, Spark 3%, else gone |  |  | fuel fed |
-| 11 | Spark | gas | hidden | `#ffe078` | 0.3 |  |  |  | 0 |  | tiles | 6 | gone |  |  |  |
-| 12 | Explosion | static | hidden | `#ffbe46` |  |  |  |  |  |  | tiles | 12 | Smoke 25%, Flame 3%, Spark 2%, Rubble 6%, else gone |  |  |  |
-| 13 | Bomb | static | yes | `#3e3e48` |  |  |  |  |  |  | tiles |  |  |  |  | flammable |
-| 14 | Charcoal | powder | yes | `#262428` | 1.5 | 3 | 0.3 |  |  |  | tiles |  |  |  | 0.2 | flammable |
-| 15 | Stone | static | yes | `#767470` |  |  |  |  |  |  | tiles |  |  |  | 0.9 |  |
-| 16 | Grass | powder | yes | `#4a8e34` | 1.5 | 3 | 0.08 |  |  |  | tiles |  |  |  | 0.1 | flammable |
-| 17 | Steel | static | yes | `#9ea8b6` |  |  |  |  |  |  | tiles |  |  |  | 0.98 |  |
-| 18 | Hot Steel | static | hidden | `#ff963c` |  |  |  |  |  |  | tiles | 0.6 | Cooling Steel 100% |  | 0.98 |  |
+| 7 | Wet Sand | powder | hidden | `#968458` | 1.8 | 3 | 0.3 | 0.85 |  |  | tiles |  |  |  | 0.5 | thrown |
+| 8 | Mud | powder | hidden | `#5c402c` | 1.8 | 4 | 0.15 | 0.9 |  |  | tiles |  |  |  | 0.5 | thrown |
+| 9 | Ember | powder | hidden | `#f06e1e` | 1.5 | 1.5 | 0.4 | 0.8 |  |  | tiles | 0.4 | Charcoal 10%, Ash 25%, else gone | Flame 0.6% | 0.3 | holds on flammable, glow 0.5 |
+| 10 | Flame | gas | yes | `#ffa028` | 0.25 |  |  |  | 0.8 |  | tiles | 8 | Smoke 80%, Spark 3%, else gone |  |  | fuel fed, glow 0.6 |
+| 11 | Spark | gas | hidden | `#ffe078` | 0.3 |  |  |  | 0 |  | tiles | 6 | gone |  |  | glow 0.7 |
+| 12 | Explosion | static | hidden | `#ffbe46` |  |  |  |  |  |  | tiles | 20 | Scorch 100% |  |  | glow 1 |
+| 13 | Bomb | static | yes | `#3e3e48` |  |  |  |  |  |  | tiles |  |  |  |  | flammable, blast power 2.5 |
+| 14 | Charcoal | powder | yes | `#262428` | 1.5 | 3 | 0.3 |  |  |  | tiles |  |  |  | 0.2 | flammable, thrown |
+| 15 | Stone | static | yes | `#767470` |  |  |  |  |  |  | tiles |  |  |  | 0.9 | thrown as Rubble |
+| 16 | Grass | powder | yes | `#4a8e34` | 1.5 | 3 | 0.08 |  |  |  | tiles |  |  |  | 0.1 | flammable, thrown |
+| 17 | Steel | static | yes | `#9ea8b6` |  |  |  |  |  |  | tiles |  |  |  | 0.98 | thrown as Rubble |
+| 18 | Hot Steel | static | hidden | `#ff963c` |  |  |  |  |  |  | tiles | 0.6 | Cooling Steel 100% |  | 0.98 | glow 0.35 |
 | 19 | Cooling Steel | static | hidden | `#963c28` |  |  |  |  |  |  | tiles | 0.4 | Steel 100% |  | 0.98 |  |
-| 20 | Acid | liquid | yes | `#8cd630` | 1.2 |  |  |  |  |  | tiles |  |  |  | 0.75 |  |
-| 21 | Ice | static | yes | `#b0e0f8` |  |  |  |  |  |  | tiles |  |  |  | 0.2 |  |
-| 22 | Methane | gas | yes | `#bcd668` | 0.08 |  |  |  | 0.6 | 0.03% | methane |  |  |  |  |  |
+| 20 | Acid | liquid | yes | `#8cd630` | 1.2 |  |  |  |  |  | tiles |  |  |  | 0.75 | thrown |
+| 21 | Ice | static | yes | `#b0e0f8` |  |  |  |  |  |  | tiles |  |  |  | 0.2 | thrown as Water |
+| 22 | Methane | gas | yes | `#bcd668` | 0.08 |  |  |  | 0.6 | 0.03% | methane |  |  |  |  | blast power 1 |
 | 23 | Mold | static | yes | `#60a88c` |  |  |  |  |  |  | tiles | 0.12 | Dirt 100% |  | 0.1 | flammable |
-| 24 | Ash | powder | yes | `#949296` | 1.3 | 2 | 0.7 |  |  |  | tiles |  |  |  | 0.05 |  |
-| 25 | Rubble | powder | yes | `#706862` | 1.8 | 3 | 0.2 |  |  |  | tiles |  |  |  | 0.4 |  |
+| 24 | Ash | powder | yes | `#949296` | 1.3 | 2 | 0.7 |  |  |  | tiles |  |  |  | 0.05 | thrown |
+| 25 | Rubble | powder | yes | `#706862` | 1.8 | 3 | 0.2 |  |  |  | tiles |  |  |  | 0.4 | thrown |
 | 26 | Spring | static | yes | `#4a84c4` |  |  |  |  |  |  | tiles |  |  | Water 12% (also below) | 0.9 |  |
 | 27 | Torch | static | yes | `#c4702c` |  |  |  |  |  |  | tiles |  |  | Flame 5% | 0.3 |  |
-| 28 | Live Steel | static | hidden | `#96cdff` |  |  |  |  |  |  | tiles | 8 | Spent Steel 100%, Hot Steel 0.05% | Arc 1% (also below) | 0.98 |  |
+| 28 | Live Steel | static | hidden | `#96cdff` |  |  |  |  |  |  | tiles | 8 | Spent Steel 100%, Hot Steel 0.05% | Arc 1% (also below) | 0.98 | glow 0.3 |
 | 29 | Spent Steel | static | hidden | `#4a5e86` |  |  |  |  |  |  | tiles | 4 | Steel 100% |  | 0.98 |  |
-| 30 | Arc | static | hidden | `#c8e6ff` |  |  |  |  |  |  | tiles | 32 | gone |  |  |  |
+| 30 | Arc | static | hidden | `#c8e6ff` |  |  |  |  |  |  | tiles | 32 | gone |  |  | glow 0.9 |
 | 31 | Generator | static | yes | `#5c6aa8` |  |  |  |  |  |  | tiles |  |  | Arc 0.2% (also below) | 0.5 |  |
 | 32 | Shocked Water | static | hidden | `#c8ecff` |  |  |  |  |  |  | water | 16 | Numb Water 100% |  | 0.75 |  |
 | 33 | Numb Water | static | hidden | `#3a78c4` |  |  |  |  |  |  | water | 10 | Water 100% |  | 0.75 |  |
 | 34 | Fuse | static | yes | `#bea470` |  |  |  |  |  |  | tiles |  |  |  | 0.3 |  |
 | 35 | Live Fuse | static | hidden | `#ffd696` |  |  |  |  |  |  | tiles | 12 | gone |  | 0.3 |  |
 | 36 | Rubber | static | yes | `#42303a` |  |  |  |  |  |  | tiles |  |  |  | 0.3 | flammable |
-| 37 | Copper | static | yes | `#b8683e` |  |  |  |  |  |  | tiles |  |  |  | 0.95 |  |
-| 38 | Live Copper | static | hidden | `#ffe2be` |  |  |  |  |  |  | tiles | 8 | Spent Copper 100% |  | 0.95 |  |
+| 37 | Copper | static | yes | `#b8683e` |  |  |  |  |  |  | tiles |  |  |  | 0.95 | thrown as Rubble |
+| 38 | Live Copper | static | hidden | `#ffe2be` |  |  |  |  |  |  | tiles | 8 | Spent Copper 100% |  | 0.95 | glow 0.25 |
 | 39 | Spent Copper | static | hidden | `#704232` |  |  |  |  |  |  | tiles | 3 | Copper 100% |  | 0.95 |  |
-| 40 | Bark | static | yes | `#684c38` |  |  |  |  |  |  | tiles |  |  |  | 0.35 | flammable |
-| 41 | Charred Bark | static | hidden | `#281e1c` |  |  |  |  |  |  | tiles | 0.4 | Ember 45%, Charcoal 30%, Ash 15%, else gone |  | 0.15 |  |
-| 42 | Leaves | static | yes | `#387a30` |  |  |  |  |  |  | tiles |  |  |  | 0.05 | flammable |
+| 40 | Bark | static | yes | `#684c38` |  |  |  |  |  |  | tiles |  |  |  | 0.35 | flammable, thrown as Charcoal |
+| 41 | Charred Bark | static | hidden | `#281e1c` |  |  |  |  |  |  | tiles | 0.4 | Ember 45%, Charcoal 30%, Ash 15%, else gone |  | 0.15 | thrown as Charcoal |
+| 42 | Leaves | static | yes | `#387a30` |  |  |  |  |  |  | tiles |  |  |  | 0.05 | flammable, thrown as Ash |
 | 43 | Powered Torch | static | yes | `#625248` |  |  |  |  |  |  | tiles |  |  |  | 0.3 |  |
 | 44 | Lit Torch | static | hidden | `#e28a38` |  |  |  |  |  |  | tiles | 1 | Powered Torch 100% | Flame 5% | 0.3 |  |
 | 45 | Lit Torch | static | hidden | `#e28a38` |  |  |  |  |  |  | tiles | 1 | Powered Torch 100% | Flame 5% | 0.3 |  |
 | 46 | Powered Spring | static | yes | `#485a70` |  |  |  |  |  |  | tiles |  |  |  | 0.9 |  |
 | 47 | Live Spring | static | hidden | `#6cbeff` |  |  |  |  |  |  | tiles | 1 | Powered Spring 100% | Water 12% (also below) | 0.9 |  |
 | 48 | Live Spring | static | hidden | `#6cbeff` |  |  |  |  |  |  | tiles | 1 | Powered Spring 100% | Water 12% (also below) | 0.9 |  |
-| 49 | Oil | liquid | yes | `#16110c` | 0.8 |  |  |  |  |  | tiles |  |  |  | 0.1 | flammable |
+| 49 | Oil | liquid | yes | `#16110c` | 0.8 |  |  |  |  |  | tiles |  |  |  | 0.1 | flammable, thrown |
 | 50 | Void | static | yes | `#10081a` |  |  |  |  |  |  | tiles |  |  |  | 0.99 |  |
+| 51 | Debris | static | hidden | `#706862` |  |  |  |  |  |  | tiles |  |  |  |  |  |
+| 52 | Scorch | static | hidden | `#5a281e` |  |  |  |  |  |  | tiles | 20 | Smoke 40%, Flame 3%, else gone |  |  |  |
 
 ## Reactions
 
@@ -114,7 +117,7 @@ How to read the columns:
 | Ember | Water | Air (vanishes) | 30% |  |  |
 | Flame | Water | Air (vanishes) | 80% |  |  |
 | Spark | Water | Air (vanishes) | 100% |  |  |
-| Bomb | Explosion | Explosion | 100% |  |  |
+| Bomb | Explosion | Explosion | 40% |  |  |
 | Bomb | Flame | Explosion | 5% |  |  |
 | Bomb | Ember | Explosion | 3% |  |  |
 | Bomb | Spark | Explosion | 30% |  |  |

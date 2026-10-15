@@ -1,7 +1,7 @@
 import { computeGridGeometry } from '../grid-geometry';
 import { SETTINGS } from '../../settings';
 import type { ColliderManager } from '../collider';
-import { MAX_OUTCOMES, MAX_REACTIONS, type ElementRegistry } from '../element';
+import { MAX_OUTCOMES, MAX_REACTIONS, NO_FRAGMENT, type ElementRegistry } from '../element';
 import { fitWorld, type WorldSnapshot } from '../world-file';
 import {
   CHUNK_SIZE,
@@ -9,6 +9,8 @@ import {
   COMPUTE_WGSL,
   HAZE_NONE,
   HAZE_WGSL,
+  LIGHT_SCALE,
+  LIGHT_WGSL,
   PAINT_WGSL,
   PHASE_CODES,
   REACTION_BYTES,
@@ -17,6 +19,7 @@ import {
   STATS_WGSL,
   TYPE_INFO_BYTES,
   BLAST_RESIST_SHIFT,
+  GLOW_SHIFT,
   FLAG_CONSUMED,
   FLAG_FLAMMABLE,
   FLAG_HOLDS_ON_FLAMMABLE,
@@ -154,6 +157,10 @@ export class GpuSimulation {
   private readonly hazeLayout: GPUBindGroupLayout;
   private readonly hazeHPipeline: GPUComputePipeline;
   private readonly hazeVPipeline: GPUComputePipeline;
+  private readonly lightLayout: GPUBindGroupLayout;
+  private readonly lightEmitPipeline: GPUComputePipeline;
+  private readonly lightHPipeline: GPUComputePipeline;
+  private readonly lightVPipeline: GPUComputePipeline;
   private readonly paintPipeline: GPUComputePipeline;
   private readonly statsPipeline: GPUComputePipeline;
   private readonly statsBuf: GPUBuffer;
@@ -172,6 +179,11 @@ export class GpuSimulation {
   private solidBuf: GPUBuffer | null = null;
   /** Haze (vec4f per cell, one channel per haze group): [0] = horizontal blur scratch, [1] = final blurred occupancy read by the render shader. */
   private hazeBufs: [GPUBuffer, GPUBuffer] | null = null;
+  /**
+   * Light from glowing tiles (vec4f per LIGHT_SCALE x LIGHT_SCALE block, rgb): [0] = emission,
+   * [1] = final light read by the render shader, [2] = horizontal blur scratch.
+   */
+  private lightBufs: [GPUBuffer, GPUBuffer, GPUBuffer] | null = null;
   /** Per chunk: steps left awake (0 = asleep). */
   private awakeBuf: GPUBuffer | null = null;
   /** Per chunk: changed (or asked to wake) during the current step. */
@@ -182,6 +194,7 @@ export class GpuSimulation {
   private argsBuf: GPUBuffer | null = null;
   private chunkCount = 0;
   private hazeBindGroups: [GPUBindGroup, GPUBindGroup] | null = null;
+  private lightBindGroups: [GPUBindGroup, GPUBindGroup] | null = null;
   private renderBindGroups: [GPUBindGroup, GPUBindGroup] | null = null;
   private computeBindGroups: [GPUBindGroup, GPUBindGroup] | null = null;
   private paintBindGroups: [GPUBindGroup, GPUBindGroup] | null = null;
@@ -302,6 +315,31 @@ export class GpuSimulation {
     this.hazeVPipeline = device.createComputePipeline({
       layout: hazePipelineLayout,
       compute: { module: hazeModule, entryPoint: 'blurV' },
+    });
+
+    this.lightLayout = device.createBindGroupLayout({
+      entries: [
+        storage('uniform', 0),
+        storage('read-only-storage', 1),
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+        storage('storage', 3),
+        storage('storage', 4),
+        storage('storage', 5),
+      ],
+    });
+    const lightModule = device.createShaderModule({ code: LIGHT_WGSL });
+    const lightPipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [this.lightLayout] });
+    this.lightEmitPipeline = device.createComputePipeline({
+      layout: lightPipelineLayout,
+      compute: { module: lightModule, entryPoint: 'lightEmit' },
+    });
+    this.lightHPipeline = device.createComputePipeline({
+      layout: lightPipelineLayout,
+      compute: { module: lightModule, entryPoint: 'lightH' },
+    });
+    this.lightVPipeline = device.createComputePipeline({
+      layout: lightPipelineLayout,
+      compute: { module: lightModule, entryPoint: 'lightV' },
     });
 
     this.paintPipeline = device.createComputePipeline({
@@ -426,6 +464,8 @@ export class GpuSimulation {
     this.claimBuf = storage(bytes);
     this.solidBuf = storage(bytes, GPUBufferUsage.COPY_DST);
     this.hazeBufs = [storage(bytes * 4), storage(bytes * 4)];
+    const lightBytes = Math.ceil(this.width / LIGHT_SCALE) * Math.ceil(this.height / LIGHT_SCALE) * 16;
+    this.lightBufs = [storage(lightBytes), storage(lightBytes), storage(lightBytes)];
 
     this.chunkCount =
       Math.ceil(this.width / CHUNK_SIZE) * Math.ceil(this.height / CHUNK_SIZE);
@@ -452,6 +492,7 @@ export class GpuSimulation {
     this.renderBindGroups = [this.makeRenderBindGroup(0), this.makeRenderBindGroup(1)];
     this.computeBindGroups = [this.makeComputeBindGroup(0), this.makeComputeBindGroup(1)];
     this.hazeBindGroups = [this.makeHazeBindGroup(0), this.makeHazeBindGroup(1)];
+    this.lightBindGroups = [this.makeLightBindGroup(0), this.makeLightBindGroup(1)];
     this.paintBindGroups = [this.makePaintBindGroup(0), this.makePaintBindGroup(1)];
     this.chunkBindGroup = this.makeChunkBindGroup();
     this.wake();
@@ -823,15 +864,25 @@ export class GpuSimulation {
     return copy;
   }
 
-  /** Blur haze-drawn occupancy (smoke, water, steam channels) of the current grid into the buffer the render pass samples. */
+  /**
+   * Blur haze-drawn occupancy (smoke, water, steam, methane channels) and the light of
+   * glowing tiles of the current grid into the buffers the render pass samples.
+   */
   private encodeHaze(encoder: GPUCommandEncoder, groupsX: number, groupsY: number): void {
-    if (this.hazeBindGroups === null) return;
+    if (this.hazeBindGroups === null || this.lightBindGroups === null) return;
     const pass = encoder.beginComputePass();
     pass.setBindGroup(0, this.hazeBindGroups[this.current]);
     pass.setPipeline(this.hazeHPipeline);
     pass.dispatchWorkgroups(groupsX, groupsY);
     pass.setPipeline(this.hazeVPipeline);
     pass.dispatchWorkgroups(groupsX, groupsY);
+    const lightX = Math.ceil(this.width / LIGHT_SCALE / WORKGROUP_SIZE);
+    const lightY = Math.ceil(this.height / LIGHT_SCALE / WORKGROUP_SIZE);
+    pass.setBindGroup(0, this.lightBindGroups[this.current]);
+    for (const pipeline of [this.lightEmitPipeline, this.lightHPipeline, this.lightVPipeline]) {
+      pass.setPipeline(pipeline);
+      pass.dispatchWorkgroups(lightX, lightY);
+    }
     pass.end();
   }
 
@@ -867,6 +918,21 @@ export class GpuSimulation {
         { binding: 1, resource: { buffer: this.gridBufs![gridIndex] } },
         { binding: 2, resource: this.colorTex.createView() },
         { binding: 3, resource: { buffer: this.hazeBufs![1] } },
+        { binding: 4, resource: { buffer: this.lightBufs![1] } },
+      ],
+    });
+  }
+
+  private makeLightBindGroup(gridIndex: number): GPUBindGroup {
+    return this.device.createBindGroup({
+      layout: this.lightLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.uniformBuf } },
+        { binding: 1, resource: { buffer: this.gridBufs![gridIndex] } },
+        { binding: 2, resource: this.colorTex.createView() },
+        { binding: 3, resource: { buffer: this.lightBufs![0] } },
+        { binding: 4, resource: { buffer: this.lightBufs![1] } },
+        { binding: 5, resource: { buffer: this.lightBufs![2] } },
       ],
     });
   }
@@ -933,6 +999,7 @@ export class GpuSimulation {
     const sized = [
       ...(this.gridBufs ?? []),
       ...(this.hazeBufs ?? []),
+      ...(this.lightBufs ?? []),
       this.claimBuf,
       this.solidBuf,
       this.awakeBuf,
@@ -943,6 +1010,7 @@ export class GpuSimulation {
     for (const buffer of sized) buffer?.destroy();
     this.gridBufs = null;
     this.hazeBufs = null;
+    this.lightBufs = null;
     this.claimBuf = null;
     this.solidBuf = null;
     this.awakeBuf = null;
@@ -950,6 +1018,7 @@ export class GpuSimulation {
     this.activeListBuf = null;
     this.argsBuf = null;
     this.hazeBindGroups = null;
+    this.lightBindGroups = null;
     this.renderBindGroups = null;
     this.computeBindGroups = null;
     this.paintBindGroups = null;
@@ -974,7 +1043,10 @@ export class GpuSimulation {
     f32.set(this.background, 8);
 
     const typeWords = TYPE_INFO_BYTES / 4;
-    for (let t = 0; t < 256; t++) u32[TYPES_OFFSET_BYTES / 4 + t * typeWords + 2] = HAZE_NONE;
+    for (let t = 0; t < 256; t++) {
+      u32[TYPES_OFFSET_BYTES / 4 + t * typeWords + 2] = HAZE_NONE;
+      u32[TYPES_OFFSET_BYTES / 4 + t * typeWords + 15] = NO_FRAGMENT;
+    }
     const consumedTypes = new Set(
       this.registry.list().flatMap((e) => e.reactions.filter((r) => r.consumes).map((r) => r.with)),
     );
@@ -995,11 +1067,14 @@ export class GpuSimulation {
         | (element.holdsOnFlammable ? FLAG_HOLDS_ON_FLAMMABLE : 0)
         | (element.fuelFed ? FLAG_FUEL_FED : 0)
         | (element.emitBelow ? FLAG_EMITS_BELOW : 0)
-        | (Math.round(element.blastResistance * 255) << BLAST_RESIST_SHIFT);
+        | (Math.round(element.blastResistance * 255) << BLAST_RESIST_SHIFT)
+        | (Math.round(element.glow * 255) << GLOW_SHIFT);
       f32[o + 10] = element.ageRate;
       u32[o + 11] = outcome | (element.agedInto.length << 16);
       u32[o + 12] = element.emitType;
       f32[o + 13] = element.emitChance;
+      f32[o + 14] = element.blastPower;
+      u32[o + 15] = element.thrownAs;
       for (const aged of element.agedInto) {
         const a = (OUTCOMES_OFFSET_BYTES + outcome * OUTCOME_BYTES) / 4;
         u32[a] = aged.type;

@@ -55,6 +55,7 @@ export class Leaves extends Element {
 
   readonly flammable = true;
   readonly blastResistance = 0.05;
+readonly fragmentType = SETTINGS.ASH_TYPE;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.FLAME_TYPE, chance: Leaves.FLAME_IGNITE_CHANCE },
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.ASH_TYPE, chance: Leaves.ASH_CHANCE },

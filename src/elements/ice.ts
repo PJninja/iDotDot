@@ -28,6 +28,7 @@ export class Ice extends Element {
   static ICE_COLOR_VARIANCE = 10;
 
   readonly blastResistance = 0.2;
+readonly fragmentType = SETTINGS.WATER_TYPE;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.WATER_TYPE, chance: Ice.MELT_CHANCE, radius: Ice.HEAT_RADIUS },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.WATER_TYPE, chance: Ice.MELT_CHANCE, radius: Ice.HEAT_RADIUS },

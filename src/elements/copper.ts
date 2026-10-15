@@ -27,6 +27,7 @@ export class Copper extends Element {
   static GENERATOR_CHANCE = 0.002;
 
   readonly blastResistance = 0.95;
+readonly fragmentType = SETTINGS.RUBBLE_TYPE;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.LIVE_COPPER_TYPE, becomes: SETTINGS.LIVE_COPPER_TYPE, chance: Copper.PULSE_CHANCE },
     { with: SETTINGS.LIVE_STEEL_TYPE, becomes: SETTINGS.LIVE_COPPER_TYPE, chance: Copper.PULSE_CHANCE },

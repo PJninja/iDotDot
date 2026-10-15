@@ -41,20 +41,24 @@ const ARC_RECEPTIVE = new Set<number>([...STEEL_FAMILY, ...COPPER_FAMILY, ...WAT
 const isEmitter = (t: number): boolean => STEEL_FAMILY.has(t) || t === T.GENERATOR;
 /** Live steel and live copper light these on contact, and arcs light them too. */
 const FLAMMABLE = new Set<number>([T.WOOD, T.BARK, T.LEAVES, T.GRASS, T.CHARCOAL, T.BOMB, T.METHANE]);
-const EXPLOSIVE = new Set<number>([T.BOMB, T.METHANE]);
+/** Element.blastPower of each explosive (Bomb.BLAST_POWER, Methane.BLAST_POWER): its blast spends reach that many times slower. */
+const BLAST_POWER = new Map<number, number>([[T.BOMB, 2.5], [T.METHANE, 1]]);
+const EXPLOSIVE = new Set<number>(BLAST_POWER.keys());
 
 /**
- * Cells from a blast the board must stay clear of: Explosion.REACH / Explosion.HOP_COST
- * (200 / 10 = 20, the reach in air) plus a margin. Hardcoded because the element classes are
- * not loadable here.
+ * Cells from a blast the board must stay clear of: Explosion.REACH / Explosion.HOP_COST times
+ * the strongest blast power (200 / 10 * 2.5 = 50, a bomb's reach in air) plus a margin.
+ * Hardcoded because the element classes are not loadable here. Thrown debris (Debris) can
+ * land further away; it is loose material, not a pulse or a blast, so it is not modelled.
  */
-const BLAST_CLEARANCE = 22;
+const BLAST_CLEARANCE = 52;
 /**
  * A blast's reach and what it spends per cell, as in the shader's blastSource / blastHit
  * (Explosion.REACH, HOP_COST, DIAGONAL_COST, SOLID_COST and ABSORB): air and gases cost the
- * hop, any other tile the hop plus SOLID_COST plus its blastResistance times ABSORB.
+ * hop, any other tile the hop plus SOLID_COST plus its blastResistance times ABSORB, all
+ * divided by the blast's power. Costs are kept in 1/scale units of reach for the bucket queue.
  */
-const BLAST = { reach: 200, hop: 10, diagonal: 14, solid: 15, absorb: 20 };
+const BLAST = { reach: 200, hop: 10, diagonal: 14, solid: 6, absorb: 12, scale: 8 };
 /** Element.blastResistance of every type that has one (the rest have 0). */
 const BLAST_RESISTANCE = new Map<number, number>([
   [T.ACID, 0.75], [T.ASH, 0.05], [T.BARK, 0.35], [T.CHARCOAL, 0.2], [T.CHARRED_BARK, 0.15], [T.COOLING_STEEL, 0.98], [T.COPPER, 0.95], [T.DIRT, 0.35],
@@ -142,12 +146,12 @@ function ignitions(g: Grid, powered: Set<number>): Set<number> {
 /** Gases, which a blast crosses like air. */
 const GASES = new Set<number>([T.SMOKE, T.STEAM, T.METHANE, T.FLAME, T.SPARK]);
 
-/** Reach a blast spends entering a cell of type t (Infinity off the grid). */
-function blastCost(t: number, diagonal: boolean): number {
+/** Reach (in 1/BLAST.scale units) a blast of `power` spends entering a cell of type t (Infinity off the grid). */
+function blastCost(t: number, diagonal: boolean, power: number): number {
   if (t < 0) return Infinity;
   const hop = diagonal ? BLAST.diagonal : BLAST.hop;
   const solid = t === T.AIR || GASES.has(t) ? 0 : BLAST.solid;
-  return hop + solid + Math.floor((BLAST_RESISTANCE.get(t) ?? 0) * BLAST.absorb);
+  return Math.max(1, Math.round((hop + solid + Math.floor((BLAST_RESISTANCE.get(t) ?? 0) * BLAST.absorb)) * BLAST.scale / power));
 }
 
 /**
@@ -158,13 +162,17 @@ function blastCost(t: number, diagonal: boolean): number {
  */
 function blastClosure(g: Grid, seeds: Set<number>): Set<number> {
   const burning = new Set<number>();
-  // Cheapest spent reach found per cell, and a bucket queue of cells by spent reach.
+  // Cheapest spent reach found per cell with the power of the blast that got there, and a
+  // bucket queue of cells by spent reach.
+  const reachLimit = BLAST.reach * BLAST.scale;
   const spent = new Map<number, number>();
-  const buckets: number[][] = Array.from({ length: BLAST.reach + 1 }, () => []);
+  const power = new Map<number, number>();
+  const buckets: number[][] = Array.from({ length: reachLimit + 1 }, () => []);
   let restart = Infinity;
-  const reachCell = (k: number, cost: number): void => {
-    if (cost > BLAST.reach || cost >= (spent.get(k) ?? Infinity)) return;
+  const reachCell = (k: number, cost: number, p: number): void => {
+    if (cost > reachLimit || cost >= (spent.get(k) ?? Infinity)) return;
     spent.set(k, cost);
+    power.set(k, p);
     buckets[cost].push(k);
     restart = Math.min(restart, cost);
   };
@@ -172,23 +180,24 @@ function blastClosure(g: Grid, seeds: Set<number>): Set<number> {
     const k = key(x, y);
     if (burning.has(k) || !EXPLOSIVE.has(g.typeAt(x, y))) return;
     burning.add(k);
-    reachCell(k, 0);
+    reachCell(k, 0, BLAST_POWER.get(g.typeAt(x, y)) as number);
     if (g.typeAt(x, y) !== T.METHANE) return;
     for (const [dx, dy] of NEIGHBORS) if (g.typeAt(x + dx, y + dy) === T.METHANE) ignite(x + dx, y + dy);
   };
   for (const k of seeds) ignite(...unkey(k));
-  for (let cost = 0; cost <= BLAST.reach; cost++) {
+  for (let cost = 0; cost <= reachLimit; cost++) {
     restart = Infinity;
     const bucket = buckets[cost];
     while (bucket.length > 0) {
       const k = bucket.pop() as number;
       if (spent.get(k) !== cost) continue;
       const [x, y] = unkey(k);
+      const p = power.get(k) as number;
       for (const [dx, dy] of NEIGHBORS) {
-        const next = cost + blastCost(g.typeAt(x + dx, y + dy), dx !== 0 && dy !== 0);
-        if (next > BLAST.reach) continue;
+        const next = cost + blastCost(g.typeAt(x + dx, y + dy), dx !== 0 && dy !== 0, p);
+        if (next > reachLimit) continue;
         ignite(x + dx, y + dy);
-        reachCell(key(x + dx, y + dy), next);
+        reachCell(key(x + dx, y + dy), next, p);
       }
     }
     // A new origin starts at 0, below the bucket just emptied: go back for it.

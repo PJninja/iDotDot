@@ -35,6 +35,7 @@ export class Steel extends Element {
   static GENERATOR_CHANCE = 0.002;
 
   readonly blastResistance = 0.98;
+readonly fragmentType = SETTINGS.RUBBLE_TYPE;
   readonly reactions: readonly Reaction[] = [
     { with: SETTINGS.FLAME_TYPE, becomes: SETTINGS.HOT_STEEL_TYPE, chance: Steel.FLAME_HEAT_CHANCE },
     { with: SETTINGS.EMBER_TYPE, becomes: SETTINGS.HOT_STEEL_TYPE, chance: Steel.EMBER_HEAT_CHANCE },

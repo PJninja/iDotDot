@@ -66,6 +66,8 @@ export const SETTINGS = {
   LIT_SPRING_B_TYPE: 48,
   OIL_TYPE: 49,
   VOID_TYPE: 50,
+  DEBRIS_TYPE: 51,
+  SCORCH_TYPE: 52,
 
   /**
    * Initial wind strength on the X axis, -1 (left) to +1 (right), 0 = none.
@@ -97,6 +99,18 @@ export const SETTINGS = {
    * moves that have not fired yet). Must be at least 2.
    */
   CHUNK_KEEPALIVE_STEPS: 30,
+
+  /**
+   * Light from glowing tiles (explosions, fire, arcs; Element.glow): blurred over this many
+   * tiles each side, so a blast lights the walls around it and the air glows.
+   */
+  LIGHT_RADIUS: 16,
+  /** Brightness of the light added over the picture. */
+  LIGHT_GAIN: 1.1,
+  /** Extra light on tiles in proportion to their own color, so lit surfaces stand out from the lit air. */
+  LIGHT_SURFACE: 1.5,
+  /** Weight of each sim step's new light (0..1); high, so a blast flashes and fades quickly. */
+  LIGHT_TEMPORAL: 0.35,
 
   /** Air must be 0: GPU buffers zero-initialize, so empty = air. */
   AIR_TYPE: 0,

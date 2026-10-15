@@ -10,6 +10,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const out = fileURLToPath(new URL('../elements.md', import.meta.url));
 const HAZE_NAMES = ['smoke', 'water', 'steam', 'methane'];
 const AIR_TYPE = 0;
+const NO_FRAGMENT = 255;
 
 const server = await createServer({
   root,
@@ -45,8 +46,11 @@ function render(elements) {
     const isGas = e.phase === 'gas';
     const falls = e.gravityQuantum > 0;
     const kind = e.phase === 'solid' ? (falls ? 'powder' : 'static') : e.phase;
-    const flags = [e.flammable && 'flammable', e.holdsOnFlammable && 'holds on flammable', e.fuelFed && 'fuel fed']
-      .filter(Boolean).join(', ');
+    const thrown = e.thrownAs === e.type ? 'thrown' : e.thrownAs !== NO_FRAGMENT && `thrown as ${nameOf(e.thrownAs)}`;
+    const flags = [
+      e.flammable && 'flammable', e.holdsOnFlammable && 'holds on flammable', e.fuelFed && 'fuel fed',
+      e.blastPower > 0 && `blast power ${num(e.blastPower)}`, e.glow > 0 && `glow ${num(e.glow)}`, thrown,
+    ].filter(Boolean).join(', ');
     const outcomes = e.agedInto.length === 0
       ? 'gone'
       : e.agedInto.map((o) => `${nameOf(o.type)} ${percent(o.chance)}`).join(', ')
@@ -97,7 +101,8 @@ How to read the columns:
 - **Age rate**: age steps per sim step (age runs 0 to 255, so the mean life is about 256 / rate steps).
 - **Ages into**: outcomes once the age passes 255, rolled in order.
 - **Emits**: an empty cell beside or above this element pulls in that tile at the chance per step, without using the emitter up.
-- **Blast resist.**: chance per step a tile holds against an adjacent explosion.
+- **Blast resist.**: chance per step a tile holds against an adjacent explosion, raised to the blast's power times \`Explosion.SHATTER\`.
+- **Flags**: \`blast power\` is the size of the blast an explosive sets off (1 is about 20 cells of reach in air), \`glow\` how strongly a tile lights its surroundings, \`thrown\` that a blast's outer part throws the tile as debris that lands as itself (or as the named type).
 
 ${table(['Type', 'Element', 'Kind', 'In picker', 'Color', 'Density', 'Fall (cells/step)', 'Slide', 'Cohesion', 'Rise', 'Dissipates', 'Drawn as', 'Age rate', 'Ages into', 'Emits', 'Blast resist.', 'Flags'], properties)}
 
